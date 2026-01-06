@@ -7,5 +7,5 @@
 7|open|Consider adding description field (pain count: 1)
 8|open|Switch storytime project from beads to knecht
 9|done|Normal task without pipes
-10|open|Fix test flakiness with parallel execution (pain count: 1)
+10|done|Fix test flakiness with parallel execution (pain count: 1)
 11|open|Add command to delete/remove tasks (pain count: 1)

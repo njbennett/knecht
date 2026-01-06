@@ -20,7 +20,8 @@ fn rand_string() -> String {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_nanos();
-    format!("{}", nanos)
+    let thread_id = std::thread::current().id();
+    format!("{}-{:?}", nanos, thread_id)
 }
 
 fn cleanup_temp_dir(path: PathBuf) {
