@@ -18,3 +18,6 @@
 18|open|Update beads2knecht to preserve descriptions [addresses blocker in task-17]
 19|open|Replace bd instructions with knecht in storytime .rules [addresses blocker in task-8]
 20|open|Document how to uninstall/remove beads from storytime [addresses blocker in task-8]
+21|open|Document multiple binaries setup in README (default-run in Cargo.toml)
+22|open|Consider adding test-data/ directory for example files and test fixtures
+23|open|Add test helper functions for common test operations (pain count: 1)
