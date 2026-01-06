@@ -3,5 +3,5 @@
 3|open|Add better error handling with proper Result types
 4|done|Commit .knecht/tasks to git
 5|done|Tag v0.1 release
-6|open|Write .rules file for agent guidance on architecture and design principles (include instructions to fix cargo warnings)
+6|done|Write .rules file for agent guidance on architecture and design principles (include instructions to fix cargo warnings)
 7|open|Consider adding description field (pain count: 1)

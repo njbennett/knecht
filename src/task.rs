@@ -38,20 +38,18 @@ pub fn read_tasks() -> Vec<Task> {
     let reader = BufReader::new(file);
     let mut tasks = Vec::new();
     
-    for line in reader.lines() {
-        if let Ok(line) = line {
-            if line.trim().is_empty() {
-                continue;
-            }
-            
-            let parts: Vec<&str> = line.split('|').collect();
-            if parts.len() >= 3 {
-                tasks.push(Task::new(
-                    parts[0].to_string(),
-                    parts[1].to_string(),
-                    parts[2].to_string(),
-                ));
-            }
+    for line in reader.lines().map_while(Result::ok) {
+        if line.trim().is_empty() {
+            continue;
+        }
+        
+        let parts: Vec<&str> = line.split('|').collect();
+        if parts.len() >= 3 {
+            tasks.push(Task::new(
+                parts[0].to_string(),
+                parts[1].to_string(),
+                parts[2].to_string(),
+            ));
         }
     }
     
