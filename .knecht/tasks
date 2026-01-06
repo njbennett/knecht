@@ -20,7 +20,7 @@
 20|open|Document how to uninstall/remove beads from storytime [addresses blocker in task-8]
 21|open|Document multiple binaries setup in README (default-run in Cargo.toml)
 22|open|Consider adding test-data/ directory for example files and test fixtures
-23|open|Add test helper functions for common test operations (pain count: 2)
+23|open|Add test helper functions for common test operations (pain count: 3)|Specific pain: Testing stdin/stdout binaries (beads2knecht) requires verbose boilerplate repeated in every test - spawning process with Stdio::piped, writing to stdin, waiting for output, converting bytes to strings. Need helper like run_command_with_stdin(binary, input) -> TestResult similar to existing run_command().
 24|done|Test task -d Description here
 25|done|Test with description|This is a detailed description
 26|done|Simple task without description
