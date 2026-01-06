@@ -4,7 +4,7 @@
 4|done|Commit .knecht/tasks to git
 5|done|Tag v0.1 release
 6|done|Write .rules file for agent guidance on architecture and design principles (include instructions to fix cargo warnings)
-7|open|Consider adding description field (pain count: 1)
+7|done|Consider adding description field (pain count: 1)
 8|open|Switch storytime project from beads to knecht
 9|done|Normal task without pipes
 10|done|Fix test flakiness with parallel execution (pain count: 1)
@@ -21,6 +21,6 @@
 21|open|Document multiple binaries setup in README (default-run in Cargo.toml)
 22|open|Consider adding test-data/ directory for example files and test fixtures
 23|open|Add test helper functions for common test operations (pain count: 1)
-24|open|Test task -d Description here
-25|open|Test with description|This is a detailed description
-26|open|Simple task without description
+24|done|Test task -d Description here
+25|done|Test with description|This is a detailed description
+26|done|Simple task without description
