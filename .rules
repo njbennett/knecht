@@ -203,8 +203,11 @@ knecht list          # See what needs doing
 # Work on task-N
 knecht done task-N   # Mark complete
 git add .knecht/tasks src/ tests/
+# IMPORTANT: Confirm with user before committing
 git commit -m "task-N: Description"
 ```
+
+**IMPORTANT**: Always confirm with the user before running `git commit`. Present the changes that will be committed and ask for approval.
 
 We eat our own dog food. Every knecht feature should be tracked IN knecht.
 
@@ -224,6 +227,7 @@ Keep docs practical, current, and concise. Prefer examples over prose.
 - Make test pass with simplest code
 - Track work in knecht itself
 - Fix cargo warnings immediately
+- Confirm with user before committing changes
 - Commit `.knecht/tasks` with code changes
 
 **Never:**
