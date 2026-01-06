@@ -1,8 +1,11 @@
 # knecht
 
-A git-native task tracker so simple you can build and use it in one afternoon.
+A git-native task tracker for giving agents very lightweight memory.
 
 Named after Joseph Knecht from Hermann Hesse's *The Glass Bead Game* - "knecht" means "servant" in German.
+
+This is an experiment in agent-driven coding,
+and a place to practice vibe coding.
 
 ## Philosophy
 
@@ -176,9 +179,9 @@ cargo build --release
 
 ### Contributing
 
-1. Write a failing test first
-2. Make it pass with the simplest code
-3. Use knecht to track your work
+1. Create or pick up a knecht task
+2. Write a failing test
+3. Make it pass with the simplest code
 4. Submit a PR
 
 ## Roadmap
