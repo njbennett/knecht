@@ -1,5 +1,5 @@
 1|open|Refactor: Extract Task struct to its own module
 2|done|Write README with usage examples
 3|open|Add better error handling with proper Result types
-4|open|Commit .knecht/tasks to git
-5|open|Tag v0.1 release
+4|done|Commit .knecht/tasks to git
+5|done|Tag v0.1 release
