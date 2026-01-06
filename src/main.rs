@@ -46,13 +46,26 @@ fn cmd_add(args: &[String]) {
     }
     
     let title = args.join(" ");
-    let task_id = add_task(title);
     
-    println!("Created task-{}", task_id);
+    match add_task(title) {
+        Ok(task_id) => {
+            println!("Created task-{}", task_id);
+        }
+        Err(e) => {
+            eprintln!("Error: {}", e);
+            std::process::exit(1);
+        }
+    }
 }
 
 fn cmd_list() {
-    let tasks = read_tasks();
+    let tasks = match read_tasks() {
+        Ok(tasks) => tasks,
+        Err(e) => {
+            eprintln!("Error reading tasks: {}", e);
+            std::process::exit(1);
+        }
+    };
     
     for task in tasks {
         let checkbox = if task.is_done() { "[x]" } else { "[ ]" };

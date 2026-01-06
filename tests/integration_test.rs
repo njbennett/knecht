@@ -197,3 +197,120 @@ fn rules_file_stays_under_150_directives() {
         directives, MAX_DIRECTIVES
     );
 }
+
+#[test]
+fn list_handles_malformed_task_file() {
+    let temp = setup_temp_dir();
+    run_command(&["init"], &temp);
+    
+    // Write malformed task data
+    let tasks_path = temp.join(".knecht/tasks");
+    fs::write(&tasks_path, "1|open|Good task\nBAD LINE WITHOUT PIPES\n2|open|Another good task\n")
+        .expect("Failed to write test file");
+    
+    // list should handle malformed lines gracefully
+    let result = run_command(&["list"], &temp);
+    assert!(result.success, "list should succeed even with malformed lines");
+    assert!(result.stdout.contains("task-1"), "Should show task-1");
+    assert!(result.stdout.contains("task-2"), "Should show task-2");
+    assert!(result.stdout.contains("Good task"), "Should show good task");
+    assert!(result.stdout.contains("Another good task"), "Should show another good task");
+    
+    cleanup_temp_dir(temp);
+}
+
+#[test]
+fn add_handles_missing_knecht_directory() {
+    let temp = setup_temp_dir();
+    // Don't run init - .knecht directory doesn't exist
+    
+    // add should create the directory or fail gracefully
+    let result = run_command(&["add", "New task"], &temp);
+    
+    // Either it succeeds by creating the directory, or fails with a helpful error
+    if !result.success {
+        assert!(
+            result.stderr.contains("knecht") || result.stderr.contains("directory") || result.stderr.contains("init"),
+            "Error should mention knecht/directory/init, got: {}",
+            result.stderr
+        );
+    } else {
+        // If it succeeds, verify the task was created
+        let list_result = run_command(&["list"], &temp);
+        assert!(list_result.stdout.contains("New task"));
+    }
+    
+    cleanup_temp_dir(temp);
+}
+
+#[test]
+fn done_handles_invalid_task_id_formats() {
+    let temp = setup_temp_dir();
+    run_command(&["init"], &temp);
+    run_command(&["add", "Test task"], &temp);
+    
+    // Test various invalid formats
+    let invalid_ids = vec!["not-a-number", "task-abc", "999999", "task-999999"];
+    
+    for invalid_id in invalid_ids {
+        let result = run_command(&["done", invalid_id], &temp);
+        assert!(
+            !result.success,
+            "done with invalid ID '{}' should fail",
+            invalid_id
+        );
+        assert!(
+            result.stderr.contains("not found") || result.stderr.contains("Error") || result.stderr.contains("Invalid"),
+            "Should have error message for invalid ID '{}', got: {}",
+            invalid_id,
+            result.stderr
+        );
+    }
+    
+    cleanup_temp_dir(temp);
+}
+
+#[test]
+fn list_works_with_empty_tasks_file() {
+    let temp = setup_temp_dir();
+    run_command(&["init"], &temp);
+    
+    // Verify empty file exists
+    let tasks_path = temp.join(".knecht/tasks");
+    assert!(tasks_path.exists());
+    
+    // list should succeed with no tasks
+    let result = run_command(&["list"], &temp);
+    assert!(result.success, "list should succeed with empty file");
+    assert_eq!(result.stdout.trim(), "", "Should show no tasks");
+    
+    cleanup_temp_dir(temp);
+}
+
+#[test]
+fn add_handles_tasks_with_pipe_characters_in_title() {
+    let temp = setup_temp_dir();
+    run_command(&["init"], &temp);
+    
+    // Add task with pipe in title - this is tricky for pipe-delimited format
+    let result = run_command(&["add", "Fix bug in foo|bar function"], &temp);
+    
+    // Should either handle it gracefully or reject it with clear error
+    if result.success {
+        let list = run_command(&["list"], &temp);
+        // Verify the task appears correctly
+        assert!(
+            list.stdout.contains("foo") && list.stdout.contains("bar"),
+            "Task with pipe should be stored/displayed somehow, got: {}",
+            list.stdout
+        );
+    } else {
+        assert!(
+            result.stderr.contains("pipe") || result.stderr.contains("|") || result.stderr.contains("invalid"),
+            "Should explain pipe character issue, got: {}",
+            result.stderr
+        );
+    }
+    
+    cleanup_temp_dir(temp);
+}
