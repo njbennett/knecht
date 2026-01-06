@@ -20,8 +20,13 @@
 20|open|Document how to uninstall/remove beads from storytime [addresses blocker in task-8]
 21|open|Document multiple binaries setup in README (default-run in Cargo.toml)
 22|open|Consider adding test-data/ directory for example files and test fixtures
-23|open|Add test helper functions for common test operations (pain count: 1)
+23|open|Add test helper functions for common test operations (pain count: 2)
 24|done|Test task -d Description here
 25|done|Test with description|This is a detailed description
 26|done|Simple task without description
 27|open|Add refactoring reflection prompt after task completion|When 'knecht done task-N' completes, prompt the agent: 'Did you notice anything new that was difficult about working with the codebase while you did this work? Is there anything in the work you just did that we should refactor? Make a list of the refactoring opportunities. Where you can, use named refactors from Martin Fowler's Refactoring, or Michael Feather's Working Effectively with Legacy Code.'
+28|open|Extract Method: CLI argument parsing in cmd_add|Apply 'Extract Method' refactoring (Fowler) to the manual argument parsing logic in cmd_add(). The while loop that parses -d flags is ~20 lines and will become unwieldy as we add more flags. Extract to parse_add_args() returning a struct with title and description fields. (pain count: 1)
+29|open|Replace Magic String with Symbolic Constant: pipe delimiter|Apply 'Replace Magic Number/String with Symbolic Constant' (Fowler). The pipe delimiter is hardcoded in multiple places (read_tasks, write_tasks, add_task validation). Extract to const DELIMITER: char to make format changes easier and more discoverable. (pain count: 1)
+30|open|Extract Class: TaskSerializer for format parsing/writing|Apply 'Extract Class' (Fowler). The Task struct knows about its file format (split/join on pipes). As format evolves, separate domain model (Task) from serialization concerns. Consider TaskSerializer with parse_line() and format_line() methods. (pain count: 1)
+31|open|Extract Method: Deduplicate pipe character validation|Apply 'Extract Method' (Fowler). The add_task() function validates both title and description for pipe characters with nearly identical code blocks. Extract to validate_no_pipes(text, field_name) function to eliminate duplication. (pain count: 1)
+32|open|Consider using clap or similar for CLI argument parsing|Manual arg parsing works for now but will get complex as we add flags. Consider using clap crate for proper CLI parsing with help text, validation, etc. Defer until manual parsing becomes truly painful - YAGNI applies. (pain count: 1)
