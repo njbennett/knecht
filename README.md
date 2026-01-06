@@ -54,13 +54,14 @@ Initialize knecht in the current directory. Creates `.knecht/tasks`.
 knecht init
 ```
 
-### `knecht add <title>`
+### `knecht add <title> [-d <description>]`
 
-Create a new task with the given title.
+Create a new task with the given title and optional description.
 
 ```bash
 knecht add "Implement payment processing"
 knecht add "Add tests for edge cases"
+knecht add "Refactor auth module" -d "Break down into smaller functions and add better error handling"
 ```
 
 Output: `Created task-1`
@@ -100,9 +101,12 @@ Tasks are stored in `.knecht/tasks` using a simple pipe-delimited format:
 1|open|Fix the login bug
 2|done|Write tests for authentication
 3|open|Deploy to staging
+4|open|Refactor auth module|Break down into smaller functions and add better error handling
 ```
 
-Format: `{id}|{status}|{title}`
+Format: `{id}|{status}|{title}` or `{id}|{status}|{title}|{description}`
+
+The description field is optional - tasks without descriptions use the 3-field format for backwards compatibility.
 
 This format is:
 - **Git-friendly**: Line-based diffs work perfectly
@@ -189,11 +193,11 @@ cargo build --release
 Features will be added based on actual pain points. Possible future additions:
 
 - Filter tasks by status: `knecht list --status open`
+- Show task descriptions: `knecht show task-1`
 - Blocked-by relationships: `knecht add "Deploy" --blocked-by task-3`
 - Ready work detection: `knecht ready`
 - JSON output for agents: `knecht list --json`
 - Story/epic references
-- Task notes/descriptions
 
 But we won't add these until we actually need them.
 

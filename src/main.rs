@@ -41,13 +41,39 @@ fn cmd_init() {
 
 fn cmd_add(args: &[String]) {
     if args.is_empty() {
-        eprintln!("Usage: knecht add <title>");
+        eprintln!("Usage: knecht add <title> [-d <description>]");
         std::process::exit(1);
     }
     
-    let title = args.join(" ");
+    // Parse args to find -d flag
+    let mut title_parts = Vec::new();
+    let mut description = None;
+    let mut i = 0;
     
-    match add_task(title) {
+    while i < args.len() {
+        if args[i] == "-d" {
+            // Next args form the description
+            i += 1;
+            let mut desc_parts = Vec::new();
+            while i < args.len() && args[i] != "-d" {
+                desc_parts.push(args[i].clone());
+                i += 1;
+            }
+            description = Some(desc_parts.join(" "));
+        } else {
+            title_parts.push(args[i].clone());
+            i += 1;
+        }
+    }
+    
+    let title = title_parts.join(" ");
+    
+    if title.is_empty() {
+        eprintln!("Error: Title cannot be empty");
+        std::process::exit(1);
+    }
+    
+    match add_task(title, description) {
         Ok(task_id) => {
             println!("Created task-{}", task_id);
         }

@@ -31,6 +31,7 @@ pub struct Task {
     pub id: String,
     pub status: String,
     pub title: String,
+    pub description: Option<String>,
 }
 
 impl Task {
@@ -64,10 +65,18 @@ pub fn read_tasks() -> Result<Vec<Task>, KnechtError> {
         let parts: Vec<&str> = line.split('|').collect();
         if parts.len() >= 3 {
             // Use unchecked constructor since we're reading existing data
+            // Support both old format (3 fields) and new format (4 fields)
+            let description = if parts.len() >= 4 {
+                Some(parts[3].to_string())
+            } else {
+                None
+            };
+            
             tasks.push(Task {
                 id: parts[0].to_string(),
                 status: parts[1].to_string(),
                 title: parts[2].to_string(),
+                description,
             });
         }
         // Skip malformed lines silently
@@ -83,7 +92,11 @@ pub fn write_tasks(tasks: &[Task]) -> Result<(), KnechtError> {
     let mut file = fs::File::create(".knecht/tasks")?;
     
     for task in tasks {
-        let line = format!("{}|{}|{}\n", task.id, task.status, task.title);
+        let line = if let Some(desc) = &task.description {
+            format!("{}|{}|{}|{}\n", task.id, task.status, task.title, desc)
+        } else {
+            format!("{}|{}|{}\n", task.id, task.status, task.title)
+        };
         file.write_all(line.as_bytes())?;
     }
     
@@ -102,7 +115,7 @@ pub fn get_next_id() -> Result<u32, KnechtError> {
     Ok(max_id + 1)
 }
 
-pub fn add_task(title: String) -> Result<u32, KnechtError> {
+pub fn add_task(title: String, description: Option<String>) -> Result<u32, KnechtError> {
     // Validate title before proceeding
     if title.contains('|') {
         return Err(KnechtError::InvalidCharacter(
@@ -110,8 +123,20 @@ pub fn add_task(title: String) -> Result<u32, KnechtError> {
         ));
     }
     
+    // Validate description if provided
+    if let Some(ref desc) = description
+        && desc.contains('|') {
+            return Err(KnechtError::InvalidCharacter(
+                "Task description cannot contain pipe character '|'".to_string()
+            ));
+        }
+    
     let next_id = get_next_id()?;
-    let line = format!("{}|open|{}\n", next_id, title);
+    let line = if let Some(desc) = description {
+        format!("{}|open|{}|{}\n", next_id, title, desc)
+    } else {
+        format!("{}|open|{}\n", next_id, title)
+    };
     
     // Ensure .knecht directory exists
     fs::create_dir_all(".knecht")?;

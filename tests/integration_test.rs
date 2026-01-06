@@ -289,6 +289,76 @@ fn list_works_with_empty_tasks_file() {
 }
 
 #[test]
+fn add_task_with_description() {
+    let temp = setup_temp_dir();
+    run_command(&["init"], &temp);
+
+    // Add task with description using -d flag
+    let result = run_command(&["add", "Implement feature X", "-d", "This is a longer description of the feature"], &temp);
+    assert!(result.success, "add with description should succeed: {}", result.stderr);
+    assert!(result.stdout.contains("task-1"), "Should create task-1");
+
+    // Verify task file contains description in proper format: id|status|title|description
+    let tasks_content = fs::read_to_string(temp.join(".knecht/tasks"))
+        .expect("Failed to read tasks file");
+    
+    // Expected format: 1|open|Implement feature X|This is a longer description of the feature
+    let lines: Vec<&str> = tasks_content.lines().collect();
+    assert_eq!(lines.len(), 1, "Should have exactly one task");
+    
+    let parts: Vec<&str> = lines[0].split('|').collect();
+    assert_eq!(parts.len(), 4, "Task should have 4 fields: id|status|title|description, got: {}", lines[0]);
+    assert_eq!(parts[0], "1", "ID should be 1");
+    assert_eq!(parts[1], "open", "Status should be open");
+    assert_eq!(parts[2], "Implement feature X", "Title should match");
+    assert_eq!(parts[3], "This is a longer description of the feature", "Description should match");
+
+    // List should work with tasks that have descriptions
+    let list_result = run_command(&["list"], &temp);
+    assert!(list_result.success, "list should work with descriptions");
+    assert!(list_result.stdout.contains("Implement feature X"), "Should show task title");
+
+    cleanup_temp_dir(temp);
+}
+
+#[test]
+fn add_task_without_description_still_works() {
+    let temp = setup_temp_dir();
+    run_command(&["init"], &temp);
+
+    // Add task without description (backwards compatibility)
+    let result = run_command(&["add", "Simple task"], &temp);
+    assert!(result.success, "add without description should still work");
+
+    let list_result = run_command(&["list"], &temp);
+    assert!(list_result.stdout.contains("Simple task"), "Should show task");
+
+    cleanup_temp_dir(temp);
+}
+
+#[test]
+fn read_tasks_with_and_without_descriptions() {
+    let temp = setup_temp_dir();
+    run_command(&["init"], &temp);
+
+    // Create mixed tasks file: some with descriptions, some without
+    let tasks_path = temp.join(".knecht/tasks");
+    fs::write(&tasks_path, "1|open|Old task without description\n2|open|New task|This has a description\n3|done|Another old task\n")
+        .expect("Failed to write test file");
+
+    // list should handle both formats
+    let result = run_command(&["list"], &temp);
+    assert!(result.success, "list should handle mixed format");
+    assert!(result.stdout.contains("task-1"), "Should show task-1");
+    assert!(result.stdout.contains("task-2"), "Should show task-2");
+    assert!(result.stdout.contains("task-3"), "Should show task-3");
+    assert!(result.stdout.contains("Old task without description"), "Should show old format task");
+    assert!(result.stdout.contains("New task"), "Should show new format task");
+
+    cleanup_temp_dir(temp);
+}
+
+#[test]
 fn add_handles_tasks_with_pipe_characters_in_title() {
     let temp = setup_temp_dir();
     run_command(&["init"], &temp);
