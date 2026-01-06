@@ -509,13 +509,15 @@ fn beads2knecht_handles_tasks_with_descriptions() {
 
     assert_eq!(task_lines.len(), 2, "Should convert 2 tasks");
 
-    // Verify tasks are in knecht format (currently descriptions are dropped)
-    assert!(task_lines[0].starts_with("1|open|Task with description"), "First task: {}", task_lines[0]);
-    assert!(task_lines[1].starts_with("2|open|Task without description"), "Second task: {}", task_lines[1]);
+    // Verify tasks are in knecht format with descriptions preserved
+    assert_eq!(task_lines[0], "1|open|Task with description|This is a detailed description", 
+               "First task should have description: {}", task_lines[0]);
+    assert_eq!(task_lines[1], "2|open|Task without description", 
+               "Second task should not have description: {}", task_lines[1]);
 
-    // Verify stderr reports lost descriptions
-    assert!(stderr.contains("Descriptions: 1 tasks had descriptions"), 
-            "stderr should report 1 task with description, got: {}", stderr);
+    // Verify stderr reports descriptions as preserved (not lost)
+    assert!(stderr.contains("PRESERVED INFORMATION") && stderr.contains("Descriptions: 1 tasks had descriptions (preserved)"), 
+            "stderr should report 1 task with preserved description, got: {}", stderr);
 }
 
 #[test]

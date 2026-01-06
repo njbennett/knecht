@@ -15,7 +15,7 @@
 15|done|Write test for beads2knecht migration tool [addresses blocker in task-8]
 16|open|Add README documentation for beads2knecht tool [addresses blocker in task-8]
 17|done|Add description field to knecht format (pain count: 2 - blocker for task-8)
-18|open|Update beads2knecht to preserve descriptions [addresses blocker in task-17]
+18|done|Update beads2knecht to preserve descriptions [addresses blocker in task-17]
 19|open|Replace bd instructions with knecht in storytime .rules [addresses blocker in task-8]
 20|open|Document how to uninstall/remove beads from storytime [addresses blocker in task-8]
 21|open|Document multiple binaries setup in README (default-run in Cargo.toml)

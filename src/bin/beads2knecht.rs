@@ -28,18 +28,12 @@ fn main() {
     println!("# Beads to Knecht Migration");
     println!("# {} tasks found", beads_tasks.len());
     println!("#");
-    println!("# BLOCKERS DISCOVERED:");
-    println!("# 1. Beads has descriptions - knecht v0.1 doesn't");
-    println!("# 2. Beads has priorities (0-4) - knecht doesn't");
-    println!("# 3. Beads has issue_types (bug/task/epic/etc) - knecht doesn't");
-    println!("# 4. Beads has 'in_progress' status - knecht only has open/done");
-    println!("# 5. Beads has alphanumeric IDs - knecht uses sequential numbers");
-    println!("#");
-    println!("# MIGRATION STRATEGY (for this attempt):");
+    println!("# MIGRATION STRATEGY:");
     println!("# - Map beads IDs to sequential numbers (1, 2, 3...)");
     println!("# - Map 'in_progress' -> 'open'");
-    println!("# - DROP: descriptions, priorities, issue_types, timestamps, dependencies");
-    println!("# - Keep only: id, status, title");
+    println!("# - PRESERVE: descriptions (in 4th pipe-delimited field)");
+    println!("# - DROP: priorities, issue_types, timestamps, dependencies");
+    println!("# - Keep: id, status, title, description");
     println!("#");
     
     // Generate knecht tasks file content
@@ -52,15 +46,20 @@ fn main() {
             _ => "open",
         };
         
-        // knecht format: {id}|{status}|{title}
-        println!("{}|{}|{}", knecht_id, knecht_status, task.title);
+        // knecht format: {id}|{status}|{title}|{description} (description optional)
+        if let Some(ref desc) = task.description {
+            println!("{}|{}|{}|{}", knecht_id, knecht_status, task.title, desc);
+        } else {
+            println!("{}|{}|{}", knecht_id, knecht_status, task.title);
+        }
     }
 
     eprintln!("\n=== MIGRATION COMPLETE ===");
     eprintln!("Tasks converted: {}", beads_tasks.len());
-    eprintln!("\nLOST INFORMATION:");
-    eprintln!("- Descriptions: {} tasks had descriptions", 
+    eprintln!("\nPRESERVED INFORMATION:");
+    eprintln!("- Descriptions: {} tasks had descriptions (preserved)", 
         beads_tasks.iter().filter(|t| t.description.is_some()).count());
+    eprintln!("\nLOST INFORMATION:");
     eprintln!("- Priorities: Distribution:");
     for p in 0..=4 {
         let count = beads_tasks.iter().filter(|t| t.priority == p).count();
