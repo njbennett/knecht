@@ -73,18 +73,15 @@ Format: `{id}|{status}|{title}`
 ### Example TDD Cycle
 
 ```bash
-# 1. Write failing test
-# Edit tests/integration_test.rs, add new test
+# 1. Write failing test in tests/integration_test.rs
 cargo test  # Should FAIL
 
-# 2. Implement feature
-# Edit src/main.rs or src/task.rs
+# 2. Implement feature in src/
 cargo test  # Should PASS
 
 # 3. Track completion
 knecht done task-N
-git add .knecht/tasks src/ tests/
-git commit -m "task-N: Description of what you did"
+git commit -m "task-N: Description"
 ```
 
 ## Code Style Guidelines
@@ -92,32 +89,22 @@ git commit -m "task-N: Description of what you did"
 ### Error Handling
 
 **Current state (v0.1)**: Simple `expect()` and `unwrap()` with helpful messages
-**Future state**: When error handling pain is felt, introduce proper `Result<T, E>` types
 
 ```rust
 // Current approach - acceptable for v0.1
 let file = fs::File::open(path)
     .expect("Failed to open tasks file");
 
-// Don't prematurely add complex error handling like this:
-// type Result<T> = std::result::Result<T, KnechtError>;  // YAGNI!
+// Don't prematurely add complex error handling - YAGNI!
 ```
 
-**When to improve error handling**: Track it as a task when you hit actual problems.
+**When to improve**: Track it as a task when you hit actual problems.
 
 ### Function Design
 
 - Keep functions small and focused
 - Prefer pure functions (input → output) when possible
 - Avoid hidden global state
-
-```rust
-// GOOD: Clear inputs and outputs
-pub fn add_task(title: String) -> u32 { ... }
-
-// AVOID: Hidden dependencies make testing hard
-pub fn add_task_to_global() { ... }
-```
 
 ### Module Boundaries
 
@@ -127,14 +114,7 @@ pub fn add_task_to_global() { ... }
 
 **When to extract a new module**: When you feel pain from mixing concerns or file size.
 
-Don't create modules speculatively. Examples of future extractions (only if needed):
-- `file.rs` - if file operations become complex
-- `parser.rs` - if parsing needs format variations
-- `error.rs` - if error types proliferate
-
 ## Cargo Warnings - Fix Immediately
-
-### Check for Warnings
 
 ```bash
 cargo build
@@ -143,160 +123,52 @@ cargo clippy
 
 **Zero tolerance for warnings**. Fix them before committing.
 
-### Common Issues and Fixes
-
-**Unused imports**:
-```rust
-// Remove unused imports immediately
-use std::collections::HashMap;  // If unused, DELETE IT
-```
-
-**Unused variables**:
-```rust
-// Prefix with underscore if intentionally unused
-let _unused = some_value;
-
-// Or better: don't create it if you don't need it
-```
-
-**Non-idiomatic code**:
-```bash
-# Use clippy to find issues
-cargo clippy
-
-# Fix suggestions automatically where safe
-cargo clippy --fix
-```
-
-**Missing documentation**:
-- Public functions should have doc comments
-- Keep them concise and practical
-
-```rust
-/// Creates a new task with the given title and returns its ID.
-pub fn add_task(title: String) -> u32 { ... }
-```
+- Remove unused imports/variables immediately
+- Use `cargo clippy --fix` for auto-fixes
+- Add doc comments to public functions
 
 ## Pain-Driven Feature Development
 
 ### Before Adding ANY Feature, Ask:
 
-1. **Is there a failing test?**
-   - No test = No feature. Period.
+1. **Is there a failing test?** - No test = No feature. Period.
 
 2. **Have I felt actual pain?**
    - "Might need" ≠ pain
    - "Would be nice" ≠ pain
    - "I can't do X and it's blocking me" = pain
 
-3. **Am I tracking this in knecht?**
-   - Use the tool to build the tool
-   - If it's not in `.knecht/tasks`, don't build it
+3. **Am I tracking this in knecht?** - If it's not in `.knecht/tasks`, don't build it
 
-4. **What's simpler?**
-   - Could a shell alias solve this?
-   - Could a 3-line function solve this?
-   - Do I really need a new abstraction?
+4. **What's simpler?** - Could a shell alias or 3-line function solve this?
 
-5. **Can I defer this?**
-   - Almost always: YES
-   - Add a task for later if you think you'll need it
+5. **Can I defer this?** - Almost always: YES
 
-### Features We're Explicitly NOT Building Yet
+### Examples of Deferred Features
 
-Track your pain if you want these, but don't implement without discussion:
+Track your pain count, but don't implement without discussion:
 
-- ❌ Task descriptions/notes (title works fine)
-- ❌ Blocked-by relationships (manual tracking works)
-- ❌ Task priorities (work on what matters)
-- ❌ Due dates (when pain is felt)
-- ❌ Tags/labels (when pain is felt)
-- ❌ Task update command (done + new task works)
-- ❌ JSON output (when needed for agent integration)
-- ❌ Filtering by status (when pain is felt)
-- ❌ Task search (grep works fine)
-- ❌ Multiple task files (one file scales to thousands)
-- ❌ Config files (hardcode sensible defaults)
-- ❌ Color output (basic formatting works)
+- ❌ Task descriptions/notes
+- ❌ Blocked-by relationships  
+- ❌ Priorities, due dates, tags
+- ❌ Task update/search commands
+- ❌ Multiple task files or config files
 
-**Track pain count**:
-```bash
-# If you want feature X, track it:
-knecht add "Consider adding task descriptions (pain count: 1)"
-
-# Each time you feel the pain again, increment the count
-# When count reaches ~3-5, write a test and implement it
-```
-
-## Git Integration
-
-### What to Commit
-
-**Always commit**:
-- `.knecht/tasks` - Track the project's own tasks
-- `src/**` - Source code changes
-- `tests/**` - Test changes
-- `README.md`, `*.md` - Documentation
-
-**Never commit**:
-- `target/` - Build artifacts (in `.gitignore`)
-- Temporary files
-- IDE-specific files (add to `.gitignore` if needed)
-
-### Commit Messages
-
-Format: `task-N: Brief description of what changed`
-
-```bash
-# GOOD
-git commit -m "task-6: Add .rules file for agent guidance"
-git commit -m "task-3: Improve error handling with Result types"
-
-# AVOID
-git commit -m "Fixed stuff"
-git commit -m "WIP"
-```
-
-## Working with knecht's Own Tasks
-
-### Workflow
-
-```bash
-# See what needs doing
-knecht list
-
-# Pick up a task - track it somehow (could add a 'working' status later if needed)
-# For now, just start working
-
-# Complete the task
-knecht done task-N
-
-# Commit everything together
-git add .knecht/tasks src/ tests/
-git commit -m "task-N: Description"
-```
-
-### Self-Hosting Principle
-
-We eat our own dog food. Every knecht feature should be tracked IN knecht.
-
-This validates that knecht is actually useful for its intended purpose.
+When pain count reaches ~3-5 instances, write a test and implement it.
 
 ## Testing Guidelines
 
 ### Integration Tests Over Unit Tests
 
-**Current approach**: Focus on integration tests via CLI
+Focus on integration tests via CLI in `tests/integration_test.rs`:
 - Tests run the actual binary
 - Tests verify end-to-end behavior
-- Tests use temporary directories
+- Tests use temporary directories for isolation
 
 ```rust
 #[test]
 fn test_feature_X() {
     let temp = setup_temp_dir();
-    
-    // Test via CLI, not internal functions
     let result = run_command(&["command", "args"], &temp);
     
     assert!(result.success);
@@ -306,234 +178,59 @@ fn test_feature_X() {
 }
 ```
 
-**Why**: Integration tests catch more real-world issues and are more valuable for a CLI tool.
+**Why**: Integration tests catch more real-world issues for a CLI tool.
 
 ### Unit Tests
 
-Add unit tests when:
-- You have complex parsing logic
-- You have algorithmic functions
-- You need to test edge cases in isolated functions
+Add unit tests for complex parsing logic, algorithms, or edge cases in isolated functions.
 
-```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
-    
-    #[test]
-    fn test_parse_task_line() {
-        // Test specific function behavior
-    }
-}
-```
+## Performance & Optimization
 
-### Test Isolation
+Don't optimize prematurely. Simple file I/O, reading entire files into memory, and linear search are all fine for v0.1.
 
-- Each test uses its own temporary directory
-- Tests don't depend on each other
-- Tests clean up after themselves
+When performance pain is real (5+ pain count), track it as a task, write a test, then optimize.
 
-## Common Tasks
+## Git & Self-Hosting
 
-### Adding a New Command
+### Commit Format
 
-1. **Write the test first** in `tests/integration_test.rs`:
-```rust
-#[test]
-fn test_new_command() {
-    let temp = setup_temp_dir();
-    run_command(&["init"], &temp);
-    
-    let result = run_command(&["newcmd", "arg"], &temp);
-    assert!(result.success);
-    assert!(result.stdout.contains("expected"));
-    
-    cleanup_temp_dir(temp);
-}
-```
+`task-N: Brief description of what changed`
 
-2. **Run test** - it should fail:
+### Self-Hosting Workflow
+
 ```bash
-cargo test test_new_command  # Should FAIL
+knecht list          # See what needs doing
+# Work on task-N
+knecht done task-N   # Mark complete
+git add .knecht/tasks src/ tests/
+git commit -m "task-N: Description"
 ```
 
-3. **Add command to main.rs**:
-```rust
-match args[1].as_str() {
-    "init" => cmd_init(),
-    "add" => cmd_add(&args[2..]),
-    "list" => cmd_list(),
-    "done" => cmd_done(&args[2..]),
-    "newcmd" => cmd_newcmd(&args[2..]),  // Add here
-    _ => { ... }
-}
-
-fn cmd_newcmd(args: &[String]) {
-    // Implementation
-}
-```
-
-4. **If needed, add task.rs functions**:
-```rust
-pub fn do_something_with_tasks() -> Result<_, _> {
-    // Implementation
-}
-```
-
-5. **Run test** - should pass:
-```bash
-cargo test test_new_command  # Should PASS
-```
-
-### Refactoring Existing Code
-
-1. **Ensure tests pass first**:
-```bash
-cargo test  # All green? Proceed.
-```
-
-2. **Refactor** (extract function, rename, restructure):
-```rust
-// Before: Inline logic
-fn cmd_list() {
-    let file = fs::File::open(".knecht/tasks").unwrap();
-    // ... 20 lines of parsing ...
-}
-
-// After: Extract to task.rs
-fn cmd_list() {
-    let tasks = read_tasks();  // Moved to task.rs
-    // ... just display logic ...
-}
-```
-
-3. **Keep tests passing**:
-```bash
-cargo test  # Should still be green
-```
-
-4. **Commit** when tests pass
-
-### Fixing a Bug
-
-1. **Write a failing test** that reproduces the bug:
-```rust
-#[test]
-fn test_bug_reproduction() {
-    // Setup that triggers the bug
-    // Assert what SHOULD happen (will fail)
-}
-```
-
-2. **Fix the bug**
-
-3. **Verify test passes**:
-```bash
-cargo test test_bug_reproduction
-```
-
-4. **Run all tests** to ensure no regressions:
-```bash
-cargo test
-```
-
-## Performance Guidelines
-
-### Current State (v0.1)
-
-- Simple file I/O is fine
-- Reading entire file into memory is fine
-- Linear search through tasks is fine
-
-**Why**: Premature optimization is evil. File with 1000 tasks is <100KB and parses in ~1ms.
-
-### When to Optimize
-
-Track pain:
-```bash
-knecht add "Performance: list command slow with 10K+ tasks (pain count: 1)"
-```
-
-When pain is real (say, 5+ pain count), then write a test and optimize:
-```rust
-#[test]
-fn test_performance_with_large_file() {
-    // Create 10,000 tasks
-    // Assert command completes in <100ms
-}
-```
+We eat our own dog food. Every knecht feature should be tracked IN knecht.
 
 ## Documentation
 
-### Update Documentation When:
+Update when:
+- Adding a new command → README.md
+- Changing data format → README.md and SPEC_V2_TDD.md
+- Discovering architectural insights → this .rules file
 
-1. **Adding a new command**: Update README.md
-2. **Changing data format**: Update README.md and SPEC_V2_TDD.md
-3. **Discovering architectural insights**: Update this .rules file
+Keep docs practical, current, and concise. Prefer examples over prose.
 
-### Keep Documentation:
+## Key Principles for Agents
 
-- **Practical**: Show real examples
-- **Current**: Update when behavior changes
-- **Concise**: Prefer examples over prose
-- **Honest**: Document actual behavior, not aspirations
+**Always:**
+- Write failing test first
+- Make test pass with simplest code
+- Track work in knecht itself
+- Fix cargo warnings immediately
+- Commit `.knecht/tasks` with code changes
 
-## Agent-Specific Guidance
+**Never:**
+- Add features without tests
+- Add features without tracking in knecht
+- Prematurely abstract or optimize
+- Ignore cargo warnings
+- Break existing tests
 
-### When Picking Up a Task
-
-1. **Read the task description** in `.knecht/tasks`
-2. **Check for related documentation** (README, SPEC, MIKADO_EXAMPLES)
-3. **Write the test first** - always
-4. **Make it pass with simple code**
-5. **Mark task done**: `knecht done task-N`
-6. **Commit everything** together
-
-### When You're Stuck
-
-1. **Check cargo errors/warnings**: `cargo build`, `cargo clippy`
-2. **Run tests**: `cargo test`
-3. **Read existing code** in `src/main.rs` and `src/task.rs`
-4. **Check examples** in tests/integration_test.rs
-5. **Ask for human guidance** if truly blocked
-
-### Red Flags - Don't Do These
-
-- ❌ Adding features without tests
-- ❌ Adding features without knecht tasks
-- ❌ Premature abstraction (extracting modules/traits too early)
-- ❌ Complex error handling before it's needed
-- ❌ Performance optimization without measurement
-- ❌ Adding dependencies without strong justification
-- ❌ Ignoring cargo warnings
-- ❌ Breaking existing tests
-- ❌ Committing code that doesn't compile
-
-### Green Flags - Do These
-
-- ✅ Write failing test first
-- ✅ Make test pass with simplest code
-- ✅ Use knecht to track your work
-- ✅ Keep functions small and focused
-- ✅ Fix cargo warnings immediately
-- ✅ Run full test suite before committing
-- ✅ Commit `.knecht/tasks` with code changes
-- ✅ Ask "What's simpler?" and "Can I defer this?"
-
-## Summary
-
-**knecht is intentionally simple**. It's a proving ground for:
-- Test-driven development
-- Self-hosting (using the tool to build the tool)
-- Pain-driven features (add only what hurts to lack)
-- Simplest possible design (YAGNI)
-
-As an agent working on knecht:
-1. **Always test-first**
-2. **Track work in knecht itself**
-3. **Keep it simple**
-4. **Fix warnings immediately**
-5. **Defer features until pain is proven**
-
-When in doubt, ask: "What would Kent Beck do?" 
-Answer: Write a failing test. Make it pass. Ship it. 🎯
+**When in doubt:** Ask "What's simpler?" and "Can I defer this?"

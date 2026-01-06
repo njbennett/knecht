@@ -140,3 +140,60 @@ fn done_on_nonexistent_task_fails_gracefully() {
 
     cleanup_temp_dir(temp);
 }
+
+#[test]
+fn rules_file_stays_under_150_directives() {
+    // This test enforces a hard limit on .rules file size
+    // Keeps the rules concise and forces periodic condensing
+    
+    const MAX_LINES: usize = 250;
+    const MAX_DIRECTIVES: usize = 150;
+    
+    let rules_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(".rules");
+    
+    // If .rules doesn't exist, that's fine
+    if !rules_path.exists() {
+        return;
+    }
+    
+    let content = fs::read_to_string(&rules_path)
+        .expect("Failed to read .rules file");
+    
+    // Count lines
+    let lines = content.lines().count();
+    
+    // Count directives:
+    // - Lines starting with "- " (bullets)
+    // - Lines starting with digits + "." (numbered lists)
+    // - Lines containing bold imperatives (MUST, NEVER, ALWAYS, DON'T, DO NOT)
+    let mut directives = 0;
+    for line in content.lines() {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with("- ") || trimmed.chars().next().map_or(false, |c| c.is_ascii_digit()) && trimmed.contains(". ") {
+            directives += 1;
+        }
+        if line.contains("**") && (line.contains("MUST") || line.contains("NEVER") || 
+           line.contains("ALWAYS") || line.contains("DON'T") || line.contains("DO NOT")) {
+            directives += 1;
+        }
+    }
+    
+    assert!(
+        lines <= MAX_LINES,
+        ".rules file has {} lines (max: {}). Consider condensing:\n\
+         - Remove redundant sections\n\
+         - Consolidate similar directives\n\
+         - Ask: 'What can agents infer from core principles?'\n\
+         - Keep: Philosophy, TDD, Pain-Driven Dev, Data Format",
+        lines, MAX_LINES
+    );
+    
+    assert!(
+        directives <= MAX_DIRECTIVES,
+        ".rules file has {} directives (max: {}). Consider condensing:\n\
+         - Remove redundant directives\n\
+         - Consolidate similar rules\n\
+         - Focus on core principles that imply the rest",
+        directives, MAX_DIRECTIVES
+    );
+}
