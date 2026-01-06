@@ -9,3 +9,12 @@
 9|done|Normal task without pipes
 10|done|Fix test flakiness with parallel execution (pain count: 1)
 11|open|Add command to delete/remove tasks (pain count: 1)
+12|done|Decide how to handle beads descriptions in knecht migration [addresses blocker in task-8]
+13|done|Decide how to handle beads priorities (0-4) in knecht migration [addresses blocker in task-8]
+14|done|Decide how to handle beads issue_types (bug/task/epic/feature/chore) [addresses blocker in task-8]
+15|open|Write test for beads2knecht migration tool [addresses blocker in task-8]
+16|open|Add README documentation for beads2knecht tool [addresses blocker in task-8]
+17|open|Add description field to knecht format (pain count: 2 - blocker for task-8)
+18|open|Update beads2knecht to preserve descriptions [addresses blocker in task-17]
+19|open|Replace bd instructions with knecht in storytime .rules [addresses blocker in task-8]
+20|open|Document how to uninstall/remove beads from storytime [addresses blocker in task-8]
