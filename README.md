@@ -210,6 +210,100 @@ But we won't add these until we actually need them.
 
 MIT
 
+## Migration from Beads
+
+If you're migrating from the `beads` task tracker, knecht includes a migration tool that converts beads JSON format to knecht format.
+
+### beads2knecht Tool
+
+The `beads2knecht` binary reads beads JSON from stdin and outputs knecht format to stdout.
+
+#### Building the Tool
+
+```bash
+cargo build --release
+# The binary is at target/release/beads2knecht
+```
+
+#### Usage
+
+```bash
+# Preview the migration (see what will be converted)
+bd list --json | /path/to/knecht/target/release/beads2knecht > migration_preview.txt
+cat migration_preview.txt
+
+# If acceptable, migrate to knecht
+knecht init
+bd list --json | /path/to/knecht/target/release/beads2knecht | grep -v '^#' > .knecht/tasks
+
+# Verify the migration
+knecht list
+```
+
+#### What Gets Migrated
+
+**Preserved:**
+- Task titles
+- Task status (open/in_progress/done → open/done)
+- Task descriptions (if present)
+
+**Converted:**
+- Beads IDs (alphanumeric) → Sequential numbers (1, 2, 3...)
+- Status `in_progress` → `open` (knecht only has open/done)
+
+**Dropped (Intentionally):**
+- Priorities (0-4) - Can be expressed in task titles if needed
+- Issue types (bug/task/epic/feature/chore) - Can be expressed in titles
+- Timestamps - Git provides history
+- Dependencies - Different model planned for future knecht versions
+
+The tool outputs migration statistics to stderr, including:
+- Number of tasks converted
+- Number of descriptions preserved
+- Distribution of priorities (for reference)
+- Distribution of issue types (for reference)
+
+#### Example Output
+
+```bash
+$ bd list --json | beads2knecht
+# Beads to Knecht Migration
+# 3 tasks found
+#
+# MIGRATION STRATEGY:
+# - Map beads IDs to sequential numbers (1, 2, 3...)
+# - Map 'in_progress' -> 'open'
+# - PRESERVE: descriptions (in 4th pipe-delimited field)
+# - DROP: priorities, issue_types, timestamps, dependencies
+# - Keep: id, status, title, description
+#
+1|open|Fix authentication bug
+2|done|Add user registration|Implement user registration with email verification
+3|open|Refactor database layer
+
+=== MIGRATION COMPLETE ===
+Tasks converted: 3
+
+PRESERVED INFORMATION:
+- Descriptions: 1 tasks had descriptions (preserved)
+
+LOST INFORMATION:
+- Priorities: Distribution:
+  Priority 0: 1 tasks
+  Priority 1: 2 tasks
+- Issue types:
+  bug: 1 tasks
+  task: 2 tasks
+```
+
+#### Tips for Migration
+
+1. **Preview first**: Always run a preview to see what information will be lost
+2. **Review priorities**: If high-priority tasks exist, consider adding "High priority:" prefix to titles
+3. **Review issue types**: If issue types matter, add them to titles (e.g., "Bug: Fix auth")
+4. **Backup**: Keep your beads data until you're confident in the migration
+5. **Commit**: Commit the new `.knecht/tasks` file to git immediately after migration
+
 ## Inspiration
 
 Inspired by:

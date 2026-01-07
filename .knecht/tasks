@@ -13,7 +13,7 @@
 13|done|Decide how to handle beads priorities (0-4) in knecht migration [addresses blocker in task-8]
 14|done|Decide how to handle beads issue_types (bug/task/epic/feature/chore) [addresses blocker in task-8]
 15|done|Write test for beads2knecht migration tool [addresses blocker in task-8]
-16|open|Add README documentation for beads2knecht tool [addresses blocker in task-8]
+16|done|Add README documentation for beads2knecht tool [addresses blocker in task-8]
 17|done|Add description field to knecht format (pain count: 2 - blocker for task-8)
 18|done|Update beads2knecht to preserve descriptions [addresses blocker in task-17]
 19|open|Replace bd instructions with knecht in storytime .rules [addresses blocker in task-8]
@@ -35,4 +35,4 @@
 35|open|Add 'show' command to display full task details including description|Need a way to view the complete task information, especially the description field. Something like 'knecht show task-27' that displays id, status, title, and description. This would help when tasks have detailed instructions in their descriptions. (pain count: 0 - not sure we need it yet, tracking for now)
 36|open|Print task description when starting work on a task|When an agent or user begins work on a task, the description should be displayed as a prompt/guide for the work. This could be triggered by a 'knecht start task-N' command, or possibly automatically when referencing a task. Descriptions should function as work instructions/context. (pain count: 1 - just experienced this when you had to manually grep for task-27's description)
 37|open|Add commit reminder to 'knecht done' output|When 'knecht done task-N' completes, add a reminder message like: 'Next steps: Review changes with git status/diff, then commit with: git add -A && git commit -m "task-N: Description"'. This reinforces the workflow and reminds agents/users to commit their work. (pain count: 1 - would have been helpful as a reminder throughout this session)
-
+38|open|Add command to record pain instances on tasks|Currently updating pain counts requires manually editing .knecht/tasks to increment the number and add context. Need a command like 'knecht pain task-N <description>' that: (1) increments the pain count, (2) appends the pain description to the task description with timestamp/context, (3) displays the updated task with new pain count. This makes it easy to track when and why pain occurred, supporting data-driven feature decisions. Example: 'knecht pain task-11 Had to manually edit file to remove task-38' would increment task-11's pain count and record the context.
