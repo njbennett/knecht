@@ -1,4 +1,4 @@
-use knecht::{FileSystem, Task, KnechtError};
+use knecht::FileSystem;
 use std::collections::HashMap;
 use std::io::{self, BufRead, Write};
 use std::path::{Path, PathBuf};
