@@ -28,7 +28,7 @@
 28|open|Extract Method: CLI argument parsing in cmd_add
 29|open|Replace Magic String with Symbolic Constant: pipe delimiter
 30|open|Extract Class: TaskSerializer for format parsing/writing
-31|open|Restructure to eliminate pipe character validation need
+31|done|Restructure to eliminate pipe character validation need
 32|open|Consider using clap or similar for CLI argument parsing
 33|open|Evaluate migrating from pipe-delimited to JSON Lines format
 34|open|Support multi-line descriptions in tasks
@@ -46,3 +46,4 @@
 46|open|Create release process and distribution strategy -d Current: users build from source. Future options: 1) GitHub releases with pre-built binaries for major platforms (macOS, Linux, Windows), 2) Homebrew tap for macOS, 3) cargo install knecht (publish to crates.io), 4) Installation script (curl 
 47|done|Fix bug: Task descriptions being silently dropped on read/write -d CRITICAL DATA LOSS BUG: When reading tasks file, if a description contains pipe characters, the description gets silently dropped instead of failing validation. This happened during task-19 session - many task descriptions disappeared. The read logic needs to either: 1) fail/warn on malformed lines, or 2) handle escaped pipes correctly. Write test first that reproduces the bug.
 48|open|Make reflection prompt more actionable for agents -d The 'knecht done' reflection prompt asks good questions but agents (including me) ignore it and move on. Need to make it more actionable: 1) Could pause and wait for response, 2) Could be more explicit ('Answer these questions before continuing'), 3) Could be formatted differently to stand out. Pain: Agent (me) just skipped right past reflection prompt after task-19 without responding.
+49|open|Evaluate data format complexity - we've reinvented CSV|Current pipe-delimited format with escape sequences is getting complex (split_unescaped, escape/unescape functions). Options: 1) Use actual CSV library (csv crate), 2) Switch to JSON Lines (.jsonl), 3) Switch to more structured format like TOML/YAML, 4) Keep current but document rationale. Consider: git-friendliness, human-readability, simplicity, performance. Pain: Parsing logic is now ~60 lines of custom code that could be 1-2 lines with a library.
