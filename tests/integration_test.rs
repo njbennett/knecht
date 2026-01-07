@@ -600,3 +600,319 @@ fn done_shows_refactoring_reflection_prompt() {
 
     cleanup_temp_dir(temp);
 }
+
+#[test]
+fn cli_no_args_shows_usage() {
+    let temp = setup_temp_dir();
+    
+    let result = run_command(&[], &temp);
+    
+    assert!(!result.success, "Should fail when no command provided");
+    assert!(result.stderr.contains("Usage: knecht <command> [args]"), 
+        "Should show usage message");
+    
+    cleanup_temp_dir(temp);
+}
+
+#[test]
+fn cli_unknown_command_fails() {
+    let temp = setup_temp_dir();
+    
+    let result = run_command(&["nonexistent"], &temp);
+    
+    assert!(!result.success, "Should fail for unknown command");
+    assert!(result.stderr.contains("Unknown command: nonexistent"), 
+        "Should show unknown command error");
+    
+    cleanup_temp_dir(temp);
+}
+
+#[test]
+fn add_with_no_args_shows_usage() {
+    let temp = setup_temp_dir();
+    run_command(&["init"], &temp);
+    
+    let result = run_command(&["add"], &temp);
+    
+    assert!(!result.success, "Should fail when add has no args");
+    assert!(result.stderr.contains("Usage: knecht add <title>"), 
+        "Should show add usage message");
+    
+    cleanup_temp_dir(temp);
+}
+
+#[test]
+fn add_with_empty_title_fails() {
+    let temp = setup_temp_dir();
+    run_command(&["init"], &temp);
+    
+    // Try to add task with only description flag but no title
+    let result = run_command(&["add", "-d", "some description"], &temp);
+    
+    assert!(!result.success, "Should fail when title is empty");
+    assert!(result.stderr.contains("Error: Title cannot be empty"), 
+        "Should show empty title error");
+    
+    cleanup_temp_dir(temp);
+}
+
+#[test]
+fn done_with_no_args_shows_usage() {
+    let temp = setup_temp_dir();
+    run_command(&["init"], &temp);
+    
+    let result = run_command(&["done"], &temp);
+    
+    assert!(!result.success, "Should fail when done has no args");
+    assert!(result.stderr.contains("Usage: knecht done <task-id>"), 
+        "Should show done usage message");
+    
+    cleanup_temp_dir(temp);
+}
+
+#[test]
+fn add_task_with_pipe_in_description_fails() {
+    let temp = setup_temp_dir();
+    run_command(&["init"], &temp);
+    
+    let result = run_command(&["add", "Valid title", "-d", "Invalid | description"], &temp);
+    
+    assert!(!result.success, "Should fail when description contains pipe");
+    assert!(result.stderr.contains("Task description cannot contain pipe character"), 
+        "Should show pipe character error for description");
+    
+    cleanup_temp_dir(temp);
+}
+
+#[test]
+fn list_fails_gracefully_when_tasks_file_unreadable() {
+    let temp = setup_temp_dir();
+    run_command(&["init"], &temp);
+    
+    // Create a directory instead of a file to make it unreadable as a file
+    fs::remove_file(temp.join(".knecht/tasks")).unwrap();
+    fs::create_dir(temp.join(".knecht/tasks")).unwrap();
+    
+    let result = run_command(&["list"], &temp);
+    
+    assert!(!result.success, "Should fail when tasks file is unreadable");
+    assert!(result.stderr.contains("Error reading tasks"), 
+        "Should show error reading tasks message");
+    
+    cleanup_temp_dir(temp);
+}
+
+#[test]
+fn init_fails_when_cannot_create_directory() {
+    let temp = setup_temp_dir();
+    
+    // Create .knecht as a file instead of directory to cause create_dir_all to fail
+    fs::write(temp.join(".knecht"), "").unwrap();
+    
+    let result = run_command(&["init"], &temp);
+    
+    assert!(!result.success, "Should fail when cannot create .knecht directory");
+    assert!(result.stderr.contains("Failed to create .knecht directory"), 
+        "Should show directory creation error");
+    
+    cleanup_temp_dir(temp);
+}
+
+#[test]
+fn init_fails_when_cannot_create_tasks_file() {
+    let temp = setup_temp_dir();
+    
+    // Create .knecht directory, then create tasks as a directory to cause write to fail
+    fs::create_dir_all(temp.join(".knecht")).unwrap();
+    fs::create_dir(temp.join(".knecht/tasks")).unwrap();
+    
+    let result = run_command(&["init"], &temp);
+    
+    assert!(!result.success, "Should fail when cannot create tasks file");
+    assert!(result.stderr.contains("Failed to create tasks file"), 
+        "Should show tasks file creation error");
+    
+    cleanup_temp_dir(temp);
+}
+
+#[test]
+fn beads2knecht_handles_empty_task_list() {
+    let temp = setup_temp_dir();
+    
+    // Create empty JSON array
+    let empty_json = "[]";
+    
+    let mut child = Command::new(env!("CARGO_BIN_EXE_beads2knecht"))
+        .current_dir(&temp)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("Failed to spawn beads2knecht");
+    
+    {
+        let stdin = child.stdin.as_mut().expect("Failed to open stdin");
+        stdin.write_all(empty_json.as_bytes()).expect("Failed to write to stdin");
+    }
+    
+    let output = child.wait_with_output().expect("Failed to wait for child");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    
+    assert!(output.status.success(), "beads2knecht should succeed with empty list");
+    assert!(stdout.contains("# 0 tasks found"), "Should report 0 tasks");
+    assert!(stderr.contains("Tasks converted: 0"), "Should report 0 tasks converted");
+    
+    cleanup_temp_dir(temp);
+}
+
+#[test]
+fn done_marks_task_without_description_complete() {
+    let temp = setup_temp_dir();
+    run_command(&["init"], &temp);
+    
+    // Add task without description
+    run_command(&["add", "Task without description"], &temp);
+    
+    // Mark it done
+    let result = run_command(&["done", "task-1"], &temp);
+    assert!(result.success, "done command should succeed");
+    
+    // Verify it was marked done
+    let list = run_command(&["list"], &temp);
+    assert!(list.stdout.contains("[x]"), "Task should be marked done");
+    
+    cleanup_temp_dir(temp);
+}
+
+#[test]
+fn beads2knecht_handles_task_without_description() {
+    let temp = setup_temp_dir();
+    
+    // Create JSON with a task that has no description
+    let json_input = r#"[
+        {
+            "id": "beads-1",
+            "title": "Task without description",
+            "status": "open",
+            "priority": 1,
+            "issue_type": "feature"
+        }
+    ]"#;
+    
+    let mut child = Command::new(env!("CARGO_BIN_EXE_beads2knecht"))
+        .current_dir(&temp)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("Failed to spawn beads2knecht");
+    
+    {
+        let stdin = child.stdin.as_mut().expect("Failed to open stdin");
+        stdin.write_all(json_input.as_bytes()).expect("Failed to write to stdin");
+    }
+    
+    let output = child.wait_with_output().expect("Failed to wait for child");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    
+    assert!(output.status.success(), "beads2knecht should succeed");
+    
+    // Find the task line (skip comment lines)
+    let task_lines: Vec<&str> = stdout.lines()
+        .filter(|line| !line.starts_with('#') && !line.trim().is_empty())
+        .collect();
+    
+    assert_eq!(task_lines.len(), 1, "Should have exactly one task");
+    // Task should have 3 fields (no description field)
+    assert_eq!(task_lines[0].matches('|').count(), 2, "Task without description should have only 2 pipes");
+    assert!(task_lines[0].starts_with("1|open|"), "Should be task 1 with open status");
+    assert!(task_lines[0].contains("Task without description"), "Should have correct title");
+    
+    cleanup_temp_dir(temp);
+}
+
+#[test]
+fn list_handles_tasks_file_with_empty_lines() {
+    let temp = setup_temp_dir();
+    run_command(&["init"], &temp);
+    
+    // Create tasks file with empty lines
+    let tasks_path = temp.join(".knecht/tasks");
+    fs::write(&tasks_path, "1|open|First task\n\n2|open|Second task\n  \n3|done|Third task\n\n")
+        .expect("Failed to write test file");
+    
+    // list should skip empty lines
+    let result = run_command(&["list"], &temp);
+    assert!(result.success, "list should handle empty lines");
+    assert!(result.stdout.contains("task-1"), "Should show task-1");
+    assert!(result.stdout.contains("task-2"), "Should show task-2");
+    assert!(result.stdout.contains("task-3"), "Should show task-3");
+    
+    cleanup_temp_dir(temp);
+}
+
+#[test]
+fn done_marks_task_with_description_complete() {
+    let temp = setup_temp_dir();
+    run_command(&["init"], &temp);
+    
+    // Add task with description
+    run_command(&["add", "Task with description", "-d", "This is the description"], &temp);
+    
+    // Mark it done
+    let result = run_command(&["done", "task-1"], &temp);
+    assert!(result.success, "done command should succeed");
+    
+    // Verify it was marked done and still has description
+    let tasks_content = fs::read_to_string(temp.join(".knecht/tasks")).unwrap();
+    assert!(tasks_content.contains("1|done|Task with description|This is the description"), 
+        "Task should be marked done and preserve description");
+    
+    cleanup_temp_dir(temp);
+}
+
+#[test]
+fn beads2knecht_handles_unknown_status() {
+    let temp = setup_temp_dir();
+    
+    // Create JSON with a task that has an unknown status
+    let json_input = r#"[
+        {
+            "id": "beads-1",
+            "title": "Task with unknown status",
+            "status": "blocked",
+            "priority": 1,
+            "issue_type": "feature"
+        }
+    ]"#;
+    
+    let mut child = Command::new(env!("CARGO_BIN_EXE_beads2knecht"))
+        .current_dir(&temp)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("Failed to spawn beads2knecht");
+    
+    {
+        let stdin = child.stdin.as_mut().expect("Failed to open stdin");
+        stdin.write_all(json_input.as_bytes()).expect("Failed to write to stdin");
+    }
+    
+    let output = child.wait_with_output().expect("Failed to wait for child");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    
+    assert!(output.status.success(), "beads2knecht should succeed");
+    
+    // Find the task line (skip comment lines)
+    let task_lines: Vec<&str> = stdout.lines()
+        .filter(|line| !line.starts_with('#') && !line.trim().is_empty())
+        .collect();
+    
+    assert_eq!(task_lines.len(), 1, "Should have exactly one task");
+    // Unknown status should default to "open"
+    assert!(task_lines[0].starts_with("1|open|"), "Unknown status should default to open, got: {}", task_lines[0]);
+    
+    cleanup_temp_dir(temp);
+}

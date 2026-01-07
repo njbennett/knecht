@@ -1,76 +1,12 @@
 #!/bin/sh
+set -e
 
-# Pre-commit hook to run tests and check coverage before allowing commit
+# Pre-commit hook: Enforce tests pass and 100% line coverage
 
-echo "Running tests before commit..."
-
-# Run cargo test
+echo "Running tests..."
 cargo test --quiet
 
-# Check if tests passed
-if [ $? -ne 0 ]; then
-    echo ""
-    echo "❌ Tests failed. Commit aborted."
-    echo "Fix the failing tests and try again."
-    exit 1
-fi
+echo "Checking coverage (requires 100%)..."
+cargo llvm-cov --all-features --fail-under-lines 100 --summary-only
 
-echo "✓ All tests passed."
-echo ""
-echo "Checking test coverage..."
-
-# Check if cargo-llvm-cov is installed
-if ! command -v cargo-llvm-cov >/dev/null 2>&1; then
-    echo "⚠️  Warning: cargo-llvm-cov not installed. Skipping coverage check."
-    echo "Install with: cargo install cargo-llvm-cov"
-    echo "              rustup component add llvm-tools-preview"
-    exit 0
-fi
-
-# Run coverage check and capture output
-COVERAGE_OUTPUT=$(cargo llvm-cov --all-features --summary-only 2>&1)
-COVERAGE_RESULT=$?
-
-if [ $COVERAGE_RESULT -ne 0 ]; then
-    echo "⚠️  Warning: Coverage check failed to run."
-    echo "Proceeding with commit anyway."
-    exit 0
-fi
-
-# Extract line coverage percentage from output
-LINE_COVERAGE=$(echo "$COVERAGE_OUTPUT" | grep "TOTAL" | awk '{print $NF}' | tr -d '%')
-
-if [ -z "$LINE_COVERAGE" ]; then
-    echo "⚠️  Warning: Could not parse coverage percentage."
-    echo "Proceeding with commit anyway."
-    exit 0
-fi
-
-# Set minimum coverage threshold
-MIN_COVERAGE=90
-
-echo "Line coverage: ${LINE_COVERAGE}%"
-
-# Compare coverage (using bc for floating point comparison if available, else integer comparison)
-if command -v bc >/dev/null 2>&1; then
-    BELOW_THRESHOLD=$(echo "$LINE_COVERAGE < $MIN_COVERAGE" | bc)
-else
-    # Integer comparison fallback
-    LINE_COVERAGE_INT=${LINE_COVERAGE%.*}
-    BELOW_THRESHOLD=$((LINE_COVERAGE_INT < MIN_COVERAGE))
-fi
-
-if [ "$BELOW_THRESHOLD" -eq 1 ]; then
-    echo ""
-    echo "❌ Coverage below ${MIN_COVERAGE}% threshold. Commit aborted."
-    echo "Current coverage: ${LINE_COVERAGE}%"
-    echo ""
-    echo "Run 'cargo llvm-cov --all-features' to see detailed coverage report."
-    echo "Add tests to cover missing lines."
-    exit 1
-fi
-
-echo "✓ Coverage meets ${MIN_COVERAGE}% threshold."
-echo ""
-echo "Proceeding with commit."
-exit 0
+echo "✓ All checks passed"
