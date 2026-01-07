@@ -3,11 +3,64 @@ use std::io::{self, BufRead, BufReader, Write};
 use std::path::Path;
 use std::fmt;
 
+/// Escape backslashes and pipes for storage in pipe-delimited format
+fn escape(s: &str) -> String {
+    s.replace('\\', "\\\\").replace('|', "\\|")
+}
+
+/// Unescape backslashes and pipes from pipe-delimited format
+fn unescape(s: &str) -> String {
+    let mut result = String::new();
+    let mut chars = s.chars().peekable();
+    
+    while let Some(ch) = chars.next() {
+        if ch == '\\'
+            && let Some(&next_ch) = chars.peek()
+                && (next_ch == '\\' || next_ch == '|') {
+                    result.push(chars.next().unwrap());
+                    continue;
+                }
+        result.push(ch);
+    }
+    
+    result
+}
+
+/// Split a line on unescaped pipe characters
+fn split_unescaped(line: &str) -> Vec<String> {
+    let mut parts = Vec::new();
+    let mut current = String::new();
+    let mut chars = line.chars().peekable();
+    
+    while let Some(ch) = chars.next() {
+        if ch == '\\'
+            && let Some(&next_ch) = chars.peek()
+                && (next_ch == '|' || next_ch == '\\') {
+                    // Keep the escape sequence intact for later unescaping
+                    current.push(ch);
+                    current.push(chars.next().unwrap());
+                    continue;
+                }
+        
+        if ch == '|' {
+            // Unescaped pipe - field separator
+            parts.push(current.clone());
+            current.clear();
+        } else {
+            current.push(ch);
+        }
+    }
+    
+    // Don't forget the last part
+    parts.push(current);
+    
+    parts
+}
+
 #[derive(Debug)]
 pub enum KnechtError {
     IoError(io::Error),
     TaskNotFound(String),
-    InvalidCharacter(String),
 }
 
 impl fmt::Display for KnechtError {
@@ -15,7 +68,6 @@ impl fmt::Display for KnechtError {
         match self {
             KnechtError::IoError(err) => write!(f, "I/O error: {}", err),
             KnechtError::TaskNotFound(id) => write!(f, "task-{} not found", id),
-            KnechtError::InvalidCharacter(msg) => write!(f, "Invalid character: {}", msg),
         }
     }
 }
@@ -62,20 +114,19 @@ pub fn read_tasks() -> Result<Vec<Task>, KnechtError> {
             continue;
         }
         
-        let parts: Vec<&str> = line.split('|').collect();
+        let parts = split_unescaped(&line);
         if parts.len() >= 3 {
-            // Use unchecked constructor since we're reading existing data
             // Support both old format (3 fields) and new format (4 fields)
             let description = if parts.len() >= 4 {
-                Some(parts[3].to_string())
+                Some(unescape(&parts[3]))
             } else {
                 None
             };
             
             tasks.push(Task {
-                id: parts[0].to_string(),
-                status: parts[1].to_string(),
-                title: parts[2].to_string(),
+                id: parts[0].clone(),
+                status: parts[1].clone(),
+                title: unescape(&parts[2]),
                 description,
             });
         }
@@ -93,9 +144,9 @@ pub fn write_tasks(tasks: &[Task]) -> Result<(), KnechtError> {
     
     for task in tasks {
         let line = if let Some(desc) = &task.description {
-            format!("{}|{}|{}|{}\n", task.id, task.status, task.title, desc)
+            format!("{}|{}|{}|{}\n", task.id, task.status, escape(&task.title), escape(desc))
         } else {
-            format!("{}|{}|{}\n", task.id, task.status, task.title)
+            format!("{}|{}|{}\n", task.id, task.status, escape(&task.title))
         };
         file.write_all(line.as_bytes())?;
     }
@@ -116,26 +167,11 @@ pub fn get_next_id() -> Result<u32, KnechtError> {
 }
 
 pub fn add_task(title: String, description: Option<String>) -> Result<u32, KnechtError> {
-    // Validate title before proceeding
-    if title.contains('|') {
-        return Err(KnechtError::InvalidCharacter(
-            "Task title cannot contain pipe character '|'".to_string()
-        ));
-    }
-    
-    // Validate description if provided
-    if let Some(ref desc) = description
-        && desc.contains('|') {
-            return Err(KnechtError::InvalidCharacter(
-                "Task description cannot contain pipe character '|'".to_string()
-            ));
-        }
-    
     let next_id = get_next_id()?;
     let line = if let Some(desc) = description {
-        format!("{}|open|{}|{}\n", next_id, title, desc)
+        format!("{}|open|{}|{}\n", next_id, escape(&title), escape(&desc))
     } else {
-        format!("{}|open|{}\n", next_id, title)
+        format!("{}|open|{}\n", next_id, escape(&title))
     };
     
     // Ensure .knecht directory exists

@@ -671,15 +671,26 @@ fn done_with_no_args_shows_usage() {
 }
 
 #[test]
-fn add_task_with_pipe_in_description_fails() {
+fn add_task_with_pipe_in_description_works_with_escaping() {
     let temp = setup_temp_dir();
     run_command(&["init"], &temp);
     
-    let result = run_command(&["add", "Valid title", "-d", "Invalid | description"], &temp);
+    let result = run_command(&["add", "Valid title", "-d", "Description with | pipe"], &temp);
     
-    assert!(!result.success, "Should fail when description contains pipe");
-    assert!(result.stderr.contains("Task description cannot contain pipe character"), 
-        "Should show pipe character error for description");
+    assert!(result.success, "Should succeed with pipe in description (will be escaped)");
+    
+    // Verify the pipe is preserved in the file (escaped) and can be read back
+    let tasks_file = temp.join(".knecht/tasks");
+    let content = fs::read_to_string(&tasks_file).unwrap();
+    
+    // Should be escaped in the file
+    assert!(content.contains("Description with \\| pipe"), 
+        "Should have escaped pipe in file, got: {}", content);
+    
+    // When we list (which reads and unescapes), title should show correctly
+    let list = run_command(&["list"], &temp);
+    assert!(list.stdout.contains("Valid title"), 
+        "Should show title in list output, got: {}", list.stdout);
     
     cleanup_temp_dir(temp);
 }
@@ -913,6 +924,88 @@ fn beads2knecht_handles_unknown_status() {
     assert_eq!(task_lines.len(), 1, "Should have exactly one task");
     // Unknown status should default to "open"
     assert!(task_lines[0].starts_with("1|open|"), "Unknown status should default to open, got: {}", task_lines[0]);
+    
+    cleanup_temp_dir(temp);
+}
+
+#[test]
+fn add_fails_when_tasks_file_cannot_be_written() {
+    let temp = setup_temp_dir();
+    
+    // Create .knecht directory and tasks file
+    fs::create_dir_all(temp.join(".knecht")).unwrap();
+    let tasks_file = temp.join(".knecht/tasks");
+    fs::File::create(&tasks_file).unwrap();
+    
+    // Make the tasks file read-only (no write permissions)
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = fs::metadata(&tasks_file).unwrap().permissions();
+        perms.set_mode(0o444); // read-only
+        fs::set_permissions(&tasks_file, perms).unwrap();
+    }
+    
+    #[cfg(windows)]
+    {
+        let mut perms = fs::metadata(&tasks_file).unwrap().permissions();
+        perms.set_readonly(true);
+        fs::set_permissions(&tasks_file, perms).unwrap();
+    }
+    
+    // Try to add a task - should fail with IO error
+    let result = run_command(&["add", "This should fail"], &temp);
+    
+    assert!(!result.success, "Should fail when tasks file is not writable");
+    assert!(result.stderr.contains("Error:"), 
+        "Should show error message, got: {}", result.stderr);
+    
+    // Clean up - restore permissions before cleanup
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = fs::metadata(&tasks_file).unwrap().permissions();
+        perms.set_mode(0o644);
+        fs::set_permissions(&tasks_file, perms).unwrap();
+    }
+    
+    #[cfg(windows)]
+    {
+        let mut perms = fs::metadata(&tasks_file).unwrap().permissions();
+        perms.set_readonly(false);
+        fs::set_permissions(&tasks_file, perms).unwrap();
+    }
+    
+    cleanup_temp_dir(temp);
+}
+
+#[test]
+fn read_tasks_with_pipe_in_description_should_fail_or_preserve() {
+    let temp = setup_temp_dir();
+    
+    // Manually create a tasks file with an ESCAPED pipe character in the description
+    // This simulates properly escaped data with pipes
+    fs::create_dir_all(temp.join(".knecht")).unwrap();
+    let tasks_file = temp.join(".knecht/tasks");
+    let mut file = fs::File::create(&tasks_file).unwrap();
+    
+    // Write a task with an escaped pipe in the description
+    // Expected after unescaping: "Option 1) thing, 2) other, 3) curl | script"
+    writeln!(file, "1|open|Test task|Option 1) thing, 2) other, 3) curl \\| script").unwrap();
+    drop(file);
+    
+    // Try to list the tasks - this will read the file and unescape
+    let result = run_command(&["list"], &temp);
+    
+    // List doesn't show descriptions, but it should successfully parse the file
+    // and show the task with unescaped title
+    assert!(result.success, "Should successfully parse file with escaped pipes");
+    assert!(result.stdout.contains("Test task"), "Should show task title, got: {}", result.stdout);
+    
+    // Verify the file still has the escaped data
+    let content = fs::read_to_string(&tasks_file).unwrap();
+    assert!(content.contains("curl \\| script"), 
+        "File should still have escaped pipes, got: {}", content);
     
     cleanup_temp_dir(temp);
 }
