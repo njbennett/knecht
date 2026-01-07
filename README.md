@@ -98,6 +98,26 @@ knecht done 1
 
 Output: `✓ task-1: Fix the login bug`
 
+### `knecht show <task-id>`
+
+Display full details for a specific task, including its description if present.
+
+```bash
+knecht show task-1
+# or
+knecht show 1
+```
+
+Output:
+```
+Task: task-1
+Status: open
+Title: Fix the login bug
+Description: User sessions are expiring too early. Need to investigate token timeout settings.
+```
+
+For tasks without descriptions, only the ID, status, and title are shown.
+
 ## Data Format
 
 Tasks are stored in `.knecht/tasks` using a simple pipe-delimited format:
@@ -198,7 +218,6 @@ cargo build --release
 Features will be added based on actual pain points. Possible future additions:
 
 - Filter tasks by status: `knecht list --status open`
-- Show task descriptions: `knecht show task-1`
 - Blocked-by relationships: `knecht add "Deploy" --blocked-by task-3`
 - Ready work detection: `knecht ready`
 - JSON output for agents: `knecht list --json`

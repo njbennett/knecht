@@ -1,7 +1,7 @@
 use std::env;
 use std::fs;
 
-use knecht::{add_task_with_fs, mark_task_done_with_fs, read_tasks_with_fs, RealFileSystem};
+use knecht::{add_task_with_fs, find_task_by_id_with_fs, mark_task_done_with_fs, read_tasks_with_fs, RealFileSystem};
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -16,6 +16,7 @@ fn main() {
         "add" => cmd_add(&args[2..]),
         "list" => cmd_list(),
         "done" => cmd_done(&args[2..]),
+        "show" => cmd_show(&args[2..]),
         _ => {
             eprintln!("Unknown command: {}", args[1]);
             std::process::exit(1);
@@ -116,6 +117,31 @@ Did you notice anything the user had to correct the agent about, that could have
 
 Did you notice anything new that was difficult about working with the codebase while you did this work? Is there anything in the work you just did that we should refactor? Make a list of the refactoring opportunities. Where you can, use named refactors from Martin Fowler's Refactoring, or Michael Feather's Working Effectively with Legacy Code. Check knecht to see if anything similar has already been filed, and if so, increase the pain count on those tasks.
 ");
+        }
+        Err(err) => {
+            eprintln!("Error: {}", err);
+            std::process::exit(1);
+        }
+    }
+}
+
+fn cmd_show(args: &[String]) {
+    if args.is_empty() {
+        eprintln!("Usage: knecht show <task-id>");
+        std::process::exit(1);
+    }
+    
+    let task_arg = &args[0];
+    let task_id = task_arg.strip_prefix("task-").unwrap_or(task_arg);
+    
+    match find_task_by_id_with_fs(task_id, &RealFileSystem) {
+        Ok(task) => {
+            println!("Task: task-{}", task.id);
+            println!("Status: {}", task.status);
+            println!("Title: {}", task.title);
+            if let Some(desc) = &task.description {
+                println!("Description: {}", desc);
+            }
         }
         Err(err) => {
             eprintln!("Error: {}", err);

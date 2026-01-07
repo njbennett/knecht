@@ -230,6 +230,18 @@ pub fn add_task_with_fs(title: String, description: Option<String>, fs: &dyn Fil
     Ok(next_id)
 }
 
+pub fn find_task_by_id_with_fs(task_id: &str, fs: &dyn FileSystem) -> Result<Task, KnechtError> {
+    let tasks = read_tasks_with_fs(fs)?;
+    
+    for task in tasks {
+        if task.id == task_id {
+            return Ok(task);
+        }
+    }
+    
+    Err(KnechtError::TaskNotFound(task_id.to_string()))
+}
+
 pub fn mark_task_done_with_fs(task_id: &str, fs: &dyn FileSystem) -> Result<Task, KnechtError> {
     let mut tasks = read_tasks_with_fs(fs)?;
     

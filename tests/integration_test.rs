@@ -1432,3 +1432,89 @@ fn production_tasks_file_is_never_modified_by_tests() {
         );
     }
 }
+
+#[test]
+fn show_displays_task_with_description() {
+    let temp = setup_temp_dir();
+    
+    // Initialize and add a task with description
+    run_command(&["init"], &temp);
+    run_command(&["add", "Task title", "-d", "This is a detailed description"], &temp);
+    
+    // Run show command
+    let result = run_command(&["show", "task-1"], &temp);
+    
+    assert!(result.success, "show command should succeed");
+    assert!(result.stdout.contains("task-1"), "should show task ID");
+    assert!(result.stdout.contains("Task title"), "should show title");
+    assert!(result.stdout.contains("This is a detailed description"), "should show description");
+    assert!(result.stdout.contains("open"), "should show status");
+    
+    cleanup_temp_dir(temp);
+}
+
+#[test]
+fn show_displays_task_without_description() {
+    let temp = setup_temp_dir();
+    
+    // Initialize and add a task without description
+    run_command(&["init"], &temp);
+    run_command(&["add", "Simple task"], &temp);
+    
+    // Run show command
+    let result = run_command(&["show", "task-1"], &temp);
+    
+    assert!(result.success, "show command should succeed");
+    assert!(result.stdout.contains("task-1"), "should show task ID");
+    assert!(result.stdout.contains("Simple task"), "should show title");
+    assert!(result.stdout.contains("open"), "should show status");
+    
+    cleanup_temp_dir(temp);
+}
+
+#[test]
+fn show_fails_on_nonexistent_task() {
+    let temp = setup_temp_dir();
+    
+    // Initialize but don't add any tasks
+    run_command(&["init"], &temp);
+    
+    // Try to show nonexistent task
+    let result = run_command(&["show", "task-999"], &temp);
+    
+    assert!(!result.success, "show should fail for nonexistent task");
+    assert!(result.stderr.contains("not found") || result.stderr.contains("Task 999"), 
+            "should indicate task not found");
+    
+    cleanup_temp_dir(temp);
+}
+
+#[test]
+fn show_fails_with_invalid_task_id() {
+    let temp = setup_temp_dir();
+    
+    run_command(&["init"], &temp);
+    
+    // Try with invalid task ID format
+    let result = run_command(&["show", "invalid"], &temp);
+    
+    assert!(!result.success, "show should fail for invalid task ID");
+    
+    cleanup_temp_dir(temp);
+}
+
+#[test]
+fn show_requires_task_id_argument() {
+    let temp = setup_temp_dir();
+    
+    run_command(&["init"], &temp);
+    
+    // Try show without task ID
+    let result = run_command(&["show"], &temp);
+    
+    assert!(!result.success, "show should fail without task ID");
+    assert!(result.stderr.contains("Usage") || result.stderr.contains("usage"), 
+            "should show usage message");
+    
+    cleanup_temp_dir(temp);
+}

@@ -32,7 +32,7 @@
 32|open|Consider using clap or similar for CLI argument parsing
 33|open|Evaluate migrating from pipe-delimited to JSON Lines format
 34|open|Support multi-line descriptions in tasks
-35|open|Add 'show' command to display full task details including description (pain count: 2)
+35|done|Add 'show' command to display full task details including description (pain count: 2)
 36|open|Print task description when starting work on a task (pain count: 2)
 37|open|Add commit reminder to 'knecht done' output (pain count: 2)
 38|open|Add command to record pain instances on tasks (pain count: 1)
@@ -65,3 +65,4 @@
 114|open|Add 'knecht search' command to search task titles and descriptions|Pain: During task-114 session, user mentioned 'task-144' but meant 'task-114'. Agent had to grep the file to understand. A search command would help find tasks by keywords: 'knecht search reset' or 'knecht search "tests reset"'. Related to task-111 (agents bypassing knecht interface) and task-100 (need better task discovery).
 115|open|Agent over-designed solution - should question necessity before adding complexity|Anti-pattern observed in task-114: Agent tried multiple complex solutions (mutexes, cargo config, subprocess compilation) before user asked 'Why not just remove the wrappers?' The right answer was DELETE CODE, not add complexity. Pattern: Agent was in 'fix the test' mode instead of 'question if we need the test' mode. This violates YAGNI and pain-driven development principles. Refactoring: Need better heuristics/prompts for when to SIMPLIFY vs when to ADD. Related to task-104 (agent over-engineering during task-50). Pain count should track how often agents add unnecessary complexity.
 116|open|Add pain count increment command: knecht pain <task-id>|Current pain: To increment pain count on existing task, must manually edit the file. During task-114 reflection, realized task-104 should have pain count incremented from 1 to 2 (second instance of agent over-engineering). Pain tracking is core to pain-driven development but currently requires manual file editing. Need: 'knecht pain 104' to increment count, or 'knecht pain 104 --count 2' to set explicitly. Related to task-38 which was filed earlier with pain count: 1.
+117|open|Track source task when recording pain instances|When adding pain to a task, record which task the pain was experienced during. This provides context for understanding pain patterns. Example: 'task-35 caused pain during task-8' helps understand workflow issues. Related to task-38 (pain command) and task-116 (pain increment).
