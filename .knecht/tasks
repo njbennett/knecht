@@ -8,7 +8,7 @@
 8|open|Switch storytime project from beads to knecht
 9|done|Normal task without pipes
 10|done|Fix test flakiness with parallel execution (pain count: 1)
-11|open|Add command to delete/remove tasks (pain count: 2)|Just had to manually edit .knecht/tasks to remove task-38 after deciding not to pursue it. Need a proper 'knecht delete task-N' or 'knecht remove task-N' command.
+11|open|Add command to delete/remove tasks (pain count: 2)
 12|done|Decide how to handle beads descriptions in knecht migration [addresses blocker in task-8]
 13|done|Decide how to handle beads priorities (0-4) in knecht migration [addresses blocker in task-8]
 14|done|Decide how to handle beads issue_types (bug/task/epic/feature/chore) [addresses blocker in task-8]
@@ -16,28 +16,31 @@
 16|done|Add README documentation for beads2knecht tool [addresses blocker in task-8]
 17|done|Add description field to knecht format (pain count: 2 - blocker for task-8)
 18|done|Update beads2knecht to preserve descriptions [addresses blocker in task-17]
-19|open|Replace bd instructions with knecht in storytime .rules [addresses blocker in task-8]
+19|done|Replace bd instructions with knecht in storytime .rules [addresses blocker in task-8]
 20|open|Document how to uninstall/remove beads from storytime [addresses blocker in task-8]
 21|open|Document multiple binaries setup in README (default-run in Cargo.toml)
 22|open|Consider adding test-data/ directory for example files and test fixtures
-23|open|Add test helper functions for common test operations (pain count: 3)|Specific pain: Testing stdin/stdout binaries (beads2knecht) requires verbose boilerplate repeated in every test - spawning process with Stdio::piped, writing to stdin, waiting for output, converting bytes to strings. Need helper like run_command_with_stdin(binary, input) -> TestResult similar to existing run_command().
+23|open|Add test helper functions for common test operations (pain count: 3)
 24|done|Test task -d Description here
-25|done|Test with description|This is a detailed description
+25|done|Test with description
 26|done|Simple task without description
-27|done|Add refactoring reflection prompt after task completion (pain count: 4)|When 'knecht done task-N' completes, prompt the agent: 'Did you notice anything missing from knecht's interface during this work? Did you notice anything new that was difficult about working with the codebase while you did this work? Is there anything in the work you just did that we should refactor? Make a list of the refactoring opportunities. Where you can, use named refactors from Martin Fowler's Refactoring, or Michael Feather's Working Effectively with Legacy Code. Check knecht to see if anything similar has already been filed, and if so, increase the pain count on those tasks.' PAIN: Manually reflecting and updating tasks after completing task-16.
-28|open|Extract Method: CLI argument parsing in cmd_add|Apply 'Extract Method' refactoring (Fowler) to the manual argument parsing logic in cmd_add(). The while loop that parses -d flags is ~20 lines and will become unwieldy as we add more flags. Extract to parse_add_args() returning a struct with title and description fields. (pain count: 1)
-29|open|Replace Magic String with Symbolic Constant: pipe delimiter|Apply 'Replace Magic Number/String with Symbolic Constant' (Fowler). The pipe delimiter is hardcoded in multiple places (read_tasks, write_tasks, add_task validation). Extract to const DELIMITER: char to make format changes easier and more discoverable. (pain count: 1)
-30|open|Extract Class: TaskSerializer for format parsing/writing|Apply 'Extract Class' (Fowler). The Task struct knows about its file format (split/join on pipes). As format evolves, separate domain model (Task) from serialization concerns. Consider TaskSerializer with parse_line() and format_line() methods. (pain count: 1)
-31|open|Restructure to eliminate pipe character validation need|Instead of validating/rejecting pipes, consider structural solutions: (1) Use newtypes (Title, Description) that validate on construction - 'Wrap Primitive' pattern (Feathers), (2) Escape pipes instead of rejecting them, (3) Use different delimiter (tab, multichar), (4) Length-prefixed fields, or (5) Multi-line format. Evaluate trade-offs vs simplicity/human-readable principles. (pain count: 1)
-32|open|Consider using clap or similar for CLI argument parsing|Manual arg parsing works for now but will get complex as we add flags. Consider using clap crate for proper CLI parsing with help text, validation, etc. Defer until manual parsing becomes truly painful - YAGNI applies. (pain count: 1)
-33|open|Evaluate migrating from pipe-delimited to JSON Lines format|Current pipe format has limitations: (1) Can't use pipe character in text - pain count 1, (2) Can't support multi-line descriptions - pain count 0 but likely needed for formatted notes/code blocks/lists, (3) Manual escaping complexity. JSON Lines (one JSON object per line) would solve these while maintaining git-friendly one-line-per-task diffs. Trade-offs: larger file size (3x), needs serde dependency, less manually editable, more syntax noise. Defer until multi-line descriptions become painful or pipe-in-text hits pain count 3.
-34|open|Support multi-line descriptions in tasks|Currently descriptions are single-line due to pipe-delimited format that reads line-by-line. Multi-line descriptions would be useful for: formatted notes, code examples, bullet lists, detailed explanations. This likely requires format change (JSON Lines?) or escaping newlines. Related to task-33. (pain count: 0)
-35|open|Add 'show' command to display full task details including description (pain count: 2)|Need a way to view the complete task information, especially the description field. Something like 'knecht show task-27' that displays id, status, title, and description. This would help when tasks have detailed instructions in their descriptions. PAIN: During task-16, had to manually read .knecht/tasks file to understand what the task required instead of using 'knecht show task-16'. PAIN: During task-27, agent had to guess what the reflection prompt should contain because task description wasn't easily visible.
-36|open|Print task description when starting work on a task (pain count: 2)|When an agent or user begins work on a task, the description should be displayed as a prompt/guide for the work. This could be triggered by a 'knecht start task-N' command, or possibly automatically when referencing a task. Descriptions should function as work instructions/context. PAIN: Had to manually grep for task-27's description. PAIN: During task-27, agent made up wrong prompt content because description wasn't displayed when starting work.
-37|open|Add commit reminder to 'knecht done' output (pain count: 2)|When 'knecht done task-N' completes, prompt the agent with the commit workflow. Use the commit prompt that the user has been refining (will be provided when implementing). This reinforces the workflow and reminds agents/users to commit their work. PAIN: During task-16 completion, had to manually remember to ask about committing and go through the confirmation workflow.
-38|open|Add command to record pain instances on tasks (pain count: 1)|Currently updating pain counts requires manually editing .knecht/tasks to increment the number and add context. Need a command like 'knecht pain task-N <description>' that: (1) increments the pain count, (2) appends the pain description to the task description with timestamp/context, (3) displays the updated task with new pain count. This makes it easy to track when and why pain occurred, supporting data-driven feature decisions. Example: 'knecht pain task-11 Had to manually edit file to remove task-38' would increment task-11's pain count and record the context. PAIN: After task-16 refactoring reflection, had to manually edit this file to update pain counts for tasks 27, 35, and 38 - tedious and error-prone.
-39|open|Review README for redundancy, contradictions, and structure|The README has grown to ~300 lines. Review it for: (1) Redundant sections or repetitive content that can be consolidated, (2) Contradictions or inconsistencies between sections, (3) Long sections that should be extracted to separate files (e.g., MIGRATION.md, CONTRIBUTING.md), (4) Flow and organization - does it make sense for new users/agents? Goal: Keep README focused on quick-start and core concepts, move detailed content to topic-specific files.
-40|open|Add git pre-commit hook to prompt README review on README changes|When README.md is modified in a commit, a pre-commit hook should: (1) Detect if README.md is in the staged changes, (2) Check if there's an open task about reviewing/streamlining the README (like task-39), (3) If such a task exists, increment its pain count and remind the committer about it, (4) If no such task exists, prompt to create one or add pain to an existing README maintenance task. This ensures README quality doesn't degrade as it grows. The hook should be informative but not block commits - just remind/record pain.
-41|done|Add pre-commit hook to run tests before allowing commit|Create .git/hooks/pre-commit that runs 'cargo test' and blocks the commit if tests fail. This ensures we never commit broken code. The hook should be executable and provide clear error messages if tests fail.
-42|done|Add test coverage check to pre-commit hook requiring 100% coverage|Extend the pre-commit hook to check test coverage using cargo-tarpaulin or similar. Require 100% line coverage before allowing commits. The hook should show which lines are not covered if the check fails. This might be aggressive - consider making it a warning first and track pain if it becomes annoying.
-43|open|Add command to update task title and description|Need 'knecht update task-N [--title <new-title>] [--description <new-desc>]' to modify existing tasks. Currently have to manually edit .knecht/tasks file to change task details. Should support updating title only, description only, or both. (pain count: 1)
+27|done|Add refactoring reflection prompt after task completion (pain count: 4)
+28|open|Extract Method: CLI argument parsing in cmd_add
+29|open|Replace Magic String with Symbolic Constant: pipe delimiter
+30|open|Extract Class: TaskSerializer for format parsing/writing
+31|open|Restructure to eliminate pipe character validation need
+32|open|Consider using clap or similar for CLI argument parsing
+33|open|Evaluate migrating from pipe-delimited to JSON Lines format
+34|open|Support multi-line descriptions in tasks
+35|open|Add 'show' command to display full task details including description (pain count: 2)
+36|open|Print task description when starting work on a task (pain count: 2)
+37|open|Add commit reminder to 'knecht done' output (pain count: 2)
+38|open|Add command to record pain instances on tasks (pain count: 1)
+39|open|Review README for redundancy, contradictions, and structure
+40|open|Add git pre-commit hook to prompt README review on README changes
+41|done|Add pre-commit hook to run tests before allowing commit
+42|done|Add test coverage check to pre-commit hook requiring 100% coverage
+43|open|Add command to update task title and description
+44|open|Add usage instructions to 'knecht list' output for agents
+45|open|Improve installation instructions in README -d Current instructions assume user knows about cargo, PATH, /usr/local/bin, and sudo. Add: 1) Prerequisites (Rust/cargo), 2) Step-by-step installation with actual commands, 3) Verification step (which knecht), 4) Troubleshooting common issues (permission denied, PATH not set), 5) Alternative: running via cargo run from source
+46|open|Create release process and distribution strategy -d Current: users build from source. Future options: 1) GitHub releases with pre-built binaries for major platforms (macOS, Linux, Windows), 2) Homebrew tap for macOS, 3) cargo install knecht (publish to crates.io), 4) Installation script (curl 

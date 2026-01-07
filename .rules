@@ -26,6 +26,14 @@
 7. **Structured Workflow**: Guide agents through incremental, testable work
    - Start → Test → Implement → Complete → Commit → Reflect
 
+### Extreme Programming
+
+We reject industry conventional wisdom that says "perfect is the enemy of good."
+
+We turn practices that work up to maximum: TDD, refactoring, simplicity, testing.
+
+If something is good practice, doing it 100% is better than doing it 80%.
+
 ## Architecture Overview
 
 ### Module Structure
