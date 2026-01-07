@@ -1,9 +1,7 @@
 use std::env;
 use std::fs;
 
-mod task;
-
-use task::{add_task, mark_task_done, read_tasks};
+use knecht::{add_task, mark_task_done, read_tasks};
 
 fn main() {
     let args: Vec<String> = env::args().collect();

@@ -3,6 +3,46 @@ use std::io::{self, BufRead, BufReader, Write};
 use std::path::Path;
 use std::fmt;
 
+/// Trait for filesystem operations to allow dependency injection in tests
+pub trait FileSystem {
+    fn exists(&self, path: &Path) -> bool;
+    fn open(&self, path: &Path) -> io::Result<Box<dyn BufRead>>;
+    fn create(&self, path: &Path) -> io::Result<Box<dyn Write>>;
+    fn create_dir_all(&self, path: &Path) -> io::Result<()>;
+    fn append(&self, path: &Path) -> io::Result<Box<dyn Write>>;
+}
+
+/// Real filesystem implementation
+pub struct RealFileSystem;
+
+impl FileSystem for RealFileSystem {
+    fn exists(&self, path: &Path) -> bool {
+        path.exists()
+    }
+
+    fn open(&self, path: &Path) -> io::Result<Box<dyn BufRead>> {
+        let file = fs::File::open(path)?;
+        Ok(Box::new(BufReader::new(file)))
+    }
+
+    fn create(&self, path: &Path) -> io::Result<Box<dyn Write>> {
+        let file = fs::File::create(path)?;
+        Ok(Box::new(file))
+    }
+
+    fn create_dir_all(&self, path: &Path) -> io::Result<()> {
+        fs::create_dir_all(path)
+    }
+
+    fn append(&self, path: &Path) -> io::Result<Box<dyn Write>> {
+        let file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)?;
+        Ok(Box::new(file))
+    }
+}
+
 /// Escape backslashes and pipes for storage in pipe-delimited format
 fn escape(s: &str) -> String {
     s.replace('\\', "\\\\").replace('|', "\\|")
@@ -97,20 +137,30 @@ impl Task {
 }
 
 pub fn read_tasks() -> Result<Vec<Task>, KnechtError> {
+    read_tasks_with_fs(&RealFileSystem)
+}
+
+pub fn read_tasks_with_fs(fs: &dyn FileSystem) -> Result<Vec<Task>, KnechtError> {
     let path = Path::new(".knecht/tasks");
     
-    if !path.exists() {
+    if !fs.exists(path) {
         return Ok(Vec::new());
     }
     
-    let file = fs::File::open(path)?;
-    let reader = BufReader::new(file);
+    let mut reader = fs.open(path)?;
     let mut tasks = Vec::new();
+    let mut buffer = String::new();
     
-    for line in reader.lines() {
-        let line = line?;
+    loop {
+        buffer.clear();
+        let bytes_read = reader.read_line(&mut buffer)?;
+        if bytes_read == 0 {
+            break;
+        }
         
-        if line.trim().is_empty() {
+        let line = buffer.trim_end_matches('\n').trim_end_matches('\r');
+        
+        if line.is_empty() {
             continue;
         }
         
@@ -137,10 +187,14 @@ pub fn read_tasks() -> Result<Vec<Task>, KnechtError> {
 }
 
 pub fn write_tasks(tasks: &[Task]) -> Result<(), KnechtError> {
+    write_tasks_with_fs(tasks, &RealFileSystem)
+}
+
+pub fn write_tasks_with_fs(tasks: &[Task], fs: &dyn FileSystem) -> Result<(), KnechtError> {
     // Ensure .knecht directory exists
-    fs::create_dir_all(".knecht")?;
+    fs.create_dir_all(Path::new(".knecht"))?;
     
-    let mut file = fs::File::create(".knecht/tasks")?;
+    let mut file = fs.create(Path::new(".knecht/tasks"))?;
     
     for task in tasks {
         let line = if let Some(desc) = &task.description {
@@ -155,7 +209,11 @@ pub fn write_tasks(tasks: &[Task]) -> Result<(), KnechtError> {
 }
 
 pub fn get_next_id() -> Result<u32, KnechtError> {
-    let tasks = read_tasks()?;
+    get_next_id_with_fs(&RealFileSystem)
+}
+
+pub fn get_next_id_with_fs(fs: &dyn FileSystem) -> Result<u32, KnechtError> {
+    let tasks = read_tasks_with_fs(fs)?;
     
     let max_id = tasks
         .iter()
@@ -167,7 +225,11 @@ pub fn get_next_id() -> Result<u32, KnechtError> {
 }
 
 pub fn add_task(title: String, description: Option<String>) -> Result<u32, KnechtError> {
-    let next_id = get_next_id()?;
+    add_task_with_fs(title, description, &RealFileSystem)
+}
+
+pub fn add_task_with_fs(title: String, description: Option<String>, fs: &dyn FileSystem) -> Result<u32, KnechtError> {
+    let next_id = get_next_id_with_fs(fs)?;
     let line = if let Some(desc) = description {
         format!("{}|open|{}|{}\n", next_id, escape(&title), escape(&desc))
     } else {
@@ -175,12 +237,9 @@ pub fn add_task(title: String, description: Option<String>) -> Result<u32, Knech
     };
     
     // Ensure .knecht directory exists
-    fs::create_dir_all(".knecht")?;
+    fs.create_dir_all(Path::new(".knecht"))?;
     
-    let mut file = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(".knecht/tasks")?;
+    let mut file = fs.append(Path::new(".knecht/tasks"))?;
     
     file.write_all(line.as_bytes())?;
     
@@ -188,16 +247,21 @@ pub fn add_task(title: String, description: Option<String>) -> Result<u32, Knech
 }
 
 pub fn mark_task_done(task_id: &str) -> Result<Task, KnechtError> {
-    let mut tasks = read_tasks()?;
+    mark_task_done_with_fs(task_id, &RealFileSystem)
+}
+
+pub fn mark_task_done_with_fs(task_id: &str, fs: &dyn FileSystem) -> Result<Task, KnechtError> {
+    let mut tasks = read_tasks_with_fs(fs)?;
     
     for task in &mut tasks {
         if task.id == task_id {
             task.mark_done();
             let completed_task = task.clone();
-            write_tasks(&tasks)?;
+            write_tasks_with_fs(&tasks, fs)?;
             return Ok(completed_task);
         }
     }
     
     Err(KnechtError::TaskNotFound(task_id.to_string()))
 }
+
