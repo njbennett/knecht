@@ -2,13 +2,29 @@
 
 ## Project Philosophy
 
-**knecht** is a git-native task tracker built on these core principles:
+**knecht** is a git-native task tracker designed primarily for AI agents to work in highly structured, incremental workflows.
 
-1. **Test-Driven Development**: Every feature starts with a failing test
-2. **Self-Hosting**: We use knecht to build knecht
-3. **Pain-Driven Development**: Features are added only when their absence hurts
-4. **Simplest Possible**: Sequential IDs, pipe-delimited files, no complexity
-5. **YAGNI**: You Ain't Gonna Need It - defer features until they're proven necessary
+### Core Design Principles:
+
+1. **Agent-First Design**: Optimize for AI agents working autonomously, not human convenience
+   - Programmatic interfaces over interactive UX
+   - Structured data over free-form text
+   - If humans need friendly interfaces, we'll build separate tools that consume knecht's output
+
+2. **Test-Driven Development**: Every feature starts with a failing test
+
+3. **Self-Hosting**: We use knecht to build knecht (eating our own dog food)
+
+4. **Pain-Driven Development**: Features are added only when their absence hurts
+   - Track pain counts explicitly
+   - Implement at pain count ~3-5
+
+5. **Simplest Possible**: Sequential IDs, pipe-delimited files, no complexity
+
+6. **YAGNI**: You Ain't Gonna Need It - defer features until they're proven necessary
+
+7. **Structured Workflow**: Guide agents through incremental, testable work
+   - Start → Test → Implement → Complete → Commit → Reflect
 
 ## Architecture Overview
 
@@ -229,6 +245,8 @@ Keep docs practical, current, and concise. Prefer examples over prose.
 - Fix cargo warnings immediately
 - Confirm with user before committing changes
 - Commit `.knecht/tasks` with code changes
+- Design for agents first - prioritize machine-readable output and programmatic interfaces
+- Build human-friendly tools separately if needed (don't compromise agent UX for human convenience)
 
 **Never:**
 - Add features without tests

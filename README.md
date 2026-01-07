@@ -1,20 +1,25 @@
 # knecht
 
-A git-native task tracker for giving agents very lightweight memory.
+A git-native task tracker designed primarily for AI agents to work in highly structured, incremental workflows.
 
 Named after Joseph Knecht from Hermann Hesse's *The Glass Bead Game* - "knecht" means "servant" in German.
 
-This is an experiment in agent-driven coding,
-and a place to practice vibe coding.
+## Design Philosophy
 
-## Philosophy
+**knecht is agent-first.** It's designed to help AI agents:
+- Work incrementally through structured tasks
+- Maintain context across sessions via git-native storage
+- Follow test-driven development workflows
+- Track pain points and make data-driven decisions about features
 
-**knecht** is built following these principles:
+## Core Principles
 
-1. **Test-Driven**: Every feature starts with a failing test
-2. **Self-Hosting**: We use knecht to build knecht
-3. **Pain-Driven**: Features are added only when their absence hurts
-4. **Simplest Possible**: Sequential IDs, pipe-delimited files, no complexity
+1. **Agent-First Design**: Optimize for AI agents working autonomously, not human convenience
+2. **Test-Driven Development**: Every feature starts with a failing test
+3. **Self-Hosting**: We use knecht to build knecht (eating our own dog food)
+4. **Pain-Driven Features**: Features are added only when their absence hurts (track pain counts)
+5. **Simplest Possible**: Sequential IDs, pipe-delimited files, no complexity
+6. **Structured Workflow**: Guide agents through incremental, testable work
 
 ## Installation
 
