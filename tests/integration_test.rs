@@ -572,3 +572,31 @@ fn beads2knecht_reports_lost_information() {
     assert!(stderr.contains("task:"), "Should report task issue type");
     assert!(stderr.contains("epic:"), "Should report epic issue type");
 }
+
+#[test]
+fn done_shows_refactoring_reflection_prompt() {
+    let temp = setup_temp_dir();
+    run_command(&["init"], &temp);
+    run_command(&["add", "Task to complete"], &temp);
+
+    let result = run_command(&["done", "task-1"], &temp);
+    
+    assert!(result.success, "done command should succeed");
+    assert!(result.stdout.contains("✓ task-1"), "Should show completed task");
+    assert!(result.stdout.contains("Did you notice anything missing from knetch's interface"), 
+        "Should ask about missing interface features");
+    assert!(result.stdout.contains("Did you notice anything the user had to correct the agent about"), 
+        "Should ask about user corrections");
+    assert!(result.stdout.contains("Did you notice anything new that was difficult about working with the codebase"), 
+        "Should ask about codebase difficulties");
+    assert!(result.stdout.contains("Martin Fowler's Refactoring"), 
+        "Should mention Martin Fowler's Refactoring");
+    assert!(result.stdout.contains("Michael Feather's Working Effectively with Legacy Code"), 
+        "Should mention Michael Feathers' book");
+    assert!(result.stdout.contains("Check knecht to see if anything similar has already been filed"), 
+        "Should remind to check existing tasks");
+    assert!(result.stdout.contains("increase the pain count"), 
+        "Should mention increasing pain count");
+
+    cleanup_temp_dir(temp);
+}

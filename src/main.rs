@@ -111,6 +111,13 @@ fn cmd_done(args: &[String]) {
     match mark_task_done(task_id) {
         Ok(task) => {
             println!("✓ task-{}: {}", task.id, task.title);
+            println!();
+            print!("Did you notice anything missing from knetch's interface during this work?
+
+Did you notice anything the user had to correct the agent about, that could have been improved or avoided by making a change to knecht?
+
+Did you notice anything new that was difficult about working with the codebase while you did this work? Is there anything in the work you just did that we should refactor? Make a list of the refactoring opportunities. Where you can, use named refactors from Martin Fowler's Refactoring, or Michael Feather's Working Effectively with Legacy Code. Check knecht to see if anything similar has already been filed, and if so, increase the pain count on those tasks.
+");
         }
         Err(err) => {
             eprintln!("Error: {}", err);
