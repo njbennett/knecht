@@ -79,20 +79,9 @@ fn test_mark_task_done_error_on_write() {
     assert!(mark_task_done_with_fs("1", &fs).is_err());
 }
 
-#[test]
-fn test_public_wrapper_write_tasks() {
-    // These wrapper functions are used by main.rs but not covered by integration tests
-    // since integration tests run the binary, not the library directly
-    let tasks = vec![Task { id: "99".to_string(), status: "open".to_string(), title: "Test".to_string(), description: None }];
-    // This will fail because we're not in a directory with .knecht, but that's ok - we just need to exercise the function
-    let _ = knecht::write_tasks(&tasks);
-}
-
-#[test]
-fn test_public_wrapper_get_next_id() {
-    // This will fail because we're not in a directory with .knecht, but that's ok - we just need to exercise the function
-    let _ = knecht::get_next_id();
-}
+// NOTE: Wrapper functions (write_tasks, get_next_id, add_task, mark_task_done, read_tasks)
+// have been removed. Main.rs now calls *_with_fs() functions directly with RealFileSystem.
+// This eliminates the need for problematic tests that were causing the data loss bug in task-114.
 
 #[test]
 fn test_real_filesystem_open_nonexistent_file() {

@@ -136,10 +136,6 @@ impl Task {
     }
 }
 
-pub fn read_tasks() -> Result<Vec<Task>, KnechtError> {
-    read_tasks_with_fs(&RealFileSystem)
-}
-
 pub fn read_tasks_with_fs(fs: &dyn FileSystem) -> Result<Vec<Task>, KnechtError> {
     let path = Path::new(".knecht/tasks");
     
@@ -164,7 +160,7 @@ pub fn read_tasks_with_fs(fs: &dyn FileSystem) -> Result<Vec<Task>, KnechtError>
             continue;
         }
         
-        let parts = split_unescaped(&line);
+        let parts = split_unescaped(line);
         if parts.len() >= 3 {
             // Support both old format (3 fields) and new format (4 fields)
             let description = if parts.len() >= 4 {
@@ -186,10 +182,6 @@ pub fn read_tasks_with_fs(fs: &dyn FileSystem) -> Result<Vec<Task>, KnechtError>
     Ok(tasks)
 }
 
-pub fn write_tasks(tasks: &[Task]) -> Result<(), KnechtError> {
-    write_tasks_with_fs(tasks, &RealFileSystem)
-}
-
 pub fn write_tasks_with_fs(tasks: &[Task], fs: &dyn FileSystem) -> Result<(), KnechtError> {
     // Ensure .knecht directory exists
     fs.create_dir_all(Path::new(".knecht"))?;
@@ -208,10 +200,6 @@ pub fn write_tasks_with_fs(tasks: &[Task], fs: &dyn FileSystem) -> Result<(), Kn
     Ok(())
 }
 
-pub fn get_next_id() -> Result<u32, KnechtError> {
-    get_next_id_with_fs(&RealFileSystem)
-}
-
 pub fn get_next_id_with_fs(fs: &dyn FileSystem) -> Result<u32, KnechtError> {
     let tasks = read_tasks_with_fs(fs)?;
     
@@ -222,10 +210,6 @@ pub fn get_next_id_with_fs(fs: &dyn FileSystem) -> Result<u32, KnechtError> {
         .unwrap_or(0);
     
     Ok(max_id + 1)
-}
-
-pub fn add_task(title: String, description: Option<String>) -> Result<u32, KnechtError> {
-    add_task_with_fs(title, description, &RealFileSystem)
 }
 
 pub fn add_task_with_fs(title: String, description: Option<String>, fs: &dyn FileSystem) -> Result<u32, KnechtError> {
@@ -244,10 +228,6 @@ pub fn add_task_with_fs(title: String, description: Option<String>, fs: &dyn Fil
     file.write_all(line.as_bytes())?;
     
     Ok(next_id)
-}
-
-pub fn mark_task_done(task_id: &str) -> Result<Task, KnechtError> {
-    mark_task_done_with_fs(task_id, &RealFileSystem)
 }
 
 pub fn mark_task_done_with_fs(task_id: &str, fs: &dyn FileSystem) -> Result<Task, KnechtError> {

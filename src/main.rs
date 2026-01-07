@@ -1,7 +1,7 @@
 use std::env;
 use std::fs;
 
-use knecht::{add_task, mark_task_done, read_tasks};
+use knecht::{add_task_with_fs, mark_task_done_with_fs, read_tasks_with_fs, RealFileSystem};
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -71,7 +71,7 @@ fn cmd_add(args: &[String]) {
         std::process::exit(1);
     }
     
-    match add_task(title, description) {
+    match add_task_with_fs(title, description, &RealFileSystem) {
         Ok(task_id) => {
             println!("Created task-{}", task_id);
         }
@@ -83,7 +83,7 @@ fn cmd_add(args: &[String]) {
 }
 
 fn cmd_list() {
-    let tasks = match read_tasks() {
+    let tasks = match read_tasks_with_fs(&RealFileSystem) {
         Ok(tasks) => tasks,
         Err(e) => {
             eprintln!("Error reading tasks: {}", e);
@@ -106,7 +106,7 @@ fn cmd_done(args: &[String]) {
     let task_arg = &args[0];
     let task_id = task_arg.strip_prefix("task-").unwrap_or(task_arg);
     
-    match mark_task_done(task_id) {
+    match mark_task_done_with_fs(task_id, &RealFileSystem) {
         Ok(task) => {
             println!("✓ task-{}: {}", task.id, task.title);
             println!();

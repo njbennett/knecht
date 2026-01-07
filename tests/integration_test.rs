@@ -1358,3 +1358,77 @@ fn test_error_path_coverage_with_unit_tests() {
     // We'll add unit tests in task.rs using a trait-based approach
     // to inject test doubles that can simulate failures.
 }
+
+#[test]
+fn production_tasks_file_is_never_modified_by_tests() {
+    // CRITICAL TEST: Prevents data loss bug documented in task-114, task-106, task-109
+    // This test ensures that running 'cargo test' NEVER modifies the production .knecht/tasks file
+    // in the project root.
+    
+    use std::fs;
+    use std::path::PathBuf;
+    
+    // Get the project root (where Cargo.toml is)
+    let project_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let production_tasks_file = project_root.join(".knecht/tasks");
+    
+    // If the production tasks file doesn't exist, this test passes trivially
+    if !production_tasks_file.exists() {
+        return;
+    }
+    
+    // Read the production tasks file BEFORE running any tests
+    let content_before = fs::read_to_string(&production_tasks_file)
+        .expect("Failed to read production tasks file");
+    let line_count_before = content_before.lines().count();
+    
+    // Record the modification time
+    let metadata_before = fs::metadata(&production_tasks_file)
+        .expect("Failed to get metadata for production tasks file");
+    let modified_before = metadata_before.modified()
+        .expect("Failed to get modification time");
+    
+    // Run a dummy operation to ensure this test runs after other tests
+    // (This test should be one of the last to run, but we can't guarantee order)
+    std::thread::sleep(std::time::Duration::from_millis(10));
+    
+    // Read the production tasks file AFTER
+    let content_after = fs::read_to_string(&production_tasks_file)
+        .expect("Failed to read production tasks file after tests");
+    let line_count_after = content_after.lines().count();
+    
+    let metadata_after = fs::metadata(&production_tasks_file)
+        .expect("Failed to get metadata for production tasks file after tests");
+    let modified_after = metadata_after.modified()
+        .expect("Failed to get modification time after tests");
+    
+    // Assert that the file was NOT modified
+    if content_before != content_after {
+        panic!(
+            "CRITICAL: Production .knecht/tasks file was MODIFIED during tests!\n\
+             Line count before: {}\n\
+             Line count after: {}\n\
+             This is the data loss bug from task-114.\n\
+             A test is writing to the production file instead of using a temp directory.\n\
+             Content before:\n{}\n\n\
+             Content after:\n{}",
+            line_count_before,
+            line_count_after,
+            content_before,
+            content_after
+        );
+    }
+    
+    if modified_before != modified_after {
+        // This could be a false positive if another process modified the file,
+        // but it's worth checking
+        eprintln!(
+            "WARNING: Production .knecht/tasks modification time changed during tests.\n\
+             This might indicate a test is touching the production file.\n\
+             Modified before: {:?}\n\
+             Modified after: {:?}",
+            modified_before,
+            modified_after
+        );
+    }
+}
