@@ -53,14 +53,9 @@ File: `.knecht/tasks`
 3|open|Commit the code
 ```
 
-Format: `{id}|{status}|{title}`
+Format: `{id}|{status}|{title}|{description}` (description is optional)
 
-- **Pipe-delimited**: Simple to parse with `split('|')`
-- **Line-based**: Git-friendly diffs
-- **Human-readable**: Can be edited directly
-- **Sequential IDs**: Just integers, no UUIDs or hashes
-
-**Do NOT change this format** without discussion. It's simple by design.
+Pipe-delimited, line-based, git-friendly diffs, human-readable, sequential IDs. **Do NOT change this format** without discussion.
 
 ## TDD Workflow - MANDATORY
 
@@ -89,13 +84,9 @@ Format: `{id}|{status}|{title}`
 ### Example TDD Cycle
 
 ```bash
-# 1. Write failing test in tests/integration_test.rs
-cargo test  # Should FAIL
-
-# 2. Implement feature in src/
+cargo test  # Should FAIL - write test first
+# Implement feature in src/
 cargo test  # Should PASS
-
-# 3. Track completion
 knecht done task-N
 git commit -m "task-N: Description"
 ```
@@ -107,14 +98,10 @@ git commit -m "task-N: Description"
 **Current state (v0.1)**: Simple `expect()` and `unwrap()` with helpful messages
 
 ```rust
-// Current approach - acceptable for v0.1
-let file = fs::File::open(path)
-    .expect("Failed to open tasks file");
-
-// Don't prematurely add complex error handling - YAGNI!
+let file = fs::File::open(path).expect("Failed to open tasks file");
 ```
 
-**When to improve**: Track it as a task when you hit actual problems.
+Don't prematurely add complex error handling - YAGNI! Track it as a task when you hit actual problems.
 
 ### Function Design
 
@@ -139,10 +126,6 @@ cargo clippy
 
 **Zero tolerance for warnings**. Fix them before committing.
 
-- Remove unused imports/variables immediately
-- Use `cargo clippy --fix` for auto-fixes
-- Add doc comments to public functions
-
 ## Pain-Driven Feature Development
 
 ### Before Adding ANY Feature, Ask:
@@ -160,16 +143,6 @@ cargo clippy
 
 5. **Can I defer this?** - Almost always: YES
 
-### Examples of Deferred Features
-
-Track your pain count, but don't implement without discussion:
-
-- ❌ Task descriptions/notes
-- ❌ Blocked-by relationships  
-- ❌ Priorities, due dates, tags
-- ❌ Task update/search commands
-- ❌ Multiple task files or config files
-
 When pain count reaches ~3-5 instances, write a test and implement it.
 
 ## Testing Guidelines
@@ -186,10 +159,8 @@ Focus on integration tests via CLI in `tests/integration_test.rs`:
 fn test_feature_X() {
     let temp = setup_temp_dir();
     let result = run_command(&["command", "args"], &temp);
-    
     assert!(result.success);
     assert!(result.stdout.contains("expected output"));
-    
     cleanup_temp_dir(temp);
 }
 ```
@@ -236,7 +207,7 @@ Update when:
 
 Keep docs practical, current, and concise. Prefer examples over prose.
 
-## Key Principles for Agents
+## Summary
 
 **Always:**
 - Write failing test first
@@ -246,7 +217,6 @@ Keep docs practical, current, and concise. Prefer examples over prose.
 - Confirm with user before committing changes
 - Commit `.knecht/tasks` with code changes
 - Design for agents first - prioritize machine-readable output and programmatic interfaces
-- Build human-friendly tools separately if needed (don't compromise agent UX for human convenience)
 
 **Never:**
 - Add features without tests
