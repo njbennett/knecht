@@ -574,10 +574,18 @@ fn done_shows_refactoring_reflection_prompt() {
 
     assert!(result.success, "done command should succeed");
     assert!(result.stdout.contains("✓ task-1"), "Should show completed task");
-    assert!(result.stdout.contains("Did you notice anything missing from knetch's interface"),
+    assert!(result.stdout.contains("REFLECTION PROMPT - Create tasks immediately"),
+        "Should have explicit reflection prompt header");
+    assert!(result.stdout.contains("Did you notice anything missing from knecht's interface"),
         "Should ask about missing interface features");
-    assert!(result.stdout.contains("Did you notice anything the user had to correct the agent about"),
+    assert!(result.stdout.contains("If YOU were confused about workflow or what to do next, that's a KNECHT UX BUG"),
+        "Should explicitly state that agent confusion is a knecht UX bug");
+    assert!(result.stdout.contains("Did the user have to correct or redirect you"),
         "Should ask about user corrections");
+    assert!(result.stdout.contains("That's a KNECHT UX BUG, not just 'you misunderstood'"),
+        "Should explicitly state that user corrections indicate knecht UX bugs");
+    assert!(result.stdout.contains("Did you read .knecht/tasks directly or use grep instead of knecht commands"),
+        "Should ask about bypassing knecht interface");
     assert!(result.stdout.contains("Did you notice anything new that was difficult about working with the codebase"),
         "Should ask about codebase difficulties");
     assert!(result.stdout.contains("Martin Fowler's Refactoring"),
@@ -588,6 +596,8 @@ fn done_shows_refactoring_reflection_prompt() {
         "Should remind to check existing tasks");
     assert!(result.stdout.contains("increase the pain count"),
         "Should mention increasing pain count");
+    assert!(result.stdout.contains("If agents are confused, knecht needs to improve. Create tasks NOW"),
+        "Should emphasize that agent confusion means knecht needs improvement");
 
     cleanup_temp_dir(temp);
 }

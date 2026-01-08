@@ -112,11 +112,23 @@ fn cmd_done(args: &[String]) {
         Ok(task) => {
             println!("✓ task-{}: {}", task.id, task.title);
             println!();
-            print!("Did you notice anything missing from knetch's interface during this work?
+            print!("REFLECTION PROMPT - Create tasks immediately for anything you notice:
 
-Did you notice anything the user had to correct the agent about, that could have been improved or avoided by making a change to knecht?
+1. Did you notice anything missing from knecht's interface during this work?
+   → If YOU were confused about workflow or what to do next, that's a KNECHT UX BUG.
+   → Create a task describing what knecht should have told you but didn't.
 
-Did you notice anything new that was difficult about working with the codebase while you did this work? Is there anything in the work you just did that we should refactor? Make a list of the refactoring opportunities. Where you can, use named refactors from Martin Fowler's Refactoring, or Michael Feather's Working Effectively with Legacy Code. Check knecht to see if anything similar has already been filed, and if so, increase the pain count on those tasks.
+2. Did the user have to correct or redirect you about anything?
+   → That's a KNECHT UX BUG, not just 'you misunderstood'.
+   → Create a task: How could knecht's output have prevented this confusion?
+
+3. Did you read .knecht/tasks directly or use grep instead of knecht commands?
+   → That's a KNECHT UX BUG - the interface should be better than raw file access.
+   → Create a task: What's missing from knecht's output that made you bypass it?
+
+4. Did you notice anything new that was difficult about working with the codebase while you did this work? Is there anything in the work you just did that we should refactor? Make a list of the refactoring opportunities. Where you can, use named refactors from Martin Fowler's Refactoring, or Michael Feather's Working Effectively with Legacy Code. Check knecht to see if anything similar has already been filed, and if so, increase the pain count on those tasks.
+
+IMPORTANT: If agents are confused, knecht needs to improve. Create tasks NOW, don't just note it.
 ");
         }
         Err(err) => {
