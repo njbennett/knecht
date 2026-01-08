@@ -1864,3 +1864,56 @@ fn next_with_zero_pain_count() {
         );
     });
 }
+
+#[test]
+fn done_increments_pain_on_skipped_top_task() {
+    with_initialized_repo(|temp| {
+        // Create task-1 which is the oldest
+        run_command(&["add", "Primary feature work"], &temp);
+        
+        // Create task-2 (newer task)
+        run_command(&["add", "Minor improvement"], &temp);
+        
+        // Complete task-2 instead of task-1 (skipping the oldest task)
+        let done_result = run_command(&["done", "task-2"], &temp);
+        assert!(done_result.success, "done should succeed");
+        
+        // Check that task-1's pain count increased (it was skipped)
+        let list_result = run_command(&["list"], &temp);
+        let task1_line = list_result.stdout.lines()
+            .find(|line| line.contains("task-1"))
+            .expect("Should find task-1 in list output");
+        
+        // Pain should have incremented from 0 to 1
+        assert!(task1_line.contains("(pain count: 1)"),
+            "task-1 pain should increment to 1 when skipped, got: {}", task1_line);
+        
+        // Check task-1's description mentions it was skipped
+        let show_result = run_command(&["show", "task-1"], &temp);
+        assert!(show_result.stdout.contains("Skip: task-2 completed instead") ||
+                show_result.stdout.contains("Skip:"),
+            "task-1 description should note it was skipped, got: {}", show_result.stdout);
+    });
+}
+
+#[test]
+fn done_on_oldest_task_does_not_increment_pain() {
+    with_initialized_repo(|temp| {
+        // Create two tasks
+        run_command(&["add", "Oldest task"], &temp);
+        run_command(&["add", "Newer task"], &temp);
+        
+        // Complete task-1 (the oldest task - not skipping it)
+        let done_result = run_command(&["done", "task-1"], &temp);
+        assert!(done_result.success);
+        
+        // Verify task-2 still has no pain (it wasn't skipped - we did the oldest first)
+        let list_result = run_command(&["list"], &temp);
+        let task2_line = list_result.stdout.lines()
+            .find(|line| line.contains("task-2"))
+            .expect("Should find task-2");
+        
+        assert!(!task2_line.contains("pain count:"),
+            "task-2 should have no pain when oldest task was completed, got: {}", task2_line);
+    });
+}

@@ -262,16 +262,70 @@ pub fn find_task_by_id_with_fs(task_id: &str, fs: &dyn FileSystem) -> Result<Tas
 pub fn mark_task_done_with_fs(task_id: &str, fs: &dyn FileSystem) -> Result<Task, KnechtError> {
     let mut tasks = read_tasks_with_fs(fs)?;
     
+    // Find the oldest open task (lowest ID among open tasks)
+    let oldest_open_task_id = tasks.iter()
+        .filter(|t| t.status == "open")
+        .min_by_key(|t| t.id.parse::<i32>().unwrap_or(i32::MAX))
+        .map(|t| t.id.clone());
+    
+    // Check if the task being marked done is different from the oldest open task
+    let should_increment_skip = oldest_open_task_id.as_ref().is_some_and(|oldest_id| oldest_id != task_id);
+    let skipped_task_id = oldest_open_task_id.clone();
+    
     for task in &mut tasks {
         if task.id == task_id {
             task.mark_done();
             let completed_task = task.clone();
+            
+            // If we skipped the top task, increment its pain
+            if should_increment_skip
+                && let Some(ref skipped_id) = skipped_task_id {
+                    for t in &mut tasks {
+                        if &t.id == skipped_id {
+                            t.pain_count = Some(t.pain_count.unwrap_or(0) + 1);
+                            
+                            // Add skip note to description
+                            let skip_note = format!("Skip: task-{} completed instead", task_id);
+                            if let Some(ref desc) = t.description {
+                                t.description = Some(format!("{}. {}", desc, skip_note));
+                            } else {
+                                t.description = Some(skip_note);
+                            }
+                            break;
+                        }
+                    }
+                }
+            
             write_tasks_with_fs(&tasks, fs)?;
             return Ok(completed_task);
         }
     }
     
     Err(KnechtError::TaskNotFound(task_id.to_string()))
+}
+
+pub fn find_next_task_with_fs(fs: &dyn FileSystem) -> Result<Option<Task>, KnechtError> {
+    let tasks = read_tasks_with_fs(fs)?;
+    
+    // Filter to open tasks only
+    let open_tasks: Vec<_> = tasks.iter()
+        .filter(|t| t.status == "open")
+        .collect();
+    
+    if open_tasks.is_empty() {
+        return Ok(None);
+    }
+    
+    // Find task with highest pain count, preferring older tasks on tie
+    let best_task = open_tasks.iter()
+        .max_by_key(|t| {
+            let pain = t.pain_count.unwrap_or(0);
+            let id_num: i32 = t.id.parse().unwrap_or(0);
+            (pain, -id_num)
+        })
+        .map(|t| (*t).clone());
+    
+    Ok(best_task)
 }
 
 pub fn increment_pain_count_with_fs(task_id: &str, fs: &dyn FileSystem) -> Result<Task, KnechtError> {

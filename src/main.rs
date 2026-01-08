@@ -1,7 +1,7 @@
 use std::env;
 use std::fs;
 
-use knecht::{add_task_with_fs, find_task_by_id_with_fs, increment_pain_count_with_fs, mark_task_done_with_fs, read_tasks_with_fs, RealFileSystem};
+use knecht::{add_task_with_fs, find_next_task_with_fs, find_task_by_id_with_fs, increment_pain_count_with_fs, mark_task_done_with_fs, read_tasks_with_fs, RealFileSystem};
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -216,36 +216,20 @@ fn cmd_pain(args: &[String]) {
 }
 
 fn cmd_next() {
-    match read_tasks_with_fs(&RealFileSystem) {
-        Ok(tasks) => {
-            // Filter to open tasks only
-            let open_tasks: Vec<_> = tasks.iter()
-                .filter(|t| t.status == "open")
-                .collect();
-            
-            if open_tasks.is_empty() {
-                println!("No open tasks");
-                return;
-            }
-            
-            // Find task with highest pain count, preferring older tasks on tie
-            let best_task = open_tasks.iter()
-                .max_by_key(|t| {
-                    let pain = t.pain_count.unwrap_or(0);
-                    let id_num: i32 = t.id.parse().unwrap_or(0);
-                    (pain, -id_num)
-                })
-                .unwrap();
-            
-            println!("Suggested next task: task-{}", best_task.id);
-            println!("Title: {}", best_task.title);
-            if let Some(desc) = &best_task.description {
+    match find_next_task_with_fs(&RealFileSystem) {
+        Ok(Some(task)) => {
+            println!("Suggested next task: task-{}", task.id);
+            println!("Title: {}", task.title);
+            if let Some(desc) = &task.description {
                 println!("\nDescription:\n{}", desc);
             }
-            if let Some(pain) = best_task.pain_count
+            if let Some(pain) = task.pain_count
                 && pain > 0 {
                     println!("\n(pain count: {})", pain);
                 }
+        }
+        Ok(None) => {
+            println!("No open tasks");
         }
         Err(err) => {
             eprintln!("Error reading tasks: {}", err);
