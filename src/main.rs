@@ -1,7 +1,7 @@
 use std::env;
 use std::fs;
 
-use knecht::{add_task_with_fs, find_task_by_id_with_fs, mark_task_done_with_fs, read_tasks_with_fs, RealFileSystem};
+use knecht::{add_task_with_fs, find_task_by_id_with_fs, increment_pain_count_with_fs, mark_task_done_with_fs, read_tasks_with_fs, RealFileSystem};
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -18,6 +18,7 @@ fn main() {
         "done" => cmd_done(&args[2..]),
         "show" => cmd_show(&args[2..]),
         "start" => cmd_start(&args[2..]),
+        "pain" => cmd_pain(&args[2..]),
         _ => {
             eprintln!("Unknown command: {}", args[1]);
             std::process::exit(1);
@@ -95,7 +96,12 @@ fn cmd_list() {
     
     for task in tasks {
         let checkbox = if task.is_done() { "[x]" } else { "[ ]" };
-        println!("{} task-{}  {}", checkbox, task.id, task.title);
+        let pain_suffix = if let Some(count) = task.pain_count {
+            format!(" (pain count: {})", count)
+        } else {
+            String::new()
+        };
+        println!("{} task-{}  {}{}", checkbox, task.id, task.title, pain_suffix);
     }
 }
 
@@ -180,6 +186,26 @@ fn cmd_start(args: &[String]) {
                 println!("Description:");
                 println!("{}", desc);
             }
+        }
+        Err(err) => {
+            eprintln!("Error: {}", err);
+            std::process::exit(1);
+        }
+    }
+}
+
+fn cmd_pain(args: &[String]) {
+    if args.is_empty() {
+        eprintln!("Usage: knecht pain <task-id>");
+        std::process::exit(1);
+    }
+    
+    let task_arg = &args[0];
+    let task_id = task_arg.strip_prefix("task-").unwrap_or(task_arg);
+    
+    match increment_pain_count_with_fs(task_id, &RealFileSystem) {
+        Ok(task) => {
+            println!("Incremented pain count for task-{}: {}", task.id, task.title);
         }
         Err(err) => {
             eprintln!("Error: {}", err);

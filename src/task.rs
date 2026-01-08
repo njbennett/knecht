@@ -124,6 +124,7 @@ pub struct Task {
     pub status: String,
     pub title: String,
     pub description: Option<String>,
+    pub pain_count: Option<u32>,
 }
 
 impl Task {
@@ -162,9 +163,15 @@ pub fn read_tasks_with_fs(fs: &dyn FileSystem) -> Result<Vec<Task>, KnechtError>
         
         let parts = split_unescaped(line);
         if parts.len() >= 3 {
-            // Support both old format (3 fields) and new format (4 fields)
-            let description = if parts.len() >= 4 {
+            // Support formats: id|status|title or id|status|title|description or id|status|title|description|pain_count
+            let description = if parts.len() >= 4 && !parts[3].is_empty() {
                 Some(unescape(&parts[3]))
+            } else {
+                None
+            };
+            
+            let pain_count = if parts.len() >= 5 {
+                parts[4].parse::<u32>().ok()
             } else {
                 None
             };
@@ -174,6 +181,7 @@ pub fn read_tasks_with_fs(fs: &dyn FileSystem) -> Result<Vec<Task>, KnechtError>
                 status: parts[1].clone(),
                 title: unescape(&parts[2]),
                 description,
+                pain_count,
             });
         }
         // Skip malformed lines silently
@@ -189,10 +197,19 @@ pub fn write_tasks_with_fs(tasks: &[Task], fs: &dyn FileSystem) -> Result<(), Kn
     let mut file = fs.create(Path::new(".knecht/tasks"))?;
     
     for task in tasks {
-        let line = if let Some(desc) = &task.description {
-            format!("{}|{}|{}|{}\n", task.id, task.status, escape(&task.title), escape(desc))
-        } else {
-            format!("{}|{}|{}\n", task.id, task.status, escape(&task.title))
+        let line = match (&task.description, &task.pain_count) {
+            (Some(desc), Some(pain)) => {
+                format!("{}|{}|{}|{}|{}\n", task.id, task.status, escape(&task.title), escape(desc), pain)
+            }
+            (Some(desc), None) => {
+                format!("{}|{}|{}|{}\n", task.id, task.status, escape(&task.title), escape(desc))
+            }
+            (None, Some(pain)) => {
+                format!("{}|{}|{}||{}\n", task.id, task.status, escape(&task.title), pain)
+            }
+            (None, None) => {
+                format!("{}|{}|{}\n", task.id, task.status, escape(&task.title))
+            }
         };
         file.write_all(line.as_bytes())?;
     }
@@ -257,3 +274,18 @@ pub fn mark_task_done_with_fs(task_id: &str, fs: &dyn FileSystem) -> Result<Task
     Err(KnechtError::TaskNotFound(task_id.to_string()))
 }
 
+pub fn increment_pain_count_with_fs(task_id: &str, fs: &dyn FileSystem) -> Result<Task, KnechtError> {
+    let mut tasks = read_tasks_with_fs(fs)?;
+    
+    for task in &mut tasks {
+        if task.id == task_id {
+            // Increment pain_count field
+            task.pain_count = Some(task.pain_count.unwrap_or(0) + 1);
+            let updated_task = task.clone();
+            write_tasks_with_fs(&tasks, fs)?;
+            return Ok(updated_task);
+        }
+    }
+    
+    Err(KnechtError::TaskNotFound(task_id.to_string()))
+}

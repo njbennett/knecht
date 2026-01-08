@@ -1,7 +1,7 @@
 mod test_helpers;
 
 use test_helpers::TestFileSystem;
-use knecht::{read_tasks_with_fs, write_tasks_with_fs, get_next_id_with_fs, add_task_with_fs, mark_task_done_with_fs, find_task_by_id_with_fs, Task, RealFileSystem, FileSystem};
+use knecht::{read_tasks_with_fs, write_tasks_with_fs, get_next_id_with_fs, add_task_with_fs, mark_task_done_with_fs, find_task_by_id_with_fs, increment_pain_count_with_fs, Task, RealFileSystem, FileSystem};
 use std::path::Path;
 
 #[test]
@@ -19,21 +19,21 @@ fn test_read_tasks_error_on_read_line() {
 #[test]
 fn test_write_tasks_error_on_create_dir() {
     let fs = TestFileSystem::new().fail("mkdir");
-    let tasks = vec![Task { id: "1".to_string(), status: "open".to_string(), title: "Test".to_string(), description: None }];
+    let tasks = vec![Task { id: "1".to_string(), status: "open".to_string(), title: "Test".to_string(), description: None, pain_count: None }];
     assert!(write_tasks_with_fs(&tasks, &fs).is_err());
 }
 
 #[test]
 fn test_write_tasks_error_on_create() {
     let fs = TestFileSystem::new().fail("create");
-    let tasks = vec![Task { id: "1".to_string(), status: "open".to_string(), title: "Test".to_string(), description: None }];
+    let tasks = vec![Task { id: "1".to_string(), status: "open".to_string(), title: "Test".to_string(), description: None, pain_count: None }];
     assert!(write_tasks_with_fs(&tasks, &fs).is_err());
 }
 
 #[test]
 fn test_write_tasks_error_on_write() {
     let fs = TestFileSystem::new().fail("write");
-    let tasks = vec![Task { id: "1".to_string(), status: "open".to_string(), title: "Test".to_string(), description: None }];
+    let tasks = vec![Task { id: "1".to_string(), status: "open".to_string(), title: "Test".to_string(), description: None, pain_count: None }];
     assert!(write_tasks_with_fs(&tasks, &fs).is_err());
 }
 
@@ -75,8 +75,26 @@ fn test_mark_task_done_error_on_read() {
 
 #[test]
 fn test_mark_task_done_error_on_write() {
-    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1|open|Test\n").fail("create");
+    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1|open|Test\n").fail("write");
     assert!(mark_task_done_with_fs("1", &fs).is_err());
+}
+
+#[test]
+fn test_increment_pain_count_error_on_read() {
+    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1|open|Test\n").fail("open");
+    assert!(increment_pain_count_with_fs("1", &fs).is_err());
+}
+
+#[test]
+fn test_increment_pain_count_error_on_write() {
+    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1|open|Test\n").fail("write");
+    assert!(increment_pain_count_with_fs("1", &fs).is_err());
+}
+
+#[test]
+fn test_increment_pain_count_not_found() {
+    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1|open|Test\n");
+    assert!(increment_pain_count_with_fs("999", &fs).is_err());
 }
 
 // NOTE: Wrapper functions (write_tasks, get_next_id, add_task, mark_task_done, read_tasks)
