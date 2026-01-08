@@ -17,6 +17,7 @@ fn main() {
         "list" => cmd_list(),
         "done" => cmd_done(&args[2..]),
         "show" => cmd_show(&args[2..]),
+        "start" => cmd_start(&args[2..]),
         _ => {
             eprintln!("Unknown command: {}", args[1]);
             std::process::exit(1);
@@ -141,6 +142,31 @@ fn cmd_show(args: &[String]) {
             println!("Title: {}", task.title);
             if let Some(desc) = &task.description {
                 println!("Description: {}", desc);
+            }
+        }
+        Err(err) => {
+            eprintln!("Error: {}", err);
+            std::process::exit(1);
+        }
+    }
+}
+
+fn cmd_start(args: &[String]) {
+    if args.is_empty() {
+        eprintln!("Usage: knecht start <task-id>");
+        std::process::exit(1);
+    }
+    
+    let task_arg = &args[0];
+    let task_id = task_arg.strip_prefix("task-").unwrap_or(task_arg);
+    
+    match find_task_by_id_with_fs(task_id, &RealFileSystem) {
+        Ok(task) => {
+            println!("Starting work on task-{}: {}", task.id, task.title);
+            if let Some(desc) = &task.description {
+                println!();
+                println!("Description:");
+                println!("{}", desc);
             }
         }
         Err(err) => {

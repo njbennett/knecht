@@ -1496,3 +1496,61 @@ fn show_requires_task_id_argument() {
                 "should show usage message");
     });
 }
+
+#[test]
+fn start_displays_task_details_with_description() {
+    with_initialized_repo(|temp| {
+        // Add a task with description
+        let add_result = run_command(&["add", "Implement feature X", "-d", "This feature should do X, Y, and Z"], &temp);
+        assert!(add_result.success, "Failed to add task");
+        
+        // Start working on the task
+        let result = run_command(&["start", "task-1"], &temp);
+        
+        assert!(result.success, "start command should succeed");
+        assert!(result.stdout.contains("task-1"), "should show task ID");
+        assert!(result.stdout.contains("Implement feature X"), "should show task title");
+        assert!(result.stdout.contains("This feature should do X, Y, and Z"), "should show task description");
+    });
+}
+
+#[test]
+fn start_displays_task_without_description() {
+    with_initialized_repo(|temp| {
+        // Add a task without description
+        let add_result = run_command(&["add", "Simple task"], &temp);
+        assert!(add_result.success, "Failed to add task");
+        
+        // Start working on the task
+        let result = run_command(&["start", "task-1"], &temp);
+        
+        assert!(result.success, "start command should succeed");
+        assert!(result.stdout.contains("task-1"), "should show task ID");
+        assert!(result.stdout.contains("Simple task"), "should show task title");
+        assert!(!result.stdout.contains("Description:"), "should not show description label when no description");
+    });
+}
+
+#[test]
+fn start_requires_task_id_argument() {
+    with_initialized_repo(|temp| {
+        // Try start without task ID
+        let result = run_command(&["start"], &temp);
+        
+        assert!(!result.success, "start should fail without task ID");
+        assert!(result.stderr.contains("Usage") || result.stderr.contains("usage"), 
+                "should show usage message");
+    });
+}
+
+#[test]
+fn start_fails_on_nonexistent_task() {
+    with_initialized_repo(|temp| {
+        // Try to start a task that doesn't exist
+        let result = run_command(&["start", "task-999"], &temp);
+        
+        assert!(!result.success, "start should fail on nonexistent task");
+        assert!(result.stderr.contains("not found") || result.stderr.contains("Not found"), 
+                "should indicate task was not found");
+    });
+}
