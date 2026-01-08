@@ -5,7 +5,7 @@
 5|done|Tag v0.1 release
 6|done|Write .rules file for agent guidance on architecture and design principles (include instructions to fix cargo warnings)
 7|done|Consider adding description field||1
-8|open|Switch storytime project from beads to knecht|Skip: task-137 completed instead. Skip: task-111 completed instead|2
+8|open|Switch storytime project from beads to knecht|Skip: task-137 completed instead. Skip: task-111 completed instead. Skip: task-44 completed instead|3
 9|done|Normal task without pipes
 10|done|Fix test flakiness with parallel execution||1
 11|open|Add command to delete/remove tasks||3
@@ -41,7 +41,7 @@
 41|done|Add pre-commit hook to run tests before allowing commit
 42|done|Add test coverage check to pre-commit hook requiring 100% coverage
 43|open|Add command to update task title and description|Currently updating task titles or descriptions requires manually editing .knecht/tasks file. Need command like 'knecht update task-43 --title "New title" --description "New desc"' or 'knecht update task-43 -d "Updated description"'. Pain count: 2 (instances: task-36 used awk to update task-116 and task-119 descriptions, current session manually edited task-122 title to add pain count)|2
-44|open|Add usage instructions to 'knecht list' output for agents
+44|done|Add usage instructions to 'knecht list' output for agents
 45|open|Improve installation instructions in README -d Current instructions assume user knows about cargo, PATH, /usr/local/bin, and sudo. Add: 1) Prerequisites (Rust/cargo), 2) Step-by-step installation with actual commands, 3) Verification step (which knecht), 4) Troubleshooting common issues (permission denied, PATH not set), 5) Alternative: running via cargo run from source
 46|open|Create release process and distribution strategy -d Current: users build from source. Future options: 1) GitHub releases with pre-built binaries for major platforms (macOS, Linux, Windows), 2) Homebrew tap for macOS, 3) cargo install knecht (publish to crates.io), 4) Installation script (curl 
 47|done|Fix bug: Task descriptions being silently dropped on read/write -d CRITICAL DATA LOSS BUG: When reading tasks file, if a description contains pipe characters, the description gets silently dropped instead of failing validation. This happened during task-19 session - many task descriptions disappeared. The read logic needs to either: 1) fail/warn on malformed lines, or 2) handle escaped pipes correctly. Write test first that reproduces the bug.
