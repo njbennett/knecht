@@ -1917,3 +1917,25 @@ fn done_on_oldest_task_does_not_increment_pain() {
             "task-2 should have no pain when oldest task was completed, got: {}", task2_line);
     });
 }
+
+#[test]
+fn done_increments_pain_on_task_with_existing_description() {
+    with_initialized_repo(|temp| {
+        // Create task-1 (oldest) with a description
+        run_command(&["add", "Primary feature", "-d", "Original description"], &temp);
+        
+        // Create task-2 (newer)
+        run_command(&["add", "Minor task"], &temp);
+        
+        // Complete task-2, skipping task-1
+        let done_result = run_command(&["done", "task-2"], &temp);
+        assert!(done_result.success);
+        
+        // Verify task-1's pain incremented and skip note was appended to existing description
+        let show_result = run_command(&["show", "task-1"], &temp);
+        assert!(show_result.stdout.contains("Original description"),
+            "Should preserve original description");
+        assert!(show_result.stdout.contains("Skip: task-2 completed instead"),
+            "Should append skip note to existing description, got: {}", show_result.stdout);
+    });
+}
