@@ -134,6 +134,20 @@ cargo clippy
 
 **Zero tolerance for warnings**. Fix them before committing.
 
+## Coverage and Untested Code
+
+When running coverage checks and finding uncovered code:
+
+1. **Delete the uncovered code first**
+2. Analyze what the deleted code was doing and what behavior changed
+3. Decide if the behavior change is acceptable:
+   - If acceptable (dead code, unreachable defensive checks): leave it deleted
+   - If unacceptable (important error handling, edge cases): write a test for it, then re-implement
+
+Don't spend time trying to write tests for hard-to-reach code. Delete it and see what breaks in your analysis.
+
+The goal: 100% coverage means every line has a reason to exist, proven by a test.
+
 ## Pain-Driven Feature Development
 
 ### Before Adding ANY Feature, Ask:
