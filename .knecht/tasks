@@ -8,7 +8,7 @@
 8|open|Switch storytime project from beads to knecht|Skip: task-137 completed instead|1
 9|done|Normal task without pipes
 10|done|Fix test flakiness with parallel execution||1
-11|open|Add command to delete/remove tasks||2
+11|open|Add command to delete/remove tasks||3
 12|done|Decide how to handle beads descriptions in knecht migration [addresses blocker in task-8]
 13|done|Decide how to handle beads priorities (0-4) in knecht migration [addresses blocker in task-8]
 14|done|Decide how to handle beads issue_types (bug/task/epic/feature/chore) [addresses blocker in task-8]
