@@ -20,7 +20,7 @@
 20|open|Document how to uninstall/remove beads from storytime [addresses blocker in task-8]
 21|open|Document multiple binaries setup in README (default-run in Cargo.toml)
 22|open|Consider adding test-data/ directory for example files and test fixtures
-23|open|Add test helper functions for common test operations (pain count: 3)
+23|done|Add test helper functions for common test operations (pain count: 3)
 24|done|Test task -d Description here
 25|done|Test with description
 26|done|Simple task without description
@@ -68,3 +68,4 @@
 117|open|Track source task when recording pain instances|When adding pain to a task, record which task the pain was experienced during. This provides context for understanding pain patterns. Example: 'task-35 caused pain during task-8' helps understand workflow issues. Related to task-38 (pain command) and task-116 (pain increment).
 118|open|Extract Method: Task ID parsing (strip 'task-' prefix)|Both cmd_show and cmd_done duplicate the logic: task_arg.strip_prefix('task-').unwrap_or(task_arg). Extract into a helper function like parse_task_id(arg: &str) -> &str. This is a small but clear case of 'Duplicate Code' smell. Pain count: 1 (noticed during task-35 reflection)
 119|open|Extract Method: Common CLI command pattern (parse args, call function, handle Result)|Commands cmd_show, cmd_done, and cmd_add all follow similar patterns: 1) Check args exist, 2) Parse/extract values, 3) Call a *_with_fs function, 4) Handle Result (print success or error + exit). This is a larger refactoring that could extract common patterns. Related to task-28 (cmd_add arg parsing) and task-118 (task ID parsing). Consider: Should we extract a command runner pattern, or is this YAGNI? Track pain before implementing. Pain count: 1 (noticed during task-35 reflection)
+120|open|Track skip count for oldest open task|When we skip over the oldest task repeatedly, we lose track of priorities. Add a way to track how many times the oldest open task has been passed over in favor of other work. This would help ensure we don't abandon important foundational work indefinitely.
