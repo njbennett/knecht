@@ -19,6 +19,7 @@ fn main() {
         "show" => cmd_show(&args[2..]),
         "start" => cmd_start(&args[2..]),
         "pain" => cmd_pain(&args[2..]),
+        "next" => cmd_next(),
         _ => {
             eprintln!("Unknown command: {}", args[1]);
             std::process::exit(1);
@@ -209,6 +210,45 @@ fn cmd_pain(args: &[String]) {
         }
         Err(err) => {
             eprintln!("Error: {}", err);
+            std::process::exit(1);
+        }
+    }
+}
+
+fn cmd_next() {
+    match read_tasks_with_fs(&RealFileSystem) {
+        Ok(tasks) => {
+            // Filter to open tasks only
+            let open_tasks: Vec<_> = tasks.iter()
+                .filter(|t| t.status == "open")
+                .collect();
+            
+            if open_tasks.is_empty() {
+                println!("No open tasks");
+                return;
+            }
+            
+            // Find task with highest pain count, preferring older tasks on tie
+            let best_task = open_tasks.iter()
+                .max_by_key(|t| {
+                    let pain = t.pain_count.unwrap_or(0);
+                    let id_num: i32 = t.id.parse().unwrap_or(0);
+                    (pain, -id_num)
+                })
+                .unwrap();
+            
+            println!("Suggested next task: task-{}", best_task.id);
+            println!("Title: {}", best_task.title);
+            if let Some(desc) = &best_task.description {
+                println!("\nDescription:\n{}", desc);
+            }
+            if let Some(pain) = best_task.pain_count
+                && pain > 0 {
+                    println!("\n(pain count: {})", pain);
+                }
+        }
+        Err(err) => {
+            eprintln!("Error reading tasks: {}", err);
             std::process::exit(1);
         }
     }

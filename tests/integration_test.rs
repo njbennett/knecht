@@ -50,9 +50,9 @@ where
     let temp = setup_temp_dir();
     let init_result = run_command(&["init"], &temp);
     assert!(init_result.success, "init command failed: {}", init_result.stderr);
-    
+
     test_fn(&temp);
-    
+
     cleanup_temp_dir(temp);
 }
 
@@ -1500,9 +1500,9 @@ fn show_requires_task_id_argument() {
     with_initialized_repo(|temp| {
         // Try show without task ID
         let result = run_command(&["show"], &temp);
-        
+
         assert!(!result.success, "show should fail without task ID");
-        assert!(result.stderr.contains("Usage") || result.stderr.contains("usage"), 
+        assert!(result.stderr.contains("Usage") || result.stderr.contains("usage"),
                 "should show usage message");
     });
 }
@@ -1513,10 +1513,10 @@ fn start_displays_task_details_with_description() {
         // Add a task with description
         let add_result = run_command(&["add", "Implement feature X", "-d", "This feature should do X, Y, and Z"], &temp);
         assert!(add_result.success, "Failed to add task");
-        
+
         // Start working on the task
         let result = run_command(&["start", "task-1"], &temp);
-        
+
         assert!(result.success, "start command should succeed");
         assert!(result.stdout.contains("task-1"), "should show task ID");
         assert!(result.stdout.contains("Implement feature X"), "should show task title");
@@ -1530,10 +1530,10 @@ fn start_displays_task_without_description() {
         // Add a task without description
         let add_result = run_command(&["add", "Simple task"], &temp);
         assert!(add_result.success, "Failed to add task");
-        
+
         // Start working on the task
         let result = run_command(&["start", "task-1"], &temp);
-        
+
         assert!(result.success, "start command should succeed");
         assert!(result.stdout.contains("task-1"), "should show task ID");
         assert!(result.stdout.contains("Simple task"), "should show task title");
@@ -1546,9 +1546,9 @@ fn start_requires_task_id_argument() {
     with_initialized_repo(|temp| {
         // Try start without task ID
         let result = run_command(&["start"], &temp);
-        
+
         assert!(!result.success, "start should fail without task ID");
-        assert!(result.stderr.contains("Usage") || result.stderr.contains("usage"), 
+        assert!(result.stderr.contains("Usage") || result.stderr.contains("usage"),
                 "should show usage message");
     });
 }
@@ -1558,9 +1558,9 @@ fn start_fails_on_nonexistent_task() {
     with_initialized_repo(|temp| {
         // Try to start a task that doesn't exist
         let result = run_command(&["start", "task-999"], &temp);
-        
+
         assert!(!result.success, "start should fail on nonexistent task");
-        assert!(result.stderr.contains("not found") || result.stderr.contains("Not found"), 
+        assert!(result.stderr.contains("not found") || result.stderr.contains("Not found"),
                 "should indicate task was not found");
     });
 }
@@ -1570,11 +1570,11 @@ fn pain_increments_pain_count_on_task() {
     with_initialized_repo(|temp| {
         // Add a task without pain count
         run_command(&["add", "Fix bug"], &temp);
-        
+
         // Increment pain count (should add it as 1)
         let result = run_command(&["pain", "task-1"], &temp);
         assert!(result.success, "pain command should succeed");
-        
+
         // Verify pain count was added as 1
         let list = run_command(&["list"], &temp);
         assert!(
@@ -1582,11 +1582,11 @@ fn pain_increments_pain_count_on_task() {
             "Pain count should be added as 1, got: {}",
             list.stdout
         );
-        
+
         // Increment again
         let result2 = run_command(&["pain", "task-1"], &temp);
         assert!(result2.success, "pain command should succeed again");
-        
+
         // Verify pain count was incremented to 2
         let list2 = run_command(&["list"], &temp);
         assert!(
@@ -1602,11 +1602,11 @@ fn pain_adds_pain_count_to_task_without_one() {
     with_initialized_repo(|temp| {
         // Add a task without pain count
         run_command(&["add", "Some task"], &temp);
-        
+
         // Increment pain count
         let result = run_command(&["pain", "task-1"], &temp);
         assert!(result.success, "pain command should succeed");
-        
+
         // Verify pain count was added
         let list = run_command(&["list"], &temp);
         assert!(
@@ -1621,7 +1621,7 @@ fn pain_adds_pain_count_to_task_without_one() {
 fn pain_fails_on_nonexistent_task() {
     with_initialized_repo(|temp| {
         let result = run_command(&["pain", "task-999"], &temp);
-        
+
         assert!(!result.success, "pain command should fail on nonexistent task");
         assert!(
             result.stderr.contains("not found") || result.stderr.contains("Not found"),
@@ -1634,7 +1634,7 @@ fn pain_fails_on_nonexistent_task() {
 fn pain_requires_task_id_argument() {
     with_initialized_repo(|temp| {
         let result = run_command(&["pain"], &temp);
-        
+
         assert!(!result.success, "pain command should fail without task ID");
     });
 }
@@ -1644,24 +1644,223 @@ fn pain_on_task_with_description_and_pain_count() {
     with_initialized_repo(|temp| {
         // Add a task with description
         run_command(&["add", "Fix critical bug", "-d", "This bug breaks production"], &temp);
-        
+
         // Add pain count
         run_command(&["pain", "task-1"], &temp);
-        
+
         // Increment pain count again
         let result = run_command(&["pain", "task-1"], &temp);
         assert!(result.success, "pain command should succeed on task with description");
-        
+
         // Verify both description and pain count are preserved
         let show = run_command(&["show", "task-1"], &temp);
         assert!(show.stdout.contains("Fix critical bug"), "Title should be preserved");
         assert!(show.stdout.contains("This bug breaks production"), "Description should be preserved");
-        
+
         let list = run_command(&["list"], &temp);
         assert!(
             list.stdout.contains("Fix critical bug (pain count: 2)"),
             "Pain count should be 2 with description preserved, got: {}",
             list.stdout
+        );
+    });
+}
+
+#[test]
+fn next_suggests_task_with_highest_pain_count() {
+    with_initialized_repo(|temp| {
+        // Add tasks
+        run_command(&["add", "Low priority task"], &temp);
+        run_command(&["add", "Medium pain task"], &temp);
+        run_command(&["add", "High pain task"], &temp);
+        run_command(&["add", "Another low priority"], &temp);
+        run_command(&["add", "Medium pain again"], &temp);
+
+        // Set pain counts using pain command
+        run_command(&["pain", "task-2"], &temp);
+        run_command(&["pain", "task-2"], &temp); // pain count: 2
+        
+        run_command(&["pain", "task-3"], &temp);
+        run_command(&["pain", "task-3"], &temp);
+        run_command(&["pain", "task-3"], &temp);
+        run_command(&["pain", "task-3"], &temp);
+        run_command(&["pain", "task-3"], &temp); // pain count: 5
+        
+        run_command(&["pain", "task-5"], &temp);
+        run_command(&["pain", "task-5"], &temp); // pain count: 2
+
+        // Run 'knecht next'
+        let result = run_command(&["next"], &temp);
+
+        assert!(result.success, "next command should succeed");
+        assert!(
+            result.stdout.contains("task-3"),
+            "Should suggest task-3 with highest pain count, got: {}",
+            result.stdout
+        );
+        assert!(
+            result.stdout.contains("High pain task"),
+            "Should show the task title, got: {}",
+            result.stdout
+        );
+        assert!(
+            result.stdout.contains("pain count: 5"),
+            "Should mention the pain count, got: {}",
+            result.stdout
+        );
+    });
+}
+
+#[test]
+fn next_prefers_older_task_when_pain_counts_equal() {
+    with_initialized_repo(|temp| {
+        // Add tasks
+        run_command(&["add", "First task"], &temp);
+        run_command(&["add", "Second task"], &temp);
+        run_command(&["add", "Third task"], &temp);
+
+        // Set same pain count on all tasks
+        for _ in 0..3 {
+            run_command(&["pain", "task-1"], &temp);
+            run_command(&["pain", "task-2"], &temp);
+            run_command(&["pain", "task-3"], &temp);
+        }
+
+        let result = run_command(&["next"], &temp);
+        
+        assert!(result.success, "next command should succeed");
+        assert!(
+            result.stdout.contains("task-1"),
+            "Should suggest oldest task (task-1) when pain counts equal, got: {}",
+            result.stdout
+        );
+    });
+}
+
+#[test]
+fn next_skips_done_tasks() {
+    with_initialized_repo(|temp| {
+        // Add tasks
+        run_command(&["add", "High pain but done"], &temp);
+        run_command(&["add", "Lower pain but open"], &temp);
+        
+        // Set pain counts
+        for _ in 0..5 {
+            run_command(&["pain", "task-1"], &temp);
+        }
+        for _ in 0..2 {
+            run_command(&["pain", "task-2"], &temp);
+        }
+        
+        // Mark first task as done
+        run_command(&["done", "task-1"], &temp);
+
+        let result = run_command(&["next"], &temp);
+        
+        assert!(result.success, "next command should succeed");
+        assert!(
+            result.stdout.contains("task-2"),
+            "Should skip done tasks and suggest task-2, got: {}",
+            result.stdout
+        );
+    });
+}
+
+#[test]
+fn next_handles_no_open_tasks() {
+    with_initialized_repo(|temp| {
+        // Add and complete a task
+        run_command(&["add", "Only task"], &temp);
+        run_command(&["done", "task-1"], &temp);
+
+        let result = run_command(&["next"], &temp);
+
+        assert!(result.success, "next command should succeed");
+        assert!(
+            result.stdout.contains("No open tasks") || result.stdout.contains("no open tasks"),
+            "Should indicate no open tasks available, got: {}",
+            result.stdout
+        );
+    });
+}
+
+#[test]
+fn next_fails_gracefully_when_tasks_file_unreadable() {
+    with_initialized_repo(|temp| {
+        // Add a task
+        run_command(&["add", "Some task"], &temp);
+        
+        // Make tasks file unreadable
+        let tasks_file = temp.join(".knecht/tasks");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = fs::metadata(&tasks_file).unwrap().permissions();
+            perms.set_mode(0o000);
+            fs::set_permissions(&tasks_file, perms).unwrap();
+        }
+        
+        let result = run_command(&["next"], &temp);
+        
+        // Restore permissions for cleanup
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = fs::metadata(&tasks_file).unwrap().permissions();
+            perms.set_mode(0o644);
+            fs::set_permissions(&tasks_file, perms).unwrap();
+        }
+        
+        assert!(!result.success, "next should fail when tasks file is unreadable");
+        assert!(
+            result.stderr.contains("Error reading tasks") || result.stderr.contains("error"),
+            "should indicate error reading tasks, got: {}",
+            result.stderr
+        );
+    });
+}
+
+#[test]
+fn next_displays_task_with_description() {
+    with_initialized_repo(|temp| {
+        // Add a task with description
+        run_command(&["add", "Important task", "-d", "This task has a detailed description explaining what needs to be done"], &temp);
+        
+        // Add pain to make it more likely to be selected
+        run_command(&["pain", "task-1"], &temp);
+        run_command(&["pain", "task-1"], &temp);
+        
+        let result = run_command(&["next"], &temp);
+        
+        assert!(result.success, "next command should succeed");
+        assert!(result.stdout.contains("task-1"), "Should suggest task-1");
+        assert!(result.stdout.contains("Important task"), "Should show title");
+        assert!(
+            result.stdout.contains("This task has a detailed description"),
+            "Should show description, got: {}",
+            result.stdout
+        );
+        assert!(result.stdout.contains("pain count: 2"), "Should show pain count");
+    });
+}
+
+#[test]
+fn next_with_zero_pain_count() {
+    with_initialized_repo(|temp| {
+        // Add tasks - one will have pain_count 0 (no pain added), one will be without pain_count
+        run_command(&["add", "Task with no pain"], &temp);
+        run_command(&["add", "Another task"], &temp);
+        
+        let result = run_command(&["next"], &temp);
+        
+        assert!(result.success, "next command should succeed");
+        // Should suggest task-1 (older task when both have no pain)
+        assert!(result.stdout.contains("task-1"), "Should suggest task-1");
+        // Should not show pain count line when pain is 0 or None
+        assert!(
+            !result.stdout.contains("pain count:"),
+            "Should not show pain count for tasks with 0 or no pain, got: {}",
+            result.stdout
         );
     });
 }
