@@ -285,7 +285,10 @@ fn list_works_with_empty_tasks_file() {
         // list should succeed with no tasks
         let result = run_command(&["list"], &temp);
         assert!(result.success, "list should succeed with empty file");
-        assert_eq!(result.stdout.trim(), "", "Should show no tasks");
+        
+        // Should show usage instructions even with no tasks (helpful for agents)
+        assert!(result.stdout.contains("Usage instructions:"), "Should show usage instructions");
+        assert!(result.stdout.contains("knecht show task-N"), "Should mention show command");
     });
 }
 
@@ -1937,5 +1940,28 @@ fn done_increments_pain_on_task_with_existing_description() {
             "Should preserve original description");
         assert!(show_result.stdout.contains("Skip: task-2 completed instead"),
             "Should append skip note to existing description, got: {}", show_result.stdout);
+    });
+}
+
+#[test]
+fn list_includes_usage_instructions_for_agents() {
+    with_initialized_repo(|temp| {
+        // Add a task with a description
+        run_command(&["add", "Test task", "-d", "Task description here"], &temp);
+        
+        let result = run_command(&["list"], &temp);
+        assert!(result.success);
+        
+        // Should include instructions on how to view full details
+        assert!(result.stdout.contains("knecht show task-N"),
+            "list output should guide agents to use 'knecht show' for details, got: {}", result.stdout);
+        
+        // Should mention how to start work on a task
+        assert!(result.stdout.contains("knecht start task-N"),
+            "list output should guide agents to use 'knecht start', got: {}", result.stdout);
+        
+        // Should mention how to mark tasks complete
+        assert!(result.stdout.contains("knecht done task-N"),
+            "list output should guide agents to use 'knecht done', got: {}", result.stdout);
     });
 }

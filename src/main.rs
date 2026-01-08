@@ -104,6 +104,14 @@ fn cmd_list() {
         };
         println!("{} task-{}  {}{}", checkbox, task.id, task.title, pain_suffix);
     }
+    
+    // Print usage instructions for agents
+    println!();
+    println!("Usage instructions:");
+    println!("  knecht show task-N     - View full task details including description");
+    println!("  knecht start task-N    - Begin work on a task");
+    println!("  knecht done task-N     - Mark a task as complete");
+    println!("  knecht next            - Get suggestion for what to work on next");
 }
 
 fn cmd_done(args: &[String]) {
