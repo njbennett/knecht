@@ -39,8 +39,8 @@ knecht add "Fix the login bug"
 knecht add "Write tests for authentication"
 knecht add "Deploy to staging"
 
-# See what needs doing
-knecht list
+# Get suggestion for what to work on
+knecht next
 
 # Mark a task as done
 knecht done task-1
@@ -86,6 +86,27 @@ Output:
 [ ] task-3  Deploy to staging
 ```
 
+### `knecht next`
+
+Get a suggestion for what to work on next. Analyzes open tasks and suggests the highest priority task based on pain count (tasks causing the most friction) and task age (older tasks first when pain is equal).
+
+```bash
+knecht next
+```
+
+Output:
+```
+Suggested next task: task-3
+Title: Fix critical authentication bug
+
+Description:
+Users are unable to login after password reset. This is blocking production deployment.
+
+(pain count: 5)
+```
+
+This is especially useful for agents and when managing many tasks - instead of scanning through all tasks manually, `knecht next` provides an objective recommendation.
+
 ### `knecht done <task-id>`
 
 Mark a task as complete.
@@ -117,6 +138,20 @@ Description: User sessions are expiring too early. Need to investigate token tim
 ```
 
 For tasks without descriptions, only the ID, status, and title are shown.
+
+### `knecht pain <task-id>`
+
+Increment the pain count for a task. Use this when you encounter friction or difficulty with a task - tracking pain helps prioritize work. Tasks with higher pain counts are suggested first by `knecht next`.
+
+```bash
+knecht pain task-1
+# or
+knecht pain 1
+```
+
+Output: `Incremented pain count for task-1: Fix the login bug`
+
+The pain count appears in `knecht list` output and is used by `knecht next` to prioritize which tasks to work on. This implements pain-driven development: track what hurts, and fix the things that hurt most.
 
 ## Data Format
 

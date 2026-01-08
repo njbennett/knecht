@@ -194,8 +194,8 @@ When performance pain is real (5+ pain count), track it as a task, write a test,
 ### Self-Hosting Workflow
 
 ```bash
-knecht list          # See what needs doing
-# Work on task-N
+knecht next          # Get suggestion for what to work on
+# Work on the suggested task
 knecht done task-N   # Mark complete
 git add .knecht/tasks src/ tests/
 # IMPORTANT: Confirm with user before committing
