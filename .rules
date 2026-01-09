@@ -26,19 +26,11 @@
 7. **Structured Workflow**: Guide agents through incremental, testable work
    - Start → Test → Implement → Complete → Commit → Reflect
 
-8. **One Task Per Session**: Complete one task fully before ending the session
-   - Work on a single task from start to completion
-   - When a task is complete, prepare to commit and end the session
-   - If a task reveals subtasks or blockers, file them as new tasks and end the session
-   - Don't continue to the next task automatically - let the user decide what to work on next
+8. **One Task Per Session**: Complete one task, then stop. File subtasks/blockers and let user decide next steps.
 
 ### Extreme Programming
 
-We reject industry conventional wisdom that says "perfect is the enemy of good."
-
-We turn practices that work up to maximum: TDD, refactoring, simplicity, testing.
-
-If something is good practice, doing it 100% is better than doing it 80%.
+We turn practices that work up to maximum: TDD, refactoring, simplicity, testing. If something is good practice, doing it 100% is better than doing it 80%.
 
 ## Architecture Overview
 
@@ -226,19 +218,7 @@ git commit -m "task-N: Description"
 
 ### Session Scope
 
-**Work on ONE task per session.** When you complete a task:
-
-1. Mark it done with `knecht done task-N`
-2. Respond to the reflection prompt
-3. Prepare the commit (but confirm with user before committing)
-4. **End the session** - don't automatically start the next task
-
-If during your work you discover:
-- The task needs to be broken into subtasks → file them with `knecht add` and end session
-- Blockers exist → file tasks for the blockers and end session  
-- Related improvements → file them as separate tasks and end session
-
-The user will decide what to work on next. Don't assume you should continue working.
+Work on ONE task per session. When complete: mark done, reflect, prepare commit, and **end the session**. If you discover subtasks, blockers, or improvements, file them and stop. Let the user decide what's next.
 
 We eat our own dog food. Every knecht feature should be tracked IN knecht.
 
@@ -254,20 +234,15 @@ Keep docs practical, current, and concise. Prefer examples over prose.
 ## Summary
 
 **Always:**
-- Write failing test first
-- Make test pass with simplest code
+- Write failing test first, then make it pass
 - Track work in knecht itself
 - Fix cargo warnings immediately
-- Confirm with user before committing changes
-- Commit `.knecht/tasks` with code changes
-- Design for agents first - prioritize machine-readable output and programmatic interfaces
-- Work on one task per session, then stop and let user decide next steps
+- Design for agents first
+- Work on one task per session, then stop
 
 **Never:**
-- Add features without tests
-- Add features without tracking in knecht
+- Add features without tests or tracking
 - Prematurely abstract or optimize
-- Ignore cargo warnings
-- Break existing tests
+- Ignore warnings or break tests
 
 **When in doubt:** Ask "What's simpler?" and "Can I defer this?"
