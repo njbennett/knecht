@@ -28,6 +28,8 @@ fn main() {
         "pain" => cmd_pain(&args[2..]),
         "next" => cmd_next(),
         "update" => cmd_update(&args[2..]),
+        "block" => cmd_block(&args[2..]),
+        "unblock" => cmd_unblock(&args[2..]),
         _ => {
             eprintln!("Unknown command: {}", args[1]);
             std::process::exit(1);
@@ -178,6 +180,28 @@ fn cmd_show(args: &[String]) {
             if let Some(desc) = &task.description {
                 println!("Description: {}", desc);
             }
+            
+            // Display blockers
+            let blockers = get_blockers_for_task(task_id);
+            if !blockers.is_empty() {
+                println!("Blocked by:");
+                for blocker_id in &blockers {
+                    if let Ok(blocker_task) = find_task_by_id_with_fs(blocker_id, &RealFileSystem) {
+                        println!("  - task-{} ({}): {}", blocker_task.id, blocker_task.status, blocker_task.title);
+                    }
+                }
+            }
+            
+            // Display what this task blocks
+            let blocks = get_tasks_blocked_by(task_id);
+            if !blocks.is_empty() {
+                println!("Blocks:");
+                for blocked_id in &blocks {
+                    if let Ok(blocked_task) = find_task_by_id_with_fs(blocked_id, &RealFileSystem) {
+                        println!("  - task-{} ({}): {}", blocked_task.id, blocked_task.status, blocked_task.title);
+                    }
+                }
+            }
         }
         Err(err) => {
             eprintln!("Error: {}", err);
@@ -197,6 +221,28 @@ fn cmd_start(args: &[String]) {
     
     match find_task_by_id_with_fs(task_id, &RealFileSystem) {
         Ok(task) => {
+            // Check for open blockers
+            let blockers = get_blockers_for_task(task_id);
+            let mut open_blockers = Vec::new();
+            
+            for blocker_id in &blockers {
+                if let Ok(blocker_task) = find_task_by_id_with_fs(blocker_id, &RealFileSystem) {
+                    if blocker_task.status != "done" {
+                        open_blockers.push((blocker_id.clone(), blocker_task));
+                    }
+                }
+            }
+            
+            if !open_blockers.is_empty() {
+                eprintln!("Error: Cannot start task-{}. It is blocked by the following open tasks:", task_id);
+                for (blocker_id, blocker_task) in &open_blockers {
+                    eprintln!("  - task-{} ({}): {}", blocker_id, blocker_task.status, blocker_task.title);
+                }
+                eprintln!();
+                eprintln!("Complete the blocking tasks first, or use 'knecht unblock' to remove the blocker.");
+                std::process::exit(1);
+            }
+            
             println!("Starting work on task-{}: {}", task.id, task.title);
             if let Some(desc) = &task.description {
                 println!();
@@ -342,4 +388,137 @@ fn cmd_update(args: &[String]) {
             std::process::exit(1);
         }
     }
+}
+
+fn cmd_block(args: &[String]) {
+    if args.len() < 3 || args[1] != "by" {
+        eprintln!("Usage: knecht block <task-id> by <blocker-task-id>");
+        std::process::exit(1);
+    }
+    
+    let blocked_task_id = parse_task_id(&args[0]);
+    let blocker_task_id = parse_task_id(&args[2]);
+    
+    // Verify both tasks exist
+    if let Err(err) = find_task_by_id_with_fs(blocked_task_id, &RealFileSystem) {
+        eprintln!("Error: {}", err);
+        std::process::exit(1);
+    }
+    
+    if let Err(err) = find_task_by_id_with_fs(blocker_task_id, &RealFileSystem) {
+        eprintln!("Error: {}", err);
+        std::process::exit(1);
+    }
+    
+    // Add blocker relationship
+    let blockers_path = ".knecht/blockers";
+    let mut content = fs::read_to_string(blockers_path).unwrap_or_default();
+    
+    let blocker_line = format!("task-{}|task-{}\n", blocked_task_id, blocker_task_id);
+    content.push_str(&blocker_line);
+    
+    if let Err(e) = fs::write(blockers_path, content) {
+        eprintln!("Failed to write blockers file: {}", e);
+        std::process::exit(1);
+    }
+    
+    println!("Blocker added: task-{} is blocked by task-{}", blocked_task_id, blocker_task_id);
+}
+
+fn cmd_unblock(args: &[String]) {
+    if args.len() < 3 || args[1] != "from" {
+        eprintln!("Usage: knecht unblock <task-id> from <blocker-task-id>");
+        std::process::exit(1);
+    }
+    
+    let blocked_task_id = parse_task_id(&args[0]);
+    let blocker_task_id = parse_task_id(&args[2]);
+    
+    // Read blockers file
+    let blockers_path = ".knecht/blockers";
+    let content = match fs::read_to_string(blockers_path) {
+        Ok(c) => c,
+        Err(_) => {
+            eprintln!("Error: task-{} is not blocked by task-{}", blocked_task_id, blocker_task_id);
+            std::process::exit(1);
+        }
+    };
+    
+    let blocker_line = format!("task-{}|task-{}", blocked_task_id, blocker_task_id);
+    
+    // Check if the relationship exists
+    if !content.contains(&blocker_line) {
+        eprintln!("Error: task-{} is not blocked by task-{}", blocked_task_id, blocker_task_id);
+        std::process::exit(1);
+    }
+    
+    // Remove the blocker line
+    let new_content: String = content
+        .lines()
+        .filter(|line| *line != blocker_line)
+        .collect::<Vec<_>>()
+        .join("\n");
+    
+    let new_content = if new_content.is_empty() {
+        String::new()
+    } else {
+        format!("{}\n", new_content)
+    };
+    
+    if let Err(e) = fs::write(blockers_path, new_content) {
+        eprintln!("Failed to write blockers file: {}", e);
+        std::process::exit(1);
+    }
+    
+    println!("Blocker removed: task-{} is no longer blocked by task-{}", blocked_task_id, blocker_task_id);
+}
+
+/// Returns a list of task IDs that block the given task
+fn get_blockers_for_task(task_id: &str) -> Vec<String> {
+    let blockers_path = ".knecht/blockers";
+    let content = match fs::read_to_string(blockers_path) {
+        Ok(c) => c,
+        Err(_) => return Vec::new(),
+    };
+    
+    let mut blockers = Vec::new();
+    for line in content.lines() {
+        if line.is_empty() {
+            continue;
+        }
+        let parts: Vec<&str> = line.split('|').collect();
+        if parts.len() == 2 {
+            let blocked = parts[0].trim_start_matches("task-");
+            let blocker = parts[1].trim_start_matches("task-");
+            if blocked == task_id {
+                blockers.push(blocker.to_string());
+            }
+        }
+    }
+    blockers
+}
+
+/// Returns a list of task IDs that are blocked by the given task
+fn get_tasks_blocked_by(task_id: &str) -> Vec<String> {
+    let blockers_path = ".knecht/blockers";
+    let content = match fs::read_to_string(blockers_path) {
+        Ok(c) => c,
+        Err(_) => return Vec::new(),
+    };
+    
+    let mut blocked_tasks = Vec::new();
+    for line in content.lines() {
+        if line.is_empty() {
+            continue;
+        }
+        let parts: Vec<&str> = line.split('|').collect();
+        if parts.len() == 2 {
+            let blocked = parts[0].trim_start_matches("task-");
+            let blocker = parts[1].trim_start_matches("task-");
+            if blocker == task_id {
+                blocked_tasks.push(blocked.to_string());
+            }
+        }
+    }
+    blocked_tasks
 }

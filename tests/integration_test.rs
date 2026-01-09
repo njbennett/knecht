@@ -2382,3 +2382,523 @@ fn update_handles_special_characters() {
         assert!(show.stdout.contains("Description with special chars: | and newlines"), "Pipe in description should be preserved");
     });
 }
+
+// ==============================================================================
+// Blocker Tracking Tests
+// ==============================================================================
+
+#[test]
+fn block_command_creates_blocker_relationship() {
+    with_initialized_repo(|temp| {
+        // Create two tasks
+        run_command(&["add", "Task A"], &temp);
+        run_command(&["add", "Task B"], &temp);
+
+        // Create blocker: task-1 is blocked by task-2
+        let result = run_command(&["block", "task-1", "by", "task-2"], &temp);
+        assert!(result.success, "block command should succeed: {}", result.stderr);
+        assert!(result.stdout.contains("Blocker added"), "Should confirm blocker added");
+        assert!(result.stdout.contains("task-1") && result.stdout.contains("task-2"), 
+                "Should mention both tasks");
+
+        // Verify blockers file exists and contains the relationship
+        let blockers_path = temp.join(".knecht/blockers");
+        assert!(blockers_path.exists(), "blockers file should be created");
+        
+        let content = fs::read_to_string(&blockers_path).unwrap();
+        assert!(content.contains("task-1|task-2"), "Should store blocker relationship");
+    });
+}
+
+#[test]
+fn block_command_fails_on_nonexistent_task() {
+    with_initialized_repo(|temp| {
+        run_command(&["add", "Task A"], &temp);
+
+        // Try to block nonexistent task
+        let result = run_command(&["block", "task-999", "by", "task-1"], &temp);
+        assert!(!result.success, "block command should fail for nonexistent task");
+        assert!(result.stderr.contains("does not exist") || result.stderr.contains("not found"),
+                "Should have helpful error message: {}", result.stderr);
+    });
+}
+
+#[test]
+fn block_command_fails_on_nonexistent_blocker() {
+    with_initialized_repo(|temp| {
+        run_command(&["add", "Task A"], &temp);
+
+        // Try to block by nonexistent task
+        let result = run_command(&["block", "task-1", "by", "task-999"], &temp);
+        assert!(!result.success, "block command should fail for nonexistent blocker");
+        assert!(result.stderr.contains("does not exist") || result.stderr.contains("not found"),
+                "Should have helpful error message: {}", result.stderr);
+    });
+}
+
+#[test]
+fn show_displays_blockers() {
+    with_initialized_repo(|temp| {
+        // Create tasks
+        run_command(&["add", "Blocked Task"], &temp);
+        run_command(&["add", "Blocker Task"], &temp);
+        run_command(&["add", "Another Blocker"], &temp);
+
+        // Create blocker relationships
+        run_command(&["block", "task-1", "by", "task-2"], &temp);
+        run_command(&["block", "task-1", "by", "task-3"], &temp);
+
+        // Check show output
+        let result = run_command(&["show", "task-1"], &temp);
+        assert!(result.success, "show command should succeed");
+        assert!(result.stdout.contains("Blocked by:"), "Should have 'Blocked by:' section");
+        assert!(result.stdout.contains("task-2"), "Should show task-2 as blocker");
+        assert!(result.stdout.contains("task-3"), "Should show task-3 as blocker");
+        assert!(result.stdout.contains("Blocker Task"), "Should show blocker task title");
+    });
+}
+
+#[test]
+fn show_displays_what_task_blocks() {
+    with_initialized_repo(|temp| {
+        // Create tasks
+        run_command(&["add", "Blocker Task"], &temp);
+        run_command(&["add", "Blocked Task A"], &temp);
+        run_command(&["add", "Blocked Task B"], &temp);
+
+        // task-1 blocks both task-2 and task-3
+        run_command(&["block", "task-2", "by", "task-1"], &temp);
+        run_command(&["block", "task-3", "by", "task-1"], &temp);
+
+        // Check show output for task-1
+        let result = run_command(&["show", "task-1"], &temp);
+        assert!(result.success, "show command should succeed");
+        assert!(result.stdout.contains("Blocks:"), "Should have 'Blocks:' section");
+        assert!(result.stdout.contains("task-2"), "Should show task-2 is blocked");
+        assert!(result.stdout.contains("task-3"), "Should show task-3 is blocked");
+    });
+}
+
+#[test]
+fn start_fails_when_blocked_by_open_task() {
+    with_initialized_repo(|temp| {
+        // Create tasks
+        run_command(&["add", "Blocked Task"], &temp);
+        run_command(&["add", "Blocker Task"], &temp);
+
+        // Create blocker
+        run_command(&["block", "task-1", "by", "task-2"], &temp);
+
+        // Try to start blocked task
+        let result = run_command(&["start", "task-1"], &temp);
+        assert!(!result.success, "start should fail when task is blocked by open task");
+        assert!(result.stderr.contains("Cannot start") || result.stderr.contains("blocked"),
+                "Should explain why start failed: {}", result.stderr);
+        assert!(result.stderr.contains("task-2"), "Should mention the blocking task");
+    });
+}
+
+#[test]
+fn start_succeeds_when_blocker_is_done() {
+    with_initialized_repo(|temp| {
+        // Create tasks
+        run_command(&["add", "Blocked Task"], &temp);
+        run_command(&["add", "Blocker Task"], &temp);
+
+        // Create blocker
+        run_command(&["block", "task-1", "by", "task-2"], &temp);
+
+        // Complete the blocker
+        run_command(&["done", "task-2"], &temp);
+
+        // Now start should succeed
+        let result = run_command(&["start", "task-1"], &temp);
+        assert!(result.success, "start should succeed when blocker is done: {}", result.stderr);
+    });
+}
+
+#[test]
+fn start_succeeds_when_no_blockers() {
+    with_initialized_repo(|temp| {
+        run_command(&["add", "Normal Task"], &temp);
+
+        let result = run_command(&["start", "task-1"], &temp);
+        assert!(result.success, "start should succeed for task with no blockers");
+    });
+}
+
+#[test]
+fn unblock_removes_blocker_relationship() {
+    with_initialized_repo(|temp| {
+        // Create tasks and blocker
+        run_command(&["add", "Blocked Task"], &temp);
+        run_command(&["add", "Blocker Task"], &temp);
+        run_command(&["block", "task-1", "by", "task-2"], &temp);
+
+        // Remove blocker
+        let result = run_command(&["unblock", "task-1", "from", "task-2"], &temp);
+        assert!(result.success, "unblock command should succeed: {}", result.stderr);
+        assert!(result.stdout.contains("Blocker removed"), "Should confirm removal");
+
+        // Verify blockers file no longer contains the relationship
+        let blockers_path = temp.join(".knecht/blockers");
+        let content = fs::read_to_string(&blockers_path).unwrap();
+        assert!(!content.contains("task-1|task-2"), "Should remove blocker relationship");
+
+        // Start should now succeed
+        let start_result = run_command(&["start", "task-1"], &temp);
+        assert!(start_result.success, "start should succeed after unblocking");
+    });
+}
+
+#[test]
+fn unblock_fails_when_relationship_does_not_exist() {
+    with_initialized_repo(|temp| {
+        run_command(&["add", "Task A"], &temp);
+        run_command(&["add", "Task B"], &temp);
+
+        // Try to remove nonexistent blocker
+        let result = run_command(&["unblock", "task-1", "from", "task-2"], &temp);
+        assert!(!result.success, "unblock should fail when relationship doesn't exist");
+        assert!(result.stderr.contains("not blocked") || result.stderr.contains("does not exist"),
+                "Should have helpful error message: {}", result.stderr);
+    });
+}
+
+#[test]
+fn multiple_blockers_all_prevent_start() {
+    with_initialized_repo(|temp| {
+        // Create tasks
+        run_command(&["add", "Blocked Task"], &temp);
+        run_command(&["add", "Blocker 1"], &temp);
+        run_command(&["add", "Blocker 2"], &temp);
+
+        // Create multiple blockers
+        run_command(&["block", "task-1", "by", "task-2"], &temp);
+        run_command(&["block", "task-1", "by", "task-3"], &temp);
+
+        // Start should fail
+        let result = run_command(&["start", "task-1"], &temp);
+        assert!(!result.success, "start should fail with multiple open blockers");
+        assert!(result.stderr.contains("task-2") && result.stderr.contains("task-3"),
+                "Should list all blocking tasks: {}", result.stderr);
+    });
+}
+
+#[test]
+fn start_succeeds_when_all_blockers_are_done() {
+    with_initialized_repo(|temp| {
+        // Create tasks
+        run_command(&["add", "Blocked Task"], &temp);
+        run_command(&["add", "Blocker 1"], &temp);
+        run_command(&["add", "Blocker 2"], &temp);
+
+        // Create multiple blockers
+        run_command(&["block", "task-1", "by", "task-2"], &temp);
+        run_command(&["block", "task-1", "by", "task-3"], &temp);
+
+        // Complete both blockers
+        run_command(&["done", "task-2"], &temp);
+        run_command(&["done", "task-3"], &temp);
+
+        // Start should succeed
+        let result = run_command(&["start", "task-1"], &temp);
+        assert!(result.success, "start should succeed when all blockers are done: {}", result.stderr);
+    });
+}
+
+#[test]
+fn show_indicates_blocker_status() {
+    with_initialized_repo(|temp| {
+        // Create tasks
+        run_command(&["add", "Blocked Task"], &temp);
+        run_command(&["add", "Open Blocker"], &temp);
+        run_command(&["add", "Done Blocker"], &temp);
+
+        // Create blockers
+        run_command(&["block", "task-1", "by", "task-2"], &temp);
+        run_command(&["block", "task-1", "by", "task-3"], &temp);
+
+        // Complete one blocker
+        run_command(&["done", "task-3"], &temp);
+
+        // Check show output
+        let result = run_command(&["show", "task-1"], &temp);
+        assert!(result.success);
+        assert!(result.stdout.contains("task-2") && result.stdout.contains("open"),
+                "Should show task-2 as open: {}", result.stdout);
+        assert!(result.stdout.contains("task-3") && result.stdout.contains("done"),
+                "Should show task-3 as done: {}", result.stdout);
+    });
+}
+
+#[test]
+fn block_fails_when_blockers_file_cannot_be_written() {
+    with_initialized_repo(|temp| {
+        run_command(&["add", "Task A"], &temp);
+        run_command(&["add", "Task B"], &temp);
+
+        // Make blockers file read-only
+        let blockers_path = temp.join(".knecht/blockers");
+        fs::write(&blockers_path, "").unwrap();
+        
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = fs::metadata(&blockers_path).unwrap().permissions();
+            perms.set_mode(0o444); // Read-only
+            fs::set_permissions(&blockers_path, perms).unwrap();
+        }
+        
+        #[cfg(windows)]
+        {
+            let mut perms = fs::metadata(&blockers_path).unwrap().permissions();
+            perms.set_readonly(true);
+            fs::set_permissions(&blockers_path, perms).unwrap();
+        }
+
+        // Try to add blocker - should fail
+        let result = run_command(&["block", "task-1", "by", "task-2"], &temp);
+        assert!(!result.success, "block should fail when file cannot be written");
+        assert!(result.stderr.contains("Failed to write") || result.stderr.contains("Permission denied"),
+                "Should have write error message: {}", result.stderr);
+    });
+}
+
+#[test]
+fn unblock_fails_when_blockers_file_cannot_be_written() {
+    with_initialized_repo(|temp| {
+        run_command(&["add", "Task A"], &temp);
+        run_command(&["add", "Task B"], &temp);
+        run_command(&["block", "task-1", "by", "task-2"], &temp);
+
+        // Make blockers file read-only
+        let blockers_path = temp.join(".knecht/blockers");
+        
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = fs::metadata(&blockers_path).unwrap().permissions();
+            perms.set_mode(0o444); // Read-only
+            fs::set_permissions(&blockers_path, perms).unwrap();
+        }
+        
+        #[cfg(windows)]
+        {
+            let mut perms = fs::metadata(&blockers_path).unwrap().permissions();
+            perms.set_readonly(true);
+            fs::set_permissions(&blockers_path, perms).unwrap();
+        }
+
+        // Try to remove blocker - should fail
+        let result = run_command(&["unblock", "task-1", "from", "task-2"], &temp);
+        assert!(!result.success, "unblock should fail when file cannot be written");
+        assert!(result.stderr.contains("Failed to write") || result.stderr.contains("Permission denied"),
+                "Should have write error message: {}", result.stderr);
+    });
+}
+
+#[test]
+fn block_fails_with_malformed_command_no_by() {
+    with_initialized_repo(|temp| {
+        run_command(&["add", "Task A"], &temp);
+        run_command(&["add", "Task B"], &temp);
+
+        // Try block without "by" keyword
+        let result = run_command(&["block", "task-1", "task-2"], &temp);
+        assert!(!result.success, "block should fail without 'by' keyword");
+        assert!(result.stderr.contains("Usage:"), "Should show usage: {}", result.stderr);
+    });
+}
+
+#[test]
+fn block_fails_with_too_few_arguments() {
+    with_initialized_repo(|temp| {
+        run_command(&["add", "Task A"], &temp);
+
+        // Try block with only one argument
+        let result = run_command(&["block", "task-1"], &temp);
+        assert!(!result.success, "block should fail with too few arguments");
+        assert!(result.stderr.contains("Usage:"), "Should show usage: {}", result.stderr);
+    });
+}
+
+#[test]
+fn unblock_fails_with_malformed_command_no_from() {
+    with_initialized_repo(|temp| {
+        run_command(&["add", "Task A"], &temp);
+        run_command(&["add", "Task B"], &temp);
+
+        // Try unblock without "from" keyword
+        let result = run_command(&["unblock", "task-1", "task-2"], &temp);
+        assert!(!result.success, "unblock should fail without 'from' keyword");
+        assert!(result.stderr.contains("Usage:"), "Should show usage: {}", result.stderr);
+    });
+}
+
+#[test]
+fn unblock_fails_with_too_few_arguments() {
+    with_initialized_repo(|temp| {
+        run_command(&["add", "Task A"], &temp);
+
+        // Try unblock with only one argument
+        let result = run_command(&["unblock", "task-1"], &temp);
+        assert!(!result.success, "unblock should fail with too few arguments");
+        assert!(result.stderr.contains("Usage:"), "Should show usage: {}", result.stderr);
+    });
+}
+
+#[test]
+fn unblock_fails_when_blockers_file_does_not_exist() {
+    with_initialized_repo(|temp| {
+        run_command(&["add", "Task A"], &temp);
+        run_command(&["add", "Task B"], &temp);
+        
+        // Try to unblock without ever creating blockers file
+        let result = run_command(&["unblock", "task-1", "from", "task-2"], &temp);
+        assert!(!result.success, "unblock should fail when blockers file doesn't exist");
+        assert!(result.stderr.contains("not blocked"), "Should say task is not blocked: {}", result.stderr);
+    });
+}
+
+#[test]
+fn unblock_preserves_file_format_when_removing_middle_blocker() {
+    with_initialized_repo(|temp| {
+        run_command(&["add", "Task A"], &temp);
+        run_command(&["add", "Task B"], &temp);
+        run_command(&["add", "Task C"], &temp);
+        
+        // Create three blocker relationships
+        run_command(&["block", "task-1", "by", "task-2"], &temp);
+        run_command(&["block", "task-1", "by", "task-3"], &temp);
+        run_command(&["block", "task-2", "by", "task-3"], &temp);
+        
+        // Remove middle one
+        run_command(&["unblock", "task-1", "from", "task-3"], &temp);
+        
+        // Verify file still has proper format
+        let blockers_path = temp.join(".knecht/blockers");
+        let content = fs::read_to_string(&blockers_path).unwrap();
+        assert!(content.contains("task-1|task-2"), "Should preserve first blocker");
+        assert!(!content.contains("task-1|task-3"), "Should remove middle blocker");
+        assert!(content.contains("task-2|task-3"), "Should preserve last blocker");
+    });
+}
+
+#[test]
+fn show_handles_blockers_file_with_empty_lines_and_malformed_entries() {
+    with_initialized_repo(|temp| {
+        run_command(&["add", "Task A"], &temp);
+        run_command(&["add", "Task B"], &temp);
+        run_command(&["add", "Task C"], &temp);
+        
+        // Create blockers file with empty lines and malformed entries
+        let blockers_path = temp.join(".knecht/blockers");
+        fs::write(&blockers_path, "task-1|task-2\n\ntask-3|task-2\nmalformed-line\ntask-1|\n|task-2\n").unwrap();
+        
+        // Should still parse valid entries and ignore malformed ones
+        let result = run_command(&["show", "task-1"], &temp);
+        assert!(result.success, "show should succeed with malformed blockers file");
+        assert!(result.stdout.contains("task-2"), "Should show valid blocker");
+    });
+}
+
+#[test]
+fn unblock_preserves_other_blockers_with_empty_lines() {
+    with_initialized_repo(|temp| {
+        run_command(&["add", "Task A"], &temp);
+        run_command(&["add", "Task B"], &temp);
+        run_command(&["add", "Task C"], &temp);
+        
+        // Create blockers file with empty lines
+        let blockers_path = temp.join(".knecht/blockers");
+        fs::write(&blockers_path, "task-1|task-2\n\ntask-1|task-3\n").unwrap();
+        
+        // Remove one blocker
+        let result = run_command(&["unblock", "task-1", "from", "task-2"], &temp);
+        assert!(result.success, "unblock should succeed");
+        
+        // Verify the other blocker is preserved
+        let show_result = run_command(&["show", "task-1"], &temp);
+        assert!(show_result.stdout.contains("task-3"), "Should preserve other blocker");
+        assert!(!show_result.stdout.contains("task-2"), "Should remove specified blocker");
+    });
+}
+
+#[test]
+fn unblock_fails_when_file_exists_but_relationship_not_found() {
+    with_initialized_repo(|temp| {
+        run_command(&["add", "Task A"], &temp);
+        run_command(&["add", "Task B"], &temp);
+        run_command(&["add", "Task C"], &temp);
+        
+        // Create a blocker file with a different relationship
+        run_command(&["block", "task-1", "by", "task-2"], &temp);
+        
+        // Try to remove a relationship that doesn't exist (but file does exist)
+        let result = run_command(&["unblock", "task-1", "from", "task-3"], &temp);
+        assert!(!result.success, "unblock should fail when relationship doesn't exist in file");
+        assert!(result.stderr.contains("not blocked"), "Should say task is not blocked: {}", result.stderr);
+    });
+}
+
+#[test]
+fn unblock_removes_last_blocker_leaving_empty_file() {
+    with_initialized_repo(|temp| {
+        run_command(&["add", "Task A"], &temp);
+        run_command(&["add", "Task B"], &temp);
+        
+        // Create single blocker
+        run_command(&["block", "task-1", "by", "task-2"], &temp);
+        
+        // Remove the only blocker
+        let result = run_command(&["unblock", "task-1", "from", "task-2"], &temp);
+        assert!(result.success, "unblock should succeed");
+        
+        // Verify file is empty
+        let blockers_path = temp.join(".knecht/blockers");
+        let content = fs::read_to_string(&blockers_path).unwrap();
+        assert!(content.is_empty(), "blockers file should be empty");
+        
+        // Verify task can now be started
+        let start_result = run_command(&["start", "task-1"], &temp);
+        assert!(start_result.success, "start should succeed after removing last blocker");
+    });
+}
+
+#[test]
+fn start_succeeds_when_blocker_task_is_deleted() {
+    with_initialized_repo(|temp| {
+        run_command(&["add", "Blocked Task"], &temp);
+        run_command(&["add", "Blocker Task"], &temp);
+        
+        // Create blocker
+        run_command(&["block", "task-1", "by", "task-2"], &temp);
+        
+        // Delete the blocker task (orphan the blocker reference)
+        run_command(&["delete", "task-2"], &temp);
+        
+        // Start should succeed (orphaned blockers are ignored)
+        let result = run_command(&["start", "task-1"], &temp);
+        assert!(result.success, "start should succeed when blocker task is deleted: {}", result.stderr);
+    });
+}
+
+#[test]
+fn show_handles_orphaned_blocks_reference() {
+    with_initialized_repo(|temp| {
+        run_command(&["add", "Blocker Task"], &temp);
+        run_command(&["add", "Blocked Task"], &temp);
+        
+        // Create blocker relationship
+        run_command(&["block", "task-2", "by", "task-1"], &temp);
+        
+        // Delete the blocked task (orphan the reference in "Blocks" list)
+        run_command(&["delete", "task-2"], &temp);
+        
+        // Show should succeed and skip the orphaned reference
+        let result = run_command(&["show", "task-1"], &temp);
+        assert!(result.success, "show should succeed with orphaned blocks reference: {}", result.stderr);
+        // Should not crash or show error - just silently skip the orphaned reference
+    });
+}
