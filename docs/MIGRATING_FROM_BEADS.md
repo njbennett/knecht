@@ -5,7 +5,7 @@ This guide is for AI agents working in any project to migrate from `beads` (bd) 
 ## Prerequisites
 
 - The `knecht` binary must be installed and available in your PATH
-- The `beads2knecht` migration tool is available at `/path/to/knecht/target/release/beads2knecht`
+- The `beads2knecht` migration tool must be built (see the "Migration from Beads" section in the knecht README)
 - Your project currently uses beads with tasks in `.beads/`
 
 ## Migration Steps
