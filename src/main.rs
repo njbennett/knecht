@@ -226,11 +226,10 @@ fn cmd_start(args: &[String]) {
             let mut open_blockers = Vec::new();
             
             for blocker_id in &blockers {
-                if let Ok(blocker_task) = find_task_by_id_with_fs(blocker_id, &RealFileSystem) {
-                    if blocker_task.status != "done" {
+                if let Ok(blocker_task) = find_task_by_id_with_fs(blocker_id, &RealFileSystem)
+                    && blocker_task.status != "done" {
                         open_blockers.push((blocker_id.clone(), blocker_task));
                     }
-                }
             }
             
             if !open_blockers.is_empty() {

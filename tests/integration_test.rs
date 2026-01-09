@@ -2902,3 +2902,97 @@ fn show_handles_orphaned_blocks_reference() {
         // Should not crash or show error - just silently skip the orphaned reference
     });
 }
+
+#[test]
+fn test_read_task_with_delivered_status() {
+    with_initialized_repo(&|temp: &PathBuf| {
+        // Manually create a task with "delivered" status
+        let tasks_path = temp.join(".knecht/tasks");
+        fs::write(&tasks_path, "1|delivered|Fix the bug\n").unwrap();
+        
+        // List should read and display the delivered task
+        let result = run_command(&["list"], &temp);
+        assert!(result.success, "list should succeed: {}", result.stderr);
+        assert!(result.stdout.contains("task-1"), "Should show task-1");
+        assert!(result.stdout.contains("Fix the bug"), "Should show task title");
+    });
+}
+
+#[test]
+fn test_write_task_with_delivered_status() {
+    with_initialized_repo(&|temp: &PathBuf| {
+        // For now, we can't set delivered status via CLI (no deliver command yet)
+        // So this test will manually create a delivered task, read it, and verify it persists
+        let tasks_path = temp.join(".knecht/tasks");
+        fs::write(&tasks_path, "1|delivered|Fix the bug\n").unwrap();
+        
+        // Add another task - this will read and rewrite the file
+        run_command(&["add", "Another task"], &temp);
+        
+        // Verify the delivered status was preserved
+        let content = fs::read_to_string(&tasks_path).unwrap();
+        assert!(content.contains("1|delivered|Fix the bug"), 
+                "Delivered status should be preserved after file rewrite. Content: {}", content);
+    });
+}
+
+#[test]
+fn test_delivered_status_with_description() {
+    with_initialized_repo(&|temp: &PathBuf| {
+        // Create a delivered task with description
+        let tasks_path = temp.join(".knecht/tasks");
+        fs::write(&tasks_path, "1|delivered|Fix the bug|This is the description\n").unwrap();
+        
+        // Show command should display it correctly
+        let result = run_command(&["show", "task-1"], &temp);
+        assert!(result.success, "show should succeed: {}", result.stderr);
+        assert!(result.stdout.contains("Status: delivered"), "Should show delivered status");
+        assert!(result.stdout.contains("Fix the bug"), "Should show title");
+        assert!(result.stdout.contains("This is the description"), "Should show description");
+    });
+}
+
+#[test]
+fn test_backwards_compatibility_with_open_and_done() {
+    with_initialized_repo(&|temp: &PathBuf| {
+        // Create tasks with all three statuses
+        let tasks_path = temp.join(".knecht/tasks");
+        fs::write(&tasks_path, "1|open|Open task\n2|delivered|Delivered task\n3|done|Done task\n").unwrap();
+        
+        // List should show all three
+        let result = run_command(&["list"], &temp);
+        assert!(result.success, "list should succeed: {}", result.stderr);
+        assert!(result.stdout.contains("Open task"), "Should show open task");
+        assert!(result.stdout.contains("Delivered task"), "Should show delivered task");
+        assert!(result.stdout.contains("Done task"), "Should show done task");
+        
+        // Add a new task - this will read and rewrite
+        run_command(&["add", "New task"], &temp);
+        
+        // Verify all statuses were preserved
+        let content = fs::read_to_string(&tasks_path).unwrap();
+        assert!(content.contains("1|open|Open task"), "Open status preserved");
+        assert!(content.contains("2|delivered|Delivered task"), "Delivered status preserved");
+        assert!(content.contains("3|done|Done task"), "Done status preserved");
+    });
+}
+
+#[test]
+fn test_delivered_status_value_is_preserved() {
+    with_initialized_repo(&|temp: &PathBuf| {
+        // Create a task with delivered status
+        let tasks_path = temp.join(".knecht/tasks");
+        fs::write(&tasks_path, "1|delivered|Fix the bug\n").unwrap();
+        
+        // Show command should display "delivered" as the status
+        let result = run_command(&["show", "task-1"], &temp);
+        assert!(result.success, "show should succeed: {}", result.stderr);
+        assert!(result.stdout.contains("Status: delivered"), 
+                "Status should be 'delivered', got: {}", result.stdout);
+        
+        // Verify the raw file still contains "delivered"
+        let content = fs::read_to_string(&tasks_path).unwrap();
+        assert!(content.contains("1|delivered|Fix the bug"), 
+                "File should contain delivered status: {}", content);
+    });
+}
