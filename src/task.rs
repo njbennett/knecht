@@ -343,3 +343,26 @@ pub fn increment_pain_count_with_fs(task_id: &str, fs: &dyn FileSystem) -> Resul
     
     Err(KnechtError::TaskNotFound(task_id.to_string()))
 }
+
+pub fn delete_task_with_fs(task_id: &str, fs: &dyn FileSystem) -> Result<Task, KnechtError> {
+    let mut tasks = read_tasks_with_fs(fs)?;
+    
+    // Find the task to delete
+    let mut deleted_task = None;
+    tasks.retain(|task| {
+        if task.id == task_id {
+            deleted_task = Some(task.clone());
+            false // Remove this task
+        } else {
+            true // Keep this task
+        }
+    });
+    
+    match deleted_task {
+        Some(task) => {
+            write_tasks_with_fs(&tasks, fs)?;
+            Ok(task)
+        }
+        None => Err(KnechtError::TaskNotFound(task_id.to_string()))
+    }
+}

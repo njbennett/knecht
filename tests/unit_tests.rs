@@ -1,7 +1,7 @@
 mod test_helpers;
 
 use test_helpers::TestFileSystem;
-use knecht::{read_tasks_with_fs, write_tasks_with_fs, get_next_id_with_fs, add_task_with_fs, mark_task_done_with_fs, find_task_by_id_with_fs, increment_pain_count_with_fs, find_next_task_with_fs, Task, RealFileSystem, FileSystem};
+use knecht::{read_tasks_with_fs, write_tasks_with_fs, get_next_id_with_fs, add_task_with_fs, mark_task_done_with_fs, find_task_by_id_with_fs, increment_pain_count_with_fs, find_next_task_with_fs, delete_task_with_fs, Task, RealFileSystem, FileSystem};
 use std::path::Path;
 
 #[test]
@@ -196,5 +196,24 @@ fn test_find_task_by_id_error_on_read() {
 fn test_find_task_by_id_not_found() {
     let fs = TestFileSystem::new().with_file(".knecht/tasks", "1|open|Test\n");
     let result = find_task_by_id_with_fs("999", &fs);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_delete_task_error_on_read() {
+    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1|open|Test\n").fail("open");
+    assert!(delete_task_with_fs("1", &fs).is_err());
+}
+
+#[test]
+fn test_delete_task_error_on_write() {
+    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1|open|Test\n2|open|Another\n").fail("write");
+    assert!(delete_task_with_fs("1", &fs).is_err());
+}
+
+#[test]
+fn test_delete_task_not_found() {
+    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1|open|Test\n");
+    let result = delete_task_with_fs("999", &fs);
     assert!(result.is_err());
 }

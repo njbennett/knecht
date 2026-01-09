@@ -1,7 +1,7 @@
 use std::env;
 use std::fs;
 
-use knecht::{add_task_with_fs, find_next_task_with_fs, find_task_by_id_with_fs, increment_pain_count_with_fs, mark_task_done_with_fs, read_tasks_with_fs, RealFileSystem};
+use knecht::{add_task_with_fs, delete_task_with_fs, find_next_task_with_fs, find_task_by_id_with_fs, increment_pain_count_with_fs, mark_task_done_with_fs, read_tasks_with_fs, RealFileSystem};
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -16,6 +16,7 @@ fn main() {
         "add" => cmd_add(&args[2..]),
         "list" => cmd_list(),
         "done" => cmd_done(&args[2..]),
+        "delete" => cmd_delete(&args[2..]),
         "show" => cmd_show(&args[2..]),
         "start" => cmd_start(&args[2..]),
         "pain" => cmd_pain(&args[2..]),
@@ -215,6 +216,32 @@ fn cmd_pain(args: &[String]) {
     match increment_pain_count_with_fs(task_id, &RealFileSystem) {
         Ok(task) => {
             println!("Incremented pain count for task-{}: {}", task.id, task.title);
+        }
+        Err(err) => {
+            eprintln!("Error: {}", err);
+            std::process::exit(1);
+        }
+    }
+}
+
+fn cmd_delete(args: &[String]) {
+    if args.is_empty() {
+        eprintln!("Usage: knecht delete <task-id>");
+        std::process::exit(1);
+    }
+    
+    let task_arg = &args[0];
+    let task_id = task_arg.strip_prefix("task-").unwrap_or(task_arg);
+    
+    // Validate that task_id is numeric
+    if task_id.parse::<u32>().is_err() {
+        eprintln!("Error: Invalid task ID format");
+        std::process::exit(1);
+    }
+    
+    match delete_task_with_fs(task_id, &RealFileSystem) {
+        Ok(task) => {
+            println!("Deleted task-{}: {}", task.id, task.title);
         }
         Err(err) => {
             eprintln!("Error: {}", err);
