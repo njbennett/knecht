@@ -3,6 +3,12 @@ use std::fs;
 
 use knecht::{add_task_with_fs, delete_task_with_fs, find_next_task_with_fs, find_task_by_id_with_fs, increment_pain_count_with_fs, mark_task_done_with_fs, read_tasks_with_fs, update_task_with_fs, RealFileSystem};
 
+/// Parses a task ID argument, stripping the "task-" prefix if present.
+/// Accepts both "task-N" and "N" formats, returning just the numeric ID part.
+fn parse_task_id(task_arg: &str) -> &str {
+    task_arg.strip_prefix("task-").unwrap_or(task_arg)
+}
+
 fn main() {
     let args: Vec<String> = env::args().collect();
     
@@ -123,7 +129,7 @@ fn cmd_done(args: &[String]) {
     }
     
     let task_arg = &args[0];
-    let task_id = task_arg.strip_prefix("task-").unwrap_or(task_arg);
+    let task_id = parse_task_id(task_arg);
     
     match mark_task_done_with_fs(task_id, &RealFileSystem) {
         Ok(task) => {
@@ -162,7 +168,7 @@ fn cmd_show(args: &[String]) {
     }
     
     let task_arg = &args[0];
-    let task_id = task_arg.strip_prefix("task-").unwrap_or(task_arg);
+    let task_id = parse_task_id(task_arg);
     
     match find_task_by_id_with_fs(task_id, &RealFileSystem) {
         Ok(task) => {
@@ -187,7 +193,7 @@ fn cmd_start(args: &[String]) {
     }
     
     let task_arg = &args[0];
-    let task_id = task_arg.strip_prefix("task-").unwrap_or(task_arg);
+    let task_id = parse_task_id(task_arg);
     
     match find_task_by_id_with_fs(task_id, &RealFileSystem) {
         Ok(task) => {
@@ -212,7 +218,7 @@ fn cmd_pain(args: &[String]) {
     }
     
     let task_arg = &args[0];
-    let task_id = task_arg.strip_prefix("task-").unwrap_or(task_arg);
+    let task_id = parse_task_id(task_arg);
     
     match increment_pain_count_with_fs(task_id, &RealFileSystem) {
         Ok(task) => {
@@ -232,7 +238,7 @@ fn cmd_delete(args: &[String]) {
     }
     
     let task_arg = &args[0];
-    let task_id = task_arg.strip_prefix("task-").unwrap_or(task_arg);
+    let task_id = parse_task_id(task_arg);
     
     // Validate that task_id is numeric
     if task_id.parse::<u32>().is_err() {
@@ -282,7 +288,7 @@ fn cmd_update(args: &[String]) {
     }
     
     let task_arg = &args[0];
-    let task_id = task_arg.strip_prefix("task-").unwrap_or(task_arg);
+    let task_id = parse_task_id(task_arg);
     
     // Parse flags
     let mut new_title: Option<String> = None;
