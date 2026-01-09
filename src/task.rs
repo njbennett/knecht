@@ -366,3 +366,33 @@ pub fn delete_task_with_fs(task_id: &str, fs: &dyn FileSystem) -> Result<Task, K
         None => Err(KnechtError::TaskNotFound(task_id.to_string()))
     }
 }
+
+pub fn update_task_with_fs(
+    task_id: &str,
+    new_title: Option<String>,
+    new_description: Option<Option<String>>,
+    fs: &dyn FileSystem
+) -> Result<Task, KnechtError> {
+    let mut tasks = read_tasks_with_fs(fs)?;
+    
+    for task in &mut tasks {
+        if task.id == task_id {
+            // Update title if provided
+            if let Some(title) = new_title {
+                task.title = title;
+            }
+            
+            // Update description if provided
+            // None = no change, Some(None) = clear description, Some(Some(desc)) = set description
+            if let Some(desc_opt) = new_description {
+                task.description = desc_opt;
+            }
+            
+            let updated_task = task.clone();
+            write_tasks_with_fs(&tasks, fs)?;
+            return Ok(updated_task);
+        }
+    }
+    
+    Err(KnechtError::TaskNotFound(task_id.to_string()))
+}

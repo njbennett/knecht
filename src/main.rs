@@ -1,7 +1,7 @@
 use std::env;
 use std::fs;
 
-use knecht::{add_task_with_fs, delete_task_with_fs, find_next_task_with_fs, find_task_by_id_with_fs, increment_pain_count_with_fs, mark_task_done_with_fs, read_tasks_with_fs, RealFileSystem};
+use knecht::{add_task_with_fs, delete_task_with_fs, find_next_task_with_fs, find_task_by_id_with_fs, increment_pain_count_with_fs, mark_task_done_with_fs, read_tasks_with_fs, update_task_with_fs, RealFileSystem};
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -21,6 +21,7 @@ fn main() {
         "start" => cmd_start(&args[2..]),
         "pain" => cmd_pain(&args[2..]),
         "next" => cmd_next(),
+        "update" => cmd_update(&args[2..]),
         _ => {
             eprintln!("Unknown command: {}", args[1]);
             std::process::exit(1);
@@ -268,6 +269,70 @@ fn cmd_next() {
         }
         Err(err) => {
             eprintln!("Error reading tasks: {}", err);
+            std::process::exit(1);
+        }
+    }
+}
+
+fn cmd_update(args: &[String]) {
+    if args.is_empty() {
+        eprintln!("Usage: knecht update <task-id> [--title <title>] [--description <description>]");
+        eprintln!("       knecht update <task-id> [-t <title>] [-d <description>]");
+        std::process::exit(1);
+    }
+    
+    let task_arg = &args[0];
+    let task_id = task_arg.strip_prefix("task-").unwrap_or(task_arg);
+    
+    // Parse flags
+    let mut new_title: Option<String> = None;
+    let mut new_description: Option<Option<String>> = None;
+    let mut i = 1;
+    
+    while i < args.len() {
+        match args[i].as_str() {
+            "--title" | "-t" => {
+                if i + 1 >= args.len() {
+                    eprintln!("Error: --title requires a value");
+                    std::process::exit(1);
+                }
+                new_title = Some(args[i + 1].clone());
+                i += 2;
+            }
+            "--description" | "-d" => {
+                if i + 1 >= args.len() {
+                    eprintln!("Error: --description requires a value");
+                    std::process::exit(1);
+                }
+                let desc = args[i + 1].clone();
+                if desc.is_empty() {
+                    new_description = Some(None); // Clear description
+                } else {
+                    new_description = Some(Some(desc));
+                }
+                i += 2;
+            }
+            _ => {
+                eprintln!("Error: Unknown flag '{}'", args[i]);
+                eprintln!("Usage: knecht update <task-id> [--title <title>] [--description <description>]");
+                std::process::exit(1);
+            }
+        }
+    }
+    
+    // Check that at least one flag was provided
+    if new_title.is_none() && new_description.is_none() {
+        eprintln!("Error: Must provide at least one of --title or --description");
+        eprintln!("Usage: knecht update <task-id> [--title <title>] [--description <description>]");
+        std::process::exit(1);
+    }
+    
+    match update_task_with_fs(task_id, new_title, new_description, &RealFileSystem) {
+        Ok(task) => {
+            println!("Updated task-{}", task.id);
+        }
+        Err(err) => {
+            eprintln!("Error: {}", err);
             std::process::exit(1);
         }
     }

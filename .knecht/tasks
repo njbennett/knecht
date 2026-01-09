@@ -18,14 +18,14 @@
 18|done|Update beads2knecht to preserve descriptions [addresses blocker in task-17]
 19|done|Replace bd instructions with knecht in storytime .rules [addresses blocker in task-8]
 20|done|Document how to uninstall/remove beads from storytime [addresses blocker in task-8]
-21|open|Document multiple binaries setup in README (default-run in Cargo.toml)
+21|open|Document multiple binaries setup in README (default-run in Cargo.toml)|Skip: task-43 completed instead|1
 22|open|Consider adding test-data/ directory for example files and test fixtures
 23|done|Add test helper functions for common test operations||3
 24|done|Test task -d Description here
 25|done|Test with description
 26|done|Simple task without description
 27|done|Add refactoring reflection prompt after task completion||5
-28|open|Extract Method: CLI argument parsing in cmd_add
+28|open|Extract Method: CLI argument parsing in cmd_add||1
 29|open|Replace Magic String with Symbolic Constant: pipe delimiter
 30|open|Extract Class: TaskSerializer for format parsing/writing
 31|done|Restructure to eliminate pipe character validation need
@@ -40,7 +40,7 @@
 40|open|Add git pre-commit hook to prompt README review on README changes
 41|done|Add pre-commit hook to run tests before allowing commit
 42|done|Add test coverage check to pre-commit hook requiring 100% coverage
-43|open|Add command to update task title and description|Currently updating task titles or descriptions requires manually editing .knecht/tasks file. Need command like 'knecht update task-43 --title "New title" --description "New desc"' or 'knecht update task-43 -d "Updated description"'. Pain count: 2 (instances: task-36 used awk to update task-116 and task-119 descriptions, current session manually edited task-122 title to add pain count)|3
+43|done|Add command to update task title and description|Currently updating task titles or descriptions requires manually editing .knecht/tasks file. Need command like 'knecht update task-43 --title "New title" --description "New desc"' or 'knecht update task-43 -d "Updated description"'. Pain count: 2 (instances: task-36 used awk to update task-116 and task-119 descriptions, current session manually edited task-122 title to add pain count)|3
 44|done|Add usage instructions to 'knecht list' output for agents
 45|open|Improve installation instructions in README -d Current instructions assume user knows about cargo, PATH, /usr/local/bin, and sudo. Add: 1) Prerequisites (Rust/cargo), 2) Step-by-step installation with actual commands, 3) Verification step (which knecht), 4) Troubleshooting common issues (permission denied, PATH not set), 5) Alternative: running via cargo run from source
 46|open|Create release process and distribution strategy -d Current: users build from source. Future options: 1) GitHub releases with pre-built binaries for major platforms (macOS, Linux, Windows), 2) Homebrew tap for macOS, 3) cargo install knecht (publish to crates.io), 4) Installation script (curl 

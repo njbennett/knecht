@@ -1,7 +1,7 @@
 mod test_helpers;
 
 use test_helpers::TestFileSystem;
-use knecht::{read_tasks_with_fs, write_tasks_with_fs, get_next_id_with_fs, add_task_with_fs, mark_task_done_with_fs, find_task_by_id_with_fs, increment_pain_count_with_fs, find_next_task_with_fs, delete_task_with_fs, Task, RealFileSystem, FileSystem};
+use knecht::{read_tasks_with_fs, write_tasks_with_fs, get_next_id_with_fs, add_task_with_fs, mark_task_done_with_fs, find_task_by_id_with_fs, increment_pain_count_with_fs, find_next_task_with_fs, delete_task_with_fs, update_task_with_fs, Task, RealFileSystem, FileSystem};
 use std::path::Path;
 
 #[test]
@@ -216,4 +216,60 @@ fn test_delete_task_not_found() {
     let fs = TestFileSystem::new().with_file(".knecht/tasks", "1|open|Test\n");
     let result = delete_task_with_fs("999", &fs);
     assert!(result.is_err());
+}
+
+#[test]
+fn test_update_task_error_on_read() {
+    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1|open|Test\n").fail("open");
+    assert!(update_task_with_fs("1", Some("New".to_string()), None, &fs).is_err());
+}
+
+#[test]
+fn test_update_task_error_on_write() {
+    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1|open|Test\n").fail("write");
+    assert!(update_task_with_fs("1", Some("New".to_string()), None, &fs).is_err());
+}
+
+#[test]
+fn test_update_task_not_found() {
+    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1|open|Test\n");
+    let result = update_task_with_fs("999", Some("New".to_string()), None, &fs);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_update_task_title_only() {
+    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1|open|OldTitle\n");
+    let result = update_task_with_fs("1", Some("NewTitle".to_string()), None, &fs);
+    assert!(result.is_ok());
+    let task = result.unwrap();
+    assert_eq!(task.title, "NewTitle");
+}
+
+#[test]
+fn test_update_task_description_only() {
+    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1|open|Title|OldDesc\n");
+    let result = update_task_with_fs("1", None, Some(Some("NewDesc".to_string())), &fs);
+    assert!(result.is_ok());
+    let task = result.unwrap();
+    assert_eq!(task.description, Some("NewDesc".to_string()));
+}
+
+#[test]
+fn test_update_task_clear_description() {
+    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1|open|Title|Description\n");
+    let result = update_task_with_fs("1", None, Some(None), &fs);
+    assert!(result.is_ok());
+    let task = result.unwrap();
+    assert_eq!(task.description, None);
+}
+
+#[test]
+fn test_update_task_both_fields() {
+    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1|open|OldTitle|OldDesc\n");
+    let result = update_task_with_fs("1", Some("NewTitle".to_string()), Some(Some("NewDesc".to_string())), &fs);
+    assert!(result.is_ok());
+    let task = result.unwrap();
+    assert_eq!(task.title, "NewTitle");
+    assert_eq!(task.description, Some("NewDesc".to_string()));
 }

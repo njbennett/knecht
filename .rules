@@ -2,6 +2,8 @@
 
 ## Project Philosophy
 
+**MANDATORY**: When user asks "What's next?", run `knecht next` FIRST (not read .knecht/tasks). Dogfooding!
+
 **knecht** is a git-native task tracker designed primarily for AI agents to work in highly structured, incremental workflows.
 
 ### Core Design Principles:
@@ -27,10 +29,7 @@
    - Start → Test → Implement → Complete → Commit → Reflect
 
 8. **One Task Per Session**: Complete one task, then stop. File subtasks/blockers and let user decide next steps.
-
-### Extreme Programming
-
-We turn practices that work up to maximum: TDD, refactoring, simplicity, testing. If something is good practice, doing it 100% is better than doing it 80%.
+9. **Extreme Programming**: Turn practices that work up to maximum (TDD, refactoring, simplicity, testing)
 
 ## Architecture Overview
 
@@ -206,21 +205,13 @@ When performance pain is real (5+ pain count), track it as a task, write a test,
 ### Self-Hosting Workflow
 
 ```bash
-knecht next          # Get suggestion for what to work on
-# Work on the suggested task
+knecht next          # ALWAYS first (never manually read .knecht/tasks)
 knecht done task-N   # Mark complete
 git add .knecht/tasks src/ tests/
-# IMPORTANT: Confirm with user before committing
-git commit -m "task-N: Description"
+git commit -m "task-N: Description"  # Confirm with user first!
 ```
 
-**IMPORTANT**: Always confirm with the user before running `git commit`. Present the changes that will be committed and ask for approval.
-
-### Session Scope
-
-Work on ONE task per session. When complete: mark done, reflect, prepare commit, and **end the session**. If you discover subtasks, blockers, or improvements, file them and stop. Let the user decide what's next.
-
-We eat our own dog food. Every knecht feature should be tracked IN knecht.
+Work on ONE task per session. When complete: mark done, reflect, prepare commit, and **end the session**. If you discover subtasks/blockers, file them and stop. Let user decide next.
 
 ## Documentation
 
@@ -234,10 +225,10 @@ Keep docs practical, current, and concise. Prefer examples over prose.
 ## Summary
 
 **Always:**
+- Run `knecht next` first (never read .knecht/tasks directly)
 - Write failing test first, then make it pass
 - Track work in knecht itself
 - Fix cargo warnings immediately
-- Design for agents first
 - Work on one task per session, then stop
 
 **Never:**
