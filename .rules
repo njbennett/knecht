@@ -26,6 +26,12 @@
 7. **Structured Workflow**: Guide agents through incremental, testable work
    - Start → Test → Implement → Complete → Commit → Reflect
 
+8. **One Task Per Session**: Complete one task fully before ending the session
+   - Work on a single task from start to completion
+   - When a task is complete, prepare to commit and end the session
+   - If a task reveals subtasks or blockers, file them as new tasks and end the session
+   - Don't continue to the next task automatically - let the user decide what to work on next
+
 ### Extreme Programming
 
 We reject industry conventional wisdom that says "perfect is the enemy of good."
@@ -218,6 +224,22 @@ git commit -m "task-N: Description"
 
 **IMPORTANT**: Always confirm with the user before running `git commit`. Present the changes that will be committed and ask for approval.
 
+### Session Scope
+
+**Work on ONE task per session.** When you complete a task:
+
+1. Mark it done with `knecht done task-N`
+2. Respond to the reflection prompt
+3. Prepare the commit (but confirm with user before committing)
+4. **End the session** - don't automatically start the next task
+
+If during your work you discover:
+- The task needs to be broken into subtasks → file them with `knecht add` and end session
+- Blockers exist → file tasks for the blockers and end session  
+- Related improvements → file them as separate tasks and end session
+
+The user will decide what to work on next. Don't assume you should continue working.
+
 We eat our own dog food. Every knecht feature should be tracked IN knecht.
 
 ## Documentation
@@ -239,6 +261,7 @@ Keep docs practical, current, and concise. Prefer examples over prose.
 - Confirm with user before committing changes
 - Commit `.knecht/tasks` with code changes
 - Design for agents first - prioritize machine-readable output and programmatic interfaces
+- Work on one task per session, then stop and let user decide next steps
 
 **Never:**
 - Add features without tests
