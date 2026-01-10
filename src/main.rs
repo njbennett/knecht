@@ -151,7 +151,13 @@ fn cmd_done(args: &[String]) {
         Ok(task) => {
             println!("✓ task-{}: {}", task.id, task.title);
             println!();
-            print!("REFLECTION PROMPT - Create tasks immediately for anything you notice:
+            print!("
+================================================================================
+STOP - REQUIRED REFLECTION - You MUST answer these questions before continuing
+================================================================================
+
+This is NOT optional informational text. This is REQUIRED work.
+Create tasks immediately for anything you notice:
 
 1. Did you notice anything missing from knecht's interface during this work?
    → If YOU were confused about workflow or what to do next, that's a KNECHT UX BUG.
@@ -168,6 +174,8 @@ fn cmd_done(args: &[String]) {
 4. Did you notice anything new that was difficult about working with the codebase while you did this work? Is there anything in the work you just did that we should refactor? Make a list of the refactoring opportunities. Where you can, use named refactors from Martin Fowler's Refactoring, or Michael Feather's Working Effectively with Legacy Code. Check knecht to see if anything similar has already been filed, and if so, increase the pain count on those tasks.
 
 IMPORTANT: If agents are confused, knecht needs to improve. Create tasks NOW, don't just note it.
+
+================================================================================
 ");
         }
         Err(err) => {

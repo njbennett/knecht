@@ -568,6 +568,16 @@ fn beads2knecht_reports_lost_information() {
 }
 
 #[test]
+// ACCEPTANCE CRITERIA for task-107:
+// The reflection prompt should be actionable by:
+// 1. Using imperative language that requires a response ("STOP. Answer these questions:")
+// 2. Making it visually distinct (more prominent formatting/separators)
+// 3. Explicitly stating this is REQUIRED work, not optional
+// 4. Possibly pausing for acknowledgment (though this may need --no-wait flag for tests)
+//
+// Success = Agents treat reflection as a blocking step that requires conscious action,
+// not as informational text to skip past.
+
 fn done_shows_refactoring_reflection_prompt() {
     let temp = setup_temp_dir();
     run_command(&["init"], &temp);
@@ -577,7 +587,7 @@ fn done_shows_refactoring_reflection_prompt() {
 
     assert!(result.success, "done command should succeed");
     assert!(result.stdout.contains("✓ task-1"), "Should show completed task");
-    assert!(result.stdout.contains("REFLECTION PROMPT - Create tasks immediately"),
+    assert!(result.stdout.contains("STOP - REQUIRED REFLECTION"),
         "Should have explicit reflection prompt header");
     assert!(result.stdout.contains("Did you notice anything missing from knecht's interface"),
         "Should ask about missing interface features");
@@ -601,6 +611,31 @@ fn done_shows_refactoring_reflection_prompt() {
         "Should mention increasing pain count");
     assert!(result.stdout.contains("If agents are confused, knecht needs to improve. Create tasks NOW"),
         "Should emphasize that agent confusion means knecht needs improvement");
+
+    cleanup_temp_dir(temp);
+}
+
+#[test]
+fn done_reflection_prompt_uses_actionable_language() {
+    let temp = setup_temp_dir();
+    run_command(&["init"], &temp);
+    run_command(&["add", "Task to complete"], &temp);
+
+    let result = run_command(&["done", "task-1"], &temp);
+
+    assert!(result.success, "done command should succeed");
+    
+    // Check for imperative/blocking language
+    assert!(result.stdout.contains("STOP") || result.stdout.contains("REQUIRED"),
+        "Should use strong imperative language like STOP or REQUIRED");
+    
+    // Check for visual separators to make it stand out
+    assert!(result.stdout.contains("========") || result.stdout.contains("────────"),
+        "Should use visual separators to make prompt stand out");
+    
+    // Check that it explicitly states this is required work
+    assert!(result.stdout.contains("You must") || result.stdout.contains("MUST") || result.stdout.contains("required"),
+        "Should explicitly state that reflection is required work");
 
     cleanup_temp_dir(temp);
 }
