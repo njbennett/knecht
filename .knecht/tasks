@@ -18,7 +18,7 @@
 18|done|Update beads2knecht to preserve descriptions [addresses blocker in task-17]
 19|done|Replace bd instructions with knecht in storytime .rules [addresses blocker in task-8]
 20|done|Document how to uninstall/remove beads from storytime [addresses blocker in task-8]
-22|open|Consider adding test-data/ directory for example files and test fixtures|Skip: task-175 completed instead. Skip: task-181 completed instead. Skip: task-183 completed instead|3
+22|done|Consider adding test-data/ directory for example files and test fixtures|Skip: task-175 completed instead. Skip: task-181 completed instead. Skip: task-183 completed instead|3
 23|done|Add test helper functions for common test operations||3
 24|done|Test task -d Description here
 25|done|Test with description
@@ -141,3 +141,4 @@
 191|open|Consistent with existing commands: Error messages and output format match style of other knecht commands
 192|open|Git-friendly: Changes to .knecht/tasks produce clean, readable diffs
 193|open|'knecht done' reflection prompt should explicitly remind agents to commit after reflecting|Problem: Agent completed task-183 and saw reflection prompt but didn't follow through with reflection + commit until user reminded them. The reflection prompt asks questions but doesn't explicitly say 'After reflecting, prepare a commit.' Solution: Add a final line to reflection prompt: 'After creating any needed tasks above, prepare to commit your changes (git add + git commit).' This makes the workflow explicit: reflect → file tasks → commit. Related to task-167 (move workflow guidance to command output).
+194|open|'knecht next' should warn about uncommitted changes before suggesting next task|Problem: During task-183, discovered uncommitted work from task-181 when trying to commit. 'knecht next' suggested task-183 without warning about dirty git state. This led to confusion about what to commit. Solution: Before suggesting next task, check git status. If there are uncommitted changes to .knecht/tasks, src/, or tests/, warn: 'Warning: You have uncommitted changes. Consider committing or stashing before starting new work.' This helps agents maintain clean task boundaries and proper commit hygiene. Related to task-193 (commit workflow guidance).
