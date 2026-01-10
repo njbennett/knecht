@@ -3043,6 +3043,52 @@ fn next_prefers_unblocked_subtasks_over_parent_task() {
 }
 
 #[test]
+fn next_handles_three_level_blocker_tree() {
+    with_initialized_repo(|temp| {
+        // Create a three-level blocker tree like task-143 → task-176 → tasks 184-192
+        // Root task with high pain count
+        run_command(&["add", "Root feature", "-d", "Top level feature"], &temp);
+        for _ in 0..3 {
+            run_command(&["pain", "task-1"], &temp);
+        }
+        
+        // Middle task (blocks root)
+        run_command(&["add", "Middle task", "-d", "Intermediate step"], &temp);
+        run_command(&["block", "task-1", "by", "task-2"], &temp);
+        
+        // Leaf tasks (block middle task)
+        run_command(&["add", "Leaf task A", "-d", "First leaf"], &temp);
+        run_command(&["add", "Leaf task B", "-d", "Second leaf"], &temp);
+        run_command(&["add", "Leaf task C", "-d", "Third leaf"], &temp);
+        run_command(&["block", "task-2", "by", "task-3"], &temp);
+        run_command(&["block", "task-2", "by", "task-4"], &temp);
+        run_command(&["block", "task-2", "by", "task-5"], &temp);
+        
+        // Now next should suggest one of the leaf tasks (3, 4, or 5)
+        // NOT the root (task-1) or middle (task-2)
+        let result = run_command(&["next"], &temp);
+        
+        assert!(result.success, "next command should succeed");
+        assert!(
+            !result.stdout.contains("task-1"),
+            "Should not suggest root task-1 when it has blockers, got: {}",
+            result.stdout
+        );
+        assert!(
+            !result.stdout.contains("task-2"),
+            "Should not suggest middle task-2 when it has blockers, got: {}",
+            result.stdout
+        );
+        // Should suggest one of the leaf tasks
+        assert!(
+            result.stdout.contains("task-3") || result.stdout.contains("task-4") || result.stdout.contains("task-5"),
+            "Should suggest one of the leaf tasks (task-3, task-4, or task-5), got: {}",
+            result.stdout
+        );
+    });
+}
+
+#[test]
 fn deliver_command_is_recognized() {
     with_initialized_repo(|temp| {
         // Add a task first

@@ -364,7 +364,12 @@ fn find_best_blocker(task_id: &str, tasks: &[Task], fs: &dyn FileSystem) -> Opti
         .map(|t| (*t).clone())
         .expect("No blocker found");
     
-    // Check if this blocker itself has open blockers
+    // Check if this blocker itself has open blockers - recursively find leaf blocker
+    if has_open_blockers(&best_blocker.id, tasks, fs) {
+        // Recursively find the best blocker of this blocker
+        return find_best_blocker(&best_blocker.id, tasks, fs);
+    }
+    
     Some(best_blocker)
 }
 
