@@ -4,6 +4,13 @@
 
 **MANDATORY**: When user asks "What's next?", run `knecht next` FIRST (not read .knecht/tasks). Dogfooding!
 
+**CRITICAL - NEVER BYPASS KNECHT'S INTERFACE**: 
+- NEVER read `.knecht/tasks` or `.knecht/blockers` directly with `read_file`, `grep`, `cat`, or any file access tool
+- ALWAYS use knecht commands: `knecht list`, `knecht show`, `knecht next`, etc.
+- This applies **especially during debugging knecht itself** - that's when dogfooding matters most!
+- If knecht commands don't give you what you need, that's a knecht UX bug - file a task for the missing command FIRST, then ask user what to do
+- The only exception: when explicitly instructed to examine file format for a task that requires it
+
 **knecht** is a git-native task tracker designed primarily for AI agents to work in highly structured, incremental workflows.
 
 ### Core Design Principles:
@@ -226,12 +233,14 @@ Keep docs practical, current, and concise. Prefer examples over prose.
 
 **Always:**
 - Run `knecht next` first (never read .knecht/tasks directly)
+- Use knecht commands exclusively - no grep/cat on .knecht files, even during debugging
 - Write failing test first, then make it pass
 - Track work in knecht itself
 - Fix cargo warnings immediately
 - Work on one task per session, then stop
 
 **Never:**
+- Read .knecht/tasks or .knecht/blockers directly (use knecht commands instead)
 - Add features without tests or tracking
 - Prematurely abstract or optimize
 - Ignore warnings or break tests
