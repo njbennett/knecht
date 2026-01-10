@@ -2996,3 +2996,78 @@ fn test_delivered_status_value_is_preserved() {
                 "File should contain delivered status: {}", content);
     });
 }
+
+#[test]
+fn next_prefers_unblocked_subtasks_over_parent_task() {
+    with_initialized_repo(|temp| {
+        // Create a parent task with high pain count
+        run_command(&["add", "Large feature with verification", "-d", "This is a big task"], &temp);
+        for _ in 0..3 {
+            run_command(&["pain", "task-1"], &temp);
+        }
+        
+        // Create subtasks that block the parent task
+        run_command(&["add", "Foundation work", "-d", "Must be done first"], &temp);
+        run_command(&["add", "Build feature A", "-d", "Needs foundation"], &temp);
+        run_command(&["add", "Build feature B", "-d", "Needs foundation"], &temp);
+        
+        // Parent is blocked by all subtasks (can't complete parent until subtasks done)
+        run_command(&["block", "task-1", "by", "task-2"], &temp); // task-1 blocked by task-2
+        run_command(&["block", "task-1", "by", "task-3"], &temp); // task-1 blocked by task-3
+        run_command(&["block", "task-1", "by", "task-4"], &temp); // task-1 blocked by task-4
+        
+        // Feature tasks also blocked by foundation
+        run_command(&["block", "task-3", "by", "task-2"], &temp); // task-3 blocked by task-2
+        run_command(&["block", "task-4", "by", "task-2"], &temp); // task-4 blocked by task-2
+        
+        // Complete the foundation (task-2)
+        run_command(&["done", "task-2"], &temp);
+        
+        // Now next should suggest task-3 or task-4 (unblocked subtasks) instead of task-1 (parent)
+        let result = run_command(&["next"], &temp);
+        
+        assert!(result.success, "next command should succeed");
+        // Should NOT suggest task-1 (the parent with high pain) because it has open subtasks
+        assert!(
+            !result.stdout.contains("task-1"),
+            "Should not suggest parent task-1 when it has unblocked subtasks, got: {}",
+            result.stdout
+        );
+        // Should suggest one of the unblocked subtasks (task-3 or task-4)
+        assert!(
+            result.stdout.contains("task-3") || result.stdout.contains("task-4"),
+            "Should suggest one of the unblocked subtasks (task-3 or task-4), got: {}",
+            result.stdout
+        );
+    });
+}
+
+#[test]
+fn deliver_command_is_recognized() {
+    with_initialized_repo(|temp| {
+        // Add a task first
+        let add_result = run_command(&["add", "Test task"], temp);
+        assert!(add_result.success);
+        assert!(add_result.stdout.contains("Created task-1"));
+
+        // Try to deliver it
+        let deliver_result = run_command(&["deliver", "task-1"], temp);
+        
+        // The command should be recognized (not "Unknown command")
+        assert!(
+            !deliver_result.stderr.contains("Unknown command"),
+            "deliver command should be recognized, got stderr: {}",
+            deliver_result.stderr
+        );
+    });
+}
+
+#[test]
+fn deliver_requires_task_id_argument() {
+    with_initialized_repo(|temp| {
+        let result = run_command(&["deliver"], temp);
+        
+        assert!(!result.success);
+        assert!(result.stderr.contains("Usage: knecht deliver <task-id>"));
+    });
+}

@@ -18,7 +18,7 @@
 18|done|Update beads2knecht to preserve descriptions [addresses blocker in task-17]
 19|done|Replace bd instructions with knecht in storytime .rules [addresses blocker in task-8]
 20|done|Document how to uninstall/remove beads from storytime [addresses blocker in task-8]
-22|open|Consider adding test-data/ directory for example files and test fixtures|Skip: task-175 completed instead|1
+22|open|Consider adding test-data/ directory for example files and test fixtures|Skip: task-175 completed instead. Skip: task-181 completed instead. Skip: task-183 completed instead|3
 23|done|Add test helper functions for common test operations||3
 24|done|Test task -d Description here
 25|done|Test with description
@@ -128,3 +128,16 @@
 178|open|Update 'knecht list' to distinguish delivered tasks visually|Show delivered tasks distinctly in list output. Consider: different symbol/marker than [ ] and [x], maybe [>] or [?]. Should appear between open and done tasks in output, or with clear visual distinction.
 179|open|Decide on and implement verification command|Choose command name and semantics for moving delivered→done. Options: keep 'knecht done' for verification, add 'knecht verify', add 'knecht accept', etc. Command should mark delivered task as done after verification. Consider what output/guidance to provide.
 180|open|Update README with delivered→verified workflow|Document new workflow: open→deliver→verify→done. Update all command examples. Explain the verification workflow and why it exists. Update philosophy/design sections if needed.
+181|done|Fix 'knecht next' to prefer unblocked subtasks over parent tasks|Problem: When task-143 has 5 open subtasks (176-180) with task-175 (blocker) completed, 'knecht next' still suggests task-143 instead of its subtasks. This prevents proper incremental work on large tasks. Root cause: find_next_task_with_fs() only looks at pain count and age, doesn't consider blocker/subtask relationships. Solution: Update next logic to: (1) Check if suggested task has open subtasks, (2) If yes, recursively find the best subtask to work on instead, (3) Only suggest parent when all subtasks are done or blocked. This ensures agents work bottom-up on task hierarchies. Related to task-143 (verification workflow) which revealed this issue.|1
+182|open|Refactor: Consolidate duplicate blocker-reading logic|Duplicated Code smell: Functions to read blockers file exist in both main.rs (get_blockers_for_task, get_tasks_blocked_by) and task.rs (get_blockers_for_task). The task.rs version uses FileSystem trait for testability, but main.rs versions directly call fs::read_to_string. Extract Method: Move blocker-reading logic to task.rs with FileSystem trait, then have main.rs call those functions via RealFileSystem. This centralizes the logic and makes it all testable. See task-181 where I duplicated this code.
+183|done|Command exists: 'knecht deliver task-N' is recognized and executes
+184|open|Status change: 'knecht deliver task-N' changes task status from open to delivered
+185|open|Validation: 'knecht deliver' fails gracefully for non-existent, already-delivered, already-done, or invalid task IDs
+186|open|Success message: On successful delivery, output confirms task was marked as delivered
+187|open|Workflow guidance: Output includes guidance about verification workflow and suggests 'knecht next'
+188|open|File format: .knecht/tasks file is updated correctly with 'delivered' status
+189|open|Task relationships preserved: Blocked/blocks relationships remain intact after delivery
+190|open|Integration tests exist: Tests cover successful delivery, non-existent task, already-delivered, already-done, invalid ID, and workflow guidance in output
+191|open|Consistent with existing commands: Error messages and output format match style of other knecht commands
+192|open|Git-friendly: Changes to .knecht/tasks produce clean, readable diffs
+193|open|'knecht done' reflection prompt should explicitly remind agents to commit after reflecting|Problem: Agent completed task-183 and saw reflection prompt but didn't follow through with reflection + commit until user reminded them. The reflection prompt asks questions but doesn't explicitly say 'After reflecting, prepare a commit.' Solution: Add a final line to reflection prompt: 'After creating any needed tasks above, prepare to commit your changes (git add + git commit).' This makes the workflow explicit: reflect → file tasks → commit. Related to task-167 (move workflow guidance to command output).

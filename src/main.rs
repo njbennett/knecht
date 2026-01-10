@@ -22,6 +22,7 @@ fn main() {
         "add" => cmd_add(&args[2..]),
         "list" => cmd_list(),
         "done" => cmd_done(&args[2..]),
+        "deliver" => cmd_deliver(&args[2..]),
         "delete" => cmd_delete(&args[2..]),
         "show" => cmd_show(&args[2..]),
         "start" => cmd_start(&args[2..]),
@@ -122,6 +123,19 @@ fn cmd_list() {
     println!("  knecht start task-N    - Begin work on a task");
     println!("  knecht done task-N     - Mark a task as complete");
     println!("  knecht next            - Get suggestion for what to work on next");
+}
+
+fn cmd_deliver(args: &[String]) {
+    if args.is_empty() {
+        eprintln!("Usage: knecht deliver <task-id>");
+        std::process::exit(1);
+    }
+    
+    let task_arg = &args[0];
+    let _task_id = parse_task_id(task_arg);
+    
+    // Minimal implementation - just acknowledge the command
+    println!("deliver command received for task: {}", task_arg);
 }
 
 fn cmd_done(args: &[String]) {

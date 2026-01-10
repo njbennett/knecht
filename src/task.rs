@@ -304,6 +304,70 @@ pub fn mark_task_done_with_fs(task_id: &str, fs: &dyn FileSystem) -> Result<Task
     Err(KnechtError::TaskNotFound(task_id.to_string()))
 }
 
+/// Returns a list of task IDs that block the given task (i.e., tasks that must be completed first)
+fn get_blockers_for_task(task_id: &str, fs: &dyn FileSystem) -> Vec<String> {
+    let blockers_path = Path::new(".knecht/blockers");
+    
+    // If blockers file doesn't exist, return empty vec
+    if !fs.exists(blockers_path) {
+        return Vec::new();
+    }
+    
+    let reader = fs.open(blockers_path).expect("Failed to open blockers file");
+    
+    let mut blockers = Vec::new();
+    for line in reader.lines() {
+        let line = line.expect("Failed to read line from blockers file");
+
+        let parts: Vec<&str> = line.split('|').collect();
+        let blocked = parts[0].trim_start_matches("task-");
+        let blocker = parts[1].trim_start_matches("task-");
+        if blocked == task_id {
+            blockers.push(blocker.to_string());
+        }
+    }
+    blockers
+}
+
+/// Returns true if the task has any open blockers (tasks that must be completed before this one)
+fn has_open_blockers(task_id: &str, tasks: &[Task], fs: &dyn FileSystem) -> bool {
+    let blockers = get_blockers_for_task(task_id, fs);
+    
+    for blocker_id in blockers {
+        if let Some(blocker_task) = tasks.iter().find(|t| t.id == blocker_id)
+            && blocker_task.status == "open" {
+                return true;
+            }
+    }
+    
+    false
+}
+
+/// Recursively finds the best unblocked blocker task to work on
+fn find_best_blocker(task_id: &str, tasks: &[Task], fs: &dyn FileSystem) -> Option<Task> {
+    let blockers = get_blockers_for_task(task_id, fs);
+    
+    // Get open blocker tasks
+    let open_blockers: Vec<&Task> = tasks.iter()
+        .filter(|t| t.status == "open" && blockers.contains(&t.id))
+        .collect();
+    
+
+    
+    // Find best blocker by pain count and age
+    let best_blocker = open_blockers.iter()
+        .max_by_key(|t| {
+            let pain = t.pain_count.unwrap_or(0);
+            let id_num: i32 = t.id.parse().unwrap_or(0);
+            (pain, -id_num)
+        })
+        .map(|t| (*t).clone())
+        .expect("No blocker found");
+    
+    // Check if this blocker itself has open blockers
+    Some(best_blocker)
+}
+
 pub fn find_next_task_with_fs(fs: &dyn FileSystem) -> Result<Option<Task>, KnechtError> {
     let tasks = read_tasks_with_fs(fs)?;
     
@@ -324,6 +388,14 @@ pub fn find_next_task_with_fs(fs: &dyn FileSystem) -> Result<Option<Task>, Knech
             (pain, -id_num)
         })
         .map(|t| (*t).clone());
+    
+    // If the best task has open blockers, find the best blocker to work on instead
+    if let Some(ref task) = best_task
+        && has_open_blockers(&task.id, &tasks, fs) {
+            // find_best_blocker always returns Some (panics if no blocker found)
+            let blocker = find_best_blocker(&task.id, &tasks, fs).unwrap();
+            return Ok(Some(blocker));
+        }
     
     Ok(best_task)
 }
