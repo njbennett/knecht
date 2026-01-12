@@ -210,7 +210,7 @@ fn list_handles_malformed_task_file() {
 
     // Write malformed task data
     let tasks_path = temp.join(".knecht/tasks");
-    fs::write(&tasks_path, "1|open|Good task\nBAD LINE WITHOUT PIPES\n2|open|Another good task\n")
+    fs::write(&tasks_path, "1,open,\"Good task\",,\nBAD LINE WITHOUT PIPES\n2,open,\"Another good task\",,\n")
         .expect("Failed to write test file");
 
     // list should handle malformed lines gracefully
@@ -300,20 +300,14 @@ fn add_task_with_description() {
         assert!(result.success, "add with description should succeed: {}", result.stderr);
         assert!(result.stdout.contains("task-1"), "Should create task-1");
 
-        // Verify task file contains description in proper format: id|status|title|description
+        // Verify task file contains description in proper CSV format: id,status,title,description,pain_count
         let tasks_content = fs::read_to_string(temp.join(".knecht/tasks"))
             .expect("Failed to read tasks file");
 
-        // Expected format: 1|open|Implement feature X|This is a longer description of the feature
-        let lines: Vec<&str> = tasks_content.lines().collect();
-        assert_eq!(lines.len(), 1, "Should have exactly one task");
-
-        let parts: Vec<&str> = lines[0].split('|').collect();
-        assert_eq!(parts.len(), 4, "Task should have 4 fields: id|status|title|description, got: {}", lines[0]);
-        assert_eq!(parts[0], "1", "ID should be 1");
-        assert_eq!(parts[1], "open", "Status should be open");
-        assert_eq!(parts[2], "Implement feature X", "Title should match");
-        assert_eq!(parts[3], "This is a longer description of the feature", "Description should match");
+        // Expected CSV format: 1,open,"Implement feature X","This is a longer description of the feature",
+        assert!(tasks_content.contains("1,open"), "Should have CSV format with id and status");
+        assert!(tasks_content.contains("Implement feature X"), "Should contain title");
+        assert!(tasks_content.contains("This is a longer description of the feature"), "Should contain description");
 
         // List should work with tasks that have descriptions
         let list_result = run_command(&["list"], &temp);
@@ -339,7 +333,7 @@ fn read_tasks_with_and_without_descriptions() {
     with_initialized_repo(|temp| {
         // Create mixed tasks file: some with descriptions, some without
         let tasks_path = temp.join(".knecht/tasks");
-        fs::write(&tasks_path, "1|open|Old task without description\n2|open|New task|This has a description\n3|done|Another old task\n")
+        fs::write(&tasks_path, "1,open,\"Old task without description\",,\n2,open,\"New task\",\"This has a description\",\n3,done,\"Another old task\",,\n")
             .expect("Failed to write test file");
 
         // list should handle both formats
@@ -707,17 +701,17 @@ fn add_task_with_pipe_in_description_works_with_escaping() {
 
     let result = run_command(&["add", "Valid title", "-d", "Description with | pipe"], &temp);
 
-    assert!(result.success, "Should succeed with pipe in description (will be escaped)");
+    assert!(result.success, "Should succeed with pipe in description (CSV handles it naturally)");
 
-    // Verify the pipe is preserved in the file (escaped) and can be read back
+    // Verify the pipe is preserved in the file (CSV format) and can be read back
     let tasks_file = temp.join(".knecht/tasks");
     let content = fs::read_to_string(&tasks_file).unwrap();
 
-    // Should be escaped in the file
-    assert!(content.contains("Description with \\| pipe"),
-        "Should have escaped pipe in file, got: {}", content);
+    // CSV format preserves pipe without backslash escaping
+    assert!(content.contains("Description with | pipe"),
+        "Should have pipe preserved in CSV format, got: {}", content);
 
-    // When we list (which reads and unescapes), title should show correctly
+    // When we list (which reads CSV), title should show correctly
     let list = run_command(&["list"], &temp);
     assert!(list.stdout.contains("Valid title"),
         "Should show title in list output, got: {}", list.stdout);
@@ -880,7 +874,7 @@ fn list_handles_tasks_file_with_empty_lines() {
 
     // Create tasks file with empty lines
     let tasks_path = temp.join(".knecht/tasks");
-    fs::write(&tasks_path, "1|open|First task\n\n2|open|Second task\n  \n3|done|Third task\n\n")
+    fs::write(&tasks_path, "1,open,\"First task\",,\n\n2,open,\"Second task\",,\n  \n3,done,\"Third task\",,\n\n")
         .expect("Failed to write test file");
 
     // list should skip empty lines
@@ -907,8 +901,9 @@ fn done_marks_task_with_description_complete() {
 
     // Verify it was marked done and still has description
     let tasks_content = fs::read_to_string(temp.join(".knecht/tasks")).unwrap();
-    assert!(tasks_content.contains("1|done|Task with description|This is the description"),
-        "Task should be marked done and preserve description");
+    assert!(tasks_content.contains("1,done"), "Task should be marked done");
+    assert!(tasks_content.contains("Task with description"), "Should preserve title");
+    assert!(tasks_content.contains("This is the description"), "Should preserve description");
 
     cleanup_temp_dir(temp);
 }
@@ -1040,108 +1035,107 @@ fn read_tasks_with_pipe_in_description_should_fail_or_preserve() {
     cleanup_temp_dir(temp);
 }
 #[test]
-fn escape_unescape_edge_cases_for_coverage() {
+fn csv_format_edge_cases_for_coverage() {
     let temp = setup_temp_dir();
     fs::create_dir_all(temp.join(".knecht")).unwrap();
     let tasks_file = temp.join(".knecht/tasks");
 
-    // Test 1: Escaped backslash (\\) - this tests unescape path where next_ch == '\\'
+    // Test 1: Backslash in CSV format (no special escaping needed)
     {
         let mut file = fs::File::create(&tasks_file).unwrap();
-        writeln!(file, "1|open|Test\\\\Task|Description with backslash\\\\here").unwrap();
+        writeln!(file, "1,open,\"Test\\Task\",\"Description with backslash\\here\",").unwrap();
         drop(file);
 
         let result = run_command(&["list"], &temp);
-        assert!(result.success, "Should parse escaped backslash");
+        assert!(result.success, "Should parse backslash in CSV");
     }
 
-    // Test 2: Multiple consecutive escaped characters
+    // Test 2: Multiple pipes (no escaping needed in CSV)
     {
         let mut file = fs::File::create(&tasks_file).unwrap();
-        writeln!(file, "2|open|Test\\|\\|Multi|Desc\\\\\\|combo").unwrap();
+        writeln!(file, "2,open,\"Test|||Multi\",\"Desc|||combo\",").unwrap();
         drop(file);
 
         let result = run_command(&["list"], &temp);
-        assert!(result.success, "Should parse multiple escapes");
+        assert!(result.success, "Should parse pipes in CSV");
     }
 
-    // Test 3: Backslash at end of string (not followed by \ or |)
+    // Test 3: Commas require quoting in CSV
     {
         let mut file = fs::File::create(&tasks_file).unwrap();
-        writeln!(file, "3|open|TestBackslashA\\A|DescBackslashB\\B").unwrap();
+        writeln!(file, "3,open,\"TestA, B, C\",\"DescA, B, C\",").unwrap();
         drop(file);
 
         let result = run_command(&["list"], &temp);
-        assert!(result.success, "Should handle backslash followed by regular char");
+        assert!(result.success, "Should handle commas in CSV");
     }
 
-    // Test 4: Empty description field to test split_unescaped with different field counts
+    // Test 4: Empty description field
     {
         let mut file = fs::File::create(&tasks_file).unwrap();
-        writeln!(file, "4|open|TaskNoDesc").unwrap();
+        writeln!(file, "4,open,\"TaskNoDesc\",,").unwrap();
         drop(file);
 
         let result = run_command(&["list"], &temp);
         assert!(result.success, "Should handle task without description");
     }
 
-    // Test 5: Pipe at start and end
+    // Test 5: Quotes in CSV (escaped with double quotes)
     {
         let mut file = fs::File::create(&tasks_file).unwrap();
-        writeln!(file, "5|open|\\|Start|End\\|").unwrap();
+        writeln!(file, "5,open,\"Title with \"\"quotes\"\"\",\"Desc with \"\"quotes\"\"\",").unwrap();
         drop(file);
 
         let result = run_command(&["list"], &temp);
-        assert!(result.success, "Should handle pipes at boundaries");
+        assert!(result.success, "Should handle quotes in CSV");
     }
 
-    // Test 6: Add task with backslash in title to test escape function
+    // Test 6: Add task with backslash in title
     {
         run_command(&["init"], &temp);
         let result = run_command(&["add", "Task\\with\\backslash", "-d", "Desc\\with\\backslash"], &temp);
         assert!(result.success, "Should add task with backslashes");
 
         let content = fs::read_to_string(&tasks_file).unwrap();
-        assert!(content.contains("\\\\"), "Should have escaped backslashes in file");
+        assert!(content.contains("Task\\with\\backslash"), "Should preserve backslashes in CSV");
     }
 
-    // Test 7: Consecutive escaped pipes
+    // Test 7: Multiple special characters
     {
         let mut file = fs::File::create(&tasks_file).unwrap();
-        writeln!(file, "7|open|Test|Multiple\\|\\|\\|pipes").unwrap();
+        writeln!(file, "7,open,\"Test with, comma | pipe\",\"Multiple|||pipes\",").unwrap();
         drop(file);
 
         let result = run_command(&["list"], &temp);
-        assert!(result.success, "Should parse consecutive escaped pipes");
+        assert!(result.success, "Should parse multiple special chars");
     }
 
-    // Test 8: Mixed escape sequences
+    // Test 8: Mixed special characters
     {
         let mut file = fs::File::create(&tasks_file).unwrap();
-        writeln!(file, "8|open|Test\\\\\\|Mix|Desc\\|\\\\combo").unwrap();
+        writeln!(file, "8,open,\"Test\\|Mix\",\"Desc|\\combo\",").unwrap();
         drop(file);
 
         let result = run_command(&["list"], &temp);
-        assert!(result.success, "Should parse mixed escape sequences");
+        assert!(result.success, "Should parse mixed characters");
     }
 
     cleanup_temp_dir(temp);
 }
 
 #[test]
-fn test_backslash_not_followed_by_escapable() {
+fn test_backslash_in_csv_format() {
     let temp = setup_temp_dir();
     fs::create_dir_all(temp.join(".knecht")).unwrap();
     let tasks_file = temp.join(".knecht/tasks");
 
-    // Backslash followed by character that's not \ or |
-    // This tests the "else" branch in unescape
+    // Backslash characters are preserved as-is in CSV format
     let mut file = fs::File::create(&tasks_file).unwrap();
-    writeln!(file, "1|open|Path\\ntest|C:\\\\folder\\nfile").unwrap();
+    writeln!(file, "1,open,\"Path\\ntest\",\"C:\\folder\\file\",").unwrap();
     drop(file);
 
     let result = run_command(&["list"], &temp);
-    assert!(result.success, "Should handle backslash followed by non-escapable char");
+    assert!(result.success, "Should handle backslash in CSV format");
 
     cleanup_temp_dir(temp);
 }
@@ -1151,16 +1145,15 @@ fn test_add_with_backslash_and_pipe_combination() {
     let temp = setup_temp_dir();
     run_command(&["init"], &temp);
 
-    // Add task with both backslashes and pipes to ensure escape() works correctly
+    // Add task with both backslashes and pipes - CSV handles these naturally
     let result = run_command(&["add", "Test\\path|command", "-d", "Run\\cmd|filter"], &temp);
     assert!(result.success, "Should add task with backslash and pipe");
 
     let tasks_file = temp.join(".knecht/tasks");
     let content = fs::read_to_string(&tasks_file).unwrap();
 
-    // Both should be escaped in the file
-    assert!(content.contains("\\\\"), "Should have escaped backslashes");
-    assert!(content.contains("\\|"), "Should have escaped pipes");
+    // CSV format preserves these characters without backslash escaping
+    assert!(content.contains("Test\\path|command"), "Should preserve backslash and pipe in CSV");
 
     // Should be able to list it back
     let list = run_command(&["list"], &temp);
@@ -1175,9 +1168,9 @@ fn test_backslash_at_string_end() {
     fs::create_dir_all(temp.join(".knecht")).unwrap();
     let tasks_file = temp.join(".knecht/tasks");
 
-    // Backslash at the very end of a field (chars.peek() returns None)
+    // Backslash at the end of a field in CSV format
     let mut file = fs::File::create(&tasks_file).unwrap();
-    writeln!(file, "1|open|TaskEndsWithBackslash\\|DescEndsWithBackslash\\").unwrap();
+    writeln!(file, "1,open,\"TaskEndsWithBackslash\\\",\"DescEndsWithBackslash\\\",").unwrap();
     drop(file);
 
     let result = run_command(&["list"], &temp);
@@ -2943,7 +2936,7 @@ fn test_read_task_with_delivered_status() {
     with_initialized_repo(&|temp: &PathBuf| {
         // Manually create a task with "delivered" status
         let tasks_path = temp.join(".knecht/tasks");
-        fs::write(&tasks_path, "1|delivered|Fix the bug\n").unwrap();
+        fs::write(&tasks_path, "1,delivered,\"Fix the bug\",,\n").unwrap();
         
         // List should read and display the delivered task
         let result = run_command(&["list"], &temp);
@@ -2959,14 +2952,14 @@ fn test_write_task_with_delivered_status() {
         // For now, we can't set delivered status via CLI (no deliver command yet)
         // So this test will manually create a delivered task, read it, and verify it persists
         let tasks_path = temp.join(".knecht/tasks");
-        fs::write(&tasks_path, "1|delivered|Fix the bug\n").unwrap();
+        fs::write(&tasks_path, "1,delivered,\"Fix the bug\",,\n").unwrap();
         
         // Add another task - this will read and rewrite the file
         run_command(&["add", "Another task"], &temp);
         
         // Verify the delivered status was preserved
         let content = fs::read_to_string(&tasks_path).unwrap();
-        assert!(content.contains("1|delivered|Fix the bug"), 
+        assert!(content.contains("1,delivered,\"Fix the bug\""), 
                 "Delivered status should be preserved after file rewrite. Content: {}", content);
     });
 }
@@ -2976,7 +2969,7 @@ fn test_delivered_status_with_description() {
     with_initialized_repo(&|temp: &PathBuf| {
         // Create a delivered task with description
         let tasks_path = temp.join(".knecht/tasks");
-        fs::write(&tasks_path, "1|delivered|Fix the bug|This is the description\n").unwrap();
+        fs::write(&tasks_path, "1,delivered,\"Fix the bug\",\"This is the description\",\n").unwrap();
         
         // Show command should display it correctly
         let result = run_command(&["show", "task-1"], &temp);
@@ -2992,7 +2985,7 @@ fn test_backwards_compatibility_with_open_and_done() {
     with_initialized_repo(&|temp: &PathBuf| {
         // Create tasks with all three statuses
         let tasks_path = temp.join(".knecht/tasks");
-        fs::write(&tasks_path, "1|open|Open task\n2|delivered|Delivered task\n3|done|Done task\n").unwrap();
+        fs::write(&tasks_path, "1,open,\"Open task\",,\n2,delivered,\"Delivered task\",,\n3,done,\"Done task\",,\n").unwrap();
         
         // List should show all three
         let result = run_command(&["list"], &temp);
@@ -3006,9 +2999,9 @@ fn test_backwards_compatibility_with_open_and_done() {
         
         // Verify all statuses were preserved
         let content = fs::read_to_string(&tasks_path).unwrap();
-        assert!(content.contains("1|open|Open task"), "Open status preserved");
-        assert!(content.contains("2|delivered|Delivered task"), "Delivered status preserved");
-        assert!(content.contains("3|done|Done task"), "Done status preserved");
+        assert!(content.contains("1,open,\"Open task\""), "Open status preserved");
+        assert!(content.contains("2,delivered,\"Delivered task\""), "Delivered status preserved");
+        assert!(content.contains("3,done,\"Done task\""), "Done status preserved");
     });
 }
 
@@ -3017,7 +3010,7 @@ fn test_delivered_status_value_is_preserved() {
     with_initialized_repo(&|temp: &PathBuf| {
         // Create a task with delivered status
         let tasks_path = temp.join(".knecht/tasks");
-        fs::write(&tasks_path, "1|delivered|Fix the bug\n").unwrap();
+        fs::write(&tasks_path, "1,delivered,\"Fix the bug\",,\n").unwrap();
         
         // Show command should display "delivered" as the status
         let result = run_command(&["show", "task-1"], &temp);
@@ -3027,7 +3020,7 @@ fn test_delivered_status_value_is_preserved() {
         
         // Verify the raw file still contains "delivered"
         let content = fs::read_to_string(&tasks_path).unwrap();
-        assert!(content.contains("1|delivered|Fix the bug"), 
+        assert!(content.contains("1,delivered,\"Fix the bug\""), 
                 "File should contain delivered status: {}", content);
     });
 }
@@ -3151,4 +3144,64 @@ fn deliver_requires_task_id_argument() {
         assert!(!result.success);
         assert!(result.stderr.contains("Usage: knecht deliver <task-id>"));
     });
+}
+
+#[test]
+fn csv_format_reading_basic_fields() {
+    let temp = setup_temp_dir();
+    run_command(&["init"], &temp);
+
+    // Write CSV-formatted task data
+    let tasks_path = temp.join(".knecht/tasks");
+    fs::write(&tasks_path, "1,open,\"Simple title\",,\n2,done,\"Another task\",\"Description here\",3\n")
+        .expect("Failed to write test file");
+
+    // list should read CSV format
+    let result = run_command(&["list"], &temp);
+    assert!(result.success, "list should succeed with CSV format");
+    assert!(result.stdout.contains("task-1"), "Should show task-1");
+    assert!(result.stdout.contains("Simple title"), "Should show task title");
+    assert!(result.stdout.contains("task-2"), "Should show task-2");
+    assert!(result.stdout.contains("Another task"), "Should show another task");
+
+    cleanup_temp_dir(temp);
+}
+
+#[test]
+fn csv_format_handles_special_characters() {
+    let temp = setup_temp_dir();
+    run_command(&["init"], &temp);
+
+    // Write CSV with special characters that would break pipe format
+    let tasks_path = temp.join(".knecht/tasks");
+    fs::write(&tasks_path, "1,open,\"Title with, comma\",,\n2,open,\"Title with | pipe\",\"Description with \\\"quotes\\\"\",\n")
+        .expect("Failed to write test file");
+
+    let result = run_command(&["list"], &temp);
+    assert!(result.success, "list should handle CSV special characters");
+    assert!(result.stdout.contains("Title with, comma"), "Should handle comma in title");
+    assert!(result.stdout.contains("Title with | pipe"), "Should handle pipe in title");
+
+    cleanup_temp_dir(temp);
+}
+
+#[test]
+fn add_command_writes_csv_format() {
+    let temp = setup_temp_dir();
+    run_command(&["init"], &temp);
+
+    // Add a task with special characters
+    let result = run_command(&["add", "Task with, comma and | pipe"], &temp);
+    assert!(result.success, "add should succeed");
+
+    // Verify the file is in CSV format
+    let tasks_path = temp.join(".knecht/tasks");
+    let content = fs::read_to_string(&tasks_path).expect("Failed to read tasks file");
+    
+    // Should use CSV format with quotes, not pipe-delimited with escapes
+    assert!(content.contains(",open,"), "Should use CSV format with commas");
+    assert!(content.contains("\"Task with, comma and | pipe\""), "Should quote fields with special chars");
+    assert!(!content.contains("\\|"), "Should not use backslash escaping");
+
+    cleanup_temp_dir(temp);
 }

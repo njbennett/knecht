@@ -18,7 +18,7 @@ Named after Joseph Knecht from Hermann Hesse's *The Glass Bead Game* - "knecht" 
 2. **Test-Driven Development**: Every feature starts with a failing test
 3. **Self-Hosting**: We use knecht to build knecht (eating our own dog food)
 4. **Pain-Driven Features**: Features are added only when their absence hurts (track pain counts)
-5. **Simplest Possible**: Sequential IDs, pipe-delimited files, no complexity
+5. **Simplest Possible**: Sequential IDs, CSV files, no complexity
 6. **Structured Workflow**: Guide agents through incremental, testable work
 
 ## Installation
@@ -155,18 +155,18 @@ The pain count appears in `knecht list` output and is used by `knecht next` to p
 
 ## Data Format
 
-Tasks are stored in `.knecht/tasks` using a simple pipe-delimited format:
+Tasks are stored in `.knecht/tasks` using standard CSV format:
 
 ```
-1|open|Fix the login bug
-2|done|Write tests for authentication
-3|open|Deploy to staging
-4|open|Refactor auth module|Break down into smaller functions and add better error handling
+1,open,"Fix the login bug",,
+2,done,"Write tests for authentication",,
+3,open,"Deploy to staging",,
+4,open,"Refactor auth module","Break down into smaller functions and add better error handling",
 ```
 
-Format: `{id}|{status}|{title}` or `{id}|{status}|{title}|{description}`
+Format: `{id},{status},"{title}","{description}",{pain_count}`
 
-The description field is optional - tasks without descriptions use the 3-field format for backwards compatibility.
+All fields are always present. Empty fields (description, pain_count) are included as empty values for consistency.
 
 This format is:
 - **Git-friendly**: Line-based diffs work perfectly
@@ -215,9 +215,9 @@ knecht list
 
 YAGNI (You Ain't Gonna Need It). Sequential integers work fine for a personal task tracker. We can add content-based hashing later if merge conflicts become painful.
 
-### Why pipe-delimited instead of JSON?
+### Why CSV instead of JSON?
 
-Simplicity. Three fields don't need JSON's complexity. The format is readable, editable, and git-friendly.
+Simplicity and standards. CSV is a well-understood format with robust parsing libraries. It's readable, editable, git-friendly, and handles special characters (commas, pipes, quotes) correctly out of the box.
 
 ### Why no dependencies/blockers/subtasks in v0.1?
 
@@ -327,7 +327,7 @@ $ bd list --json | beads2knecht
 # MIGRATION STRATEGY:
 # - Map beads IDs to sequential numbers (1, 2, 3...)
 # - Map 'in_progress' -> 'open'
-# - PRESERVE: descriptions (in 4th pipe-delimited field)
+# - PRESERVE: descriptions (in CSV description field)
 # - DROP: priorities, issue_types, timestamps, dependencies
 # - Keep: id, status, title, description
 #

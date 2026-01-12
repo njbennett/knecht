@@ -6,13 +6,13 @@ use std::path::Path;
 
 #[test]
 fn test_read_tasks_error_on_open() {
-    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1|open|Test\n").fail("open");
+    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1,open,Test,,\n").fail("open");
     assert!(read_tasks_with_fs(&fs).is_err());
 }
 
 #[test]
 fn test_read_tasks_error_on_read_line() {
-    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1|open|Test\n").fail("read");
+    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1,open,Test,,\n").fail("read");
     assert!(read_tasks_with_fs(&fs).is_err());
 }
 
@@ -31,21 +31,47 @@ fn test_write_tasks_error_on_create() {
 }
 
 #[test]
-fn test_write_tasks_error_on_write() {
+fn test_write_tasks_error_on_flush() {
+    // Small task: error occurs at flush() time
     let fs = TestFileSystem::new().fail("write");
     let tasks = vec![Task { id: "1".to_string(), status: "open".to_string(), title: "Test".to_string(), description: None, pain_count: None }];
     assert!(write_tasks_with_fs(&tasks, &fs).is_err());
 }
 
 #[test]
+fn test_write_tasks_error_on_write_record() {
+    // Many large tasks: error occurs during write_record() when buffer overflows
+    let fs = TestFileSystem::new().fail("write");
+    let large_desc = "x".repeat(1000);
+    let tasks: Vec<Task> = (1..=100)
+        .map(|i| Task {
+            id: i.to_string(),
+            status: "open".to_string(),
+            title: format!("Task {}", i),
+            description: Some(large_desc.clone()),
+            pain_count: None,
+        })
+        .collect();
+    assert!(write_tasks_with_fs(&tasks, &fs).is_err());
+}
+
+#[test]
+fn test_write_tasks_empty_list() {
+    // Empty task list: for loop never entered
+    let fs = TestFileSystem::new();
+    let tasks: Vec<Task> = vec![];
+    assert!(write_tasks_with_fs(&tasks, &fs).is_ok());
+}
+
+#[test]
 fn test_get_next_id_error_on_read() {
-    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1|open|Test\n").fail("open");
+    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1,open,Test,,\n").fail("open");
     assert!(get_next_id_with_fs(&fs).is_err());
 }
 
 #[test]
 fn test_add_task_error_on_read() {
-    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1|open|Test\n").fail("open");
+    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1,open,Test,,\n").fail("open");
     assert!(add_task_with_fs("New".to_string(), None, &fs).is_err());
 }
 
@@ -62,38 +88,47 @@ fn test_add_task_error_on_append() {
 }
 
 #[test]
-fn test_add_task_error_on_write() {
+fn test_add_task_error_on_flush() {
+    // Small task: error occurs at flush() time
     let fs = TestFileSystem::new().fail("write");
     assert!(add_task_with_fs("New".to_string(), None, &fs).is_err());
 }
 
 #[test]
+fn test_add_task_error_on_write_record() {
+    // Large description: error occurs during write_record() when buffer overflows
+    let fs = TestFileSystem::new().fail("write");
+    let large_desc = "x".repeat(10000);
+    assert!(add_task_with_fs("Task".to_string(), Some(large_desc), &fs).is_err());
+}
+
+#[test]
 fn test_mark_task_done_error_on_read() {
-    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1|open|Test\n").fail("open");
+    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1,open,Test,,\n").fail("open");
     assert!(mark_task_done_with_fs("1", &fs).is_err());
 }
 
 #[test]
 fn test_mark_task_done_error_on_write() {
-    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1|open|Test\n").fail("write");
+    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1,open,Test,,\n").fail("write");
     assert!(mark_task_done_with_fs("1", &fs).is_err());
 }
 
 #[test]
 fn test_increment_pain_count_error_on_read() {
-    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1|open|Test\n").fail("open");
+    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1,open,Test,,\n").fail("open");
     assert!(increment_pain_count_with_fs("1", &fs).is_err());
 }
 
 #[test]
 fn test_increment_pain_count_error_on_write() {
-    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1|open|Test\n").fail("write");
+    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1,open,Test,,\n").fail("write");
     assert!(increment_pain_count_with_fs("1", &fs).is_err());
 }
 
 #[test]
 fn test_increment_pain_count_not_found() {
-    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1|open|Test\n");
+    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1,open,Test,,\n");
     assert!(increment_pain_count_with_fs("999", &fs).is_err());
 }
 
@@ -110,14 +145,14 @@ fn test_real_filesystem_open_nonexistent_file() {
 
 #[test]
 fn test_find_next_task_error_on_read() {
-    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1|open|Test\n").fail("open");
+    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1,open,Test,,\n").fail("open");
     assert!(find_next_task_with_fs(&fs).is_err());
 }
 
 #[test]
 fn test_mark_task_done_with_malformed_oldest_task_id() {
     // Test the unwrap_or(i32::MAX) fallback when parsing task IDs
-    let fs = TestFileSystem::new().with_file(".knecht/tasks", "abc|open|Malformed ID task\n2|open|Normal task\n");
+    let fs = TestFileSystem::new().with_file(".knecht/tasks", "abc,open,Malformed ID task,,\n2,open,Normal task,,\n");
     // Mark task-2 as done, which should try to compare IDs and hit the parse error fallback
     let result = mark_task_done_with_fs("2", &fs);
     assert!(result.is_ok());
@@ -126,7 +161,7 @@ fn test_mark_task_done_with_malformed_oldest_task_id() {
 #[test]
 fn test_find_next_task_with_malformed_task_id() {
     // Test the unwrap_or(0) fallback when parsing task IDs in find_next_task_with_fs
-    let fs = TestFileSystem::new().with_file(".knecht/tasks", "abc|open|Malformed ID task\n2|open|Normal task\n");
+    let fs = TestFileSystem::new().with_file(".knecht/tasks", "abc,open,Malformed ID task,,\n2,open,Normal task,,\n");
     let result = find_next_task_with_fs(&fs);
     assert!(result.is_ok());
     assert!(result.unwrap().is_some());
@@ -135,7 +170,7 @@ fn test_find_next_task_with_malformed_task_id() {
 #[test]
 fn test_mark_task_done_with_duplicate_task_ids() {
     // Test edge case where multiple tasks have the same ID (malformed data)
-    let fs = TestFileSystem::new().with_file(".knecht/tasks", "5|open|Task five\n5|open|Duplicate task five\n");
+    let fs = TestFileSystem::new().with_file(".knecht/tasks", "5,open,Task five,,\n5,open,Duplicate task five,,\n");
     let result = mark_task_done_with_fs("5", &fs);
     assert!(result.is_ok());
 }
@@ -144,7 +179,7 @@ fn test_mark_task_done_with_duplicate_task_ids() {
 fn test_mark_task_done_when_no_skipped_task_found() {
     // Edge case: oldest task ID doesn't exist in the list (should never happen, but test the branch)
     // This tests the case where we exit the inner loop without finding the skipped task
-    let fs = TestFileSystem::new().with_file(".knecht/tasks", "10|open|Task ten\n");
+    let fs = TestFileSystem::new().with_file(".knecht/tasks", "10,open,Task ten,,\n");
     // Mark task-10 as done - it's the only/oldest task, so no skip happens
     let result = mark_task_done_with_fs("10", &fs);
     assert!(result.is_ok());
@@ -153,7 +188,7 @@ fn test_mark_task_done_when_no_skipped_task_found() {
 #[test]
 fn test_mark_task_done_when_all_tasks_will_be_done() {
     // Edge case: marking the last open task as done (no open tasks remain after)
-    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1|done|Already done\n2|open|Last open task\n");
+    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1,done,Already done,,\n2,open,Last open task,,\n");
     let result = mark_task_done_with_fs("2", &fs);
     assert!(result.is_ok());
 }
@@ -163,7 +198,7 @@ fn test_mark_task_done_iterates_through_multiple_tasks() {
     // Test case where we iterate through multiple tasks before finding the skipped task
     // This covers the loop path where we check multiple tasks and hit line 295 (closing brace)
     // Create multiple tasks where oldest is last in the list
-    let fs = TestFileSystem::new().with_file(".knecht/tasks", "10|open|Task ten\n5|open|Task five (oldest)\n20|open|Task twenty\n");
+    let fs = TestFileSystem::new().with_file(".knecht/tasks", "10,open,Task ten,,\n5,open,Task five (oldest),,\n20,open,Task twenty,,\n");
     // Mark task-20 as done - oldest is task-5, so we'll iterate through task-10 first (no match)
     // then find task-5 and increment its pain
     let result = mark_task_done_with_fs("20", &fs);
@@ -188,58 +223,58 @@ fn test_real_filesystem_append_nonexistent_parent() {
 
 #[test]
 fn test_find_task_by_id_error_on_read() {
-    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1|open|Test\n").fail("open");
+    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1,open,Test,,\n").fail("open");
     assert!(find_task_by_id_with_fs("1", &fs).is_err());
 }
 
 #[test]
 fn test_find_task_by_id_not_found() {
-    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1|open|Test\n");
+    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1,open,Test,,\n");
     let result = find_task_by_id_with_fs("999", &fs);
     assert!(result.is_err());
 }
 
 #[test]
 fn test_delete_task_error_on_read() {
-    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1|open|Test\n").fail("open");
+    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1,open,Test,,\n").fail("open");
     assert!(delete_task_with_fs("1", &fs).is_err());
 }
 
 #[test]
 fn test_delete_task_error_on_write() {
-    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1|open|Test\n2|open|Another\n").fail("write");
+    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1,open,Test,,\n2,open,Another,,\n").fail("write");
     assert!(delete_task_with_fs("1", &fs).is_err());
 }
 
 #[test]
 fn test_delete_task_not_found() {
-    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1|open|Test\n");
+    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1,open,Test,,\n");
     let result = delete_task_with_fs("999", &fs);
     assert!(result.is_err());
 }
 
 #[test]
 fn test_update_task_error_on_read() {
-    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1|open|Test\n").fail("open");
+    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1,open,Test,,\n").fail("open");
     assert!(update_task_with_fs("1", Some("New".to_string()), None, &fs).is_err());
 }
 
 #[test]
 fn test_update_task_error_on_write() {
-    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1|open|Test\n").fail("write");
+    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1,open,Test,,\n").fail("write");
     assert!(update_task_with_fs("1", Some("New".to_string()), None, &fs).is_err());
 }
 
 #[test]
 fn test_update_task_not_found() {
-    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1|open|Test\n");
+    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1,open,Test,,\n");
     let result = update_task_with_fs("999", Some("New".to_string()), None, &fs);
     assert!(result.is_err());
 }
 
 #[test]
 fn test_update_task_title_only() {
-    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1|open|OldTitle\n");
+    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1,open,OldTitle,,\n");
     let result = update_task_with_fs("1", Some("NewTitle".to_string()), None, &fs);
     assert!(result.is_ok());
     let task = result.unwrap();
@@ -248,7 +283,7 @@ fn test_update_task_title_only() {
 
 #[test]
 fn test_update_task_description_only() {
-    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1|open|Title|OldDesc\n");
+    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1,open,Title,OldDesc,\n");
     let result = update_task_with_fs("1", None, Some(Some("NewDesc".to_string())), &fs);
     assert!(result.is_ok());
     let task = result.unwrap();
@@ -257,7 +292,7 @@ fn test_update_task_description_only() {
 
 #[test]
 fn test_update_task_clear_description() {
-    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1|open|Title|Description\n");
+    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1,open,Title,Description,\n");
     let result = update_task_with_fs("1", None, Some(None), &fs);
     assert!(result.is_ok());
     let task = result.unwrap();
@@ -266,7 +301,7 @@ fn test_update_task_clear_description() {
 
 #[test]
 fn test_update_task_both_fields() {
-    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1|open|OldTitle|OldDesc\n");
+    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1,open,OldTitle,OldDesc,\n");
     let result = update_task_with_fs("1", Some("NewTitle".to_string()), Some(Some("NewDesc".to_string())), &fs);
     assert!(result.is_ok());
     let task = result.unwrap();
