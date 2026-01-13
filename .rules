@@ -57,17 +57,9 @@ knecht/
 
 ### Data Format
 
-File: `.knecht/tasks`
+File: `.knecht/tasks` - CSV format: `id,status,title,description,pain_count`
 
-```
-1|open|Write first test
-2|done|Make it pass
-3|open|Commit the code
-```
-
-Format: `{id}|{status}|{title}|{description}` (description is optional)
-
-Pipe-delimited, line-based, git-friendly diffs, human-readable, sequential IDs. **Do NOT change this format** without discussion.
+Git-friendly diffs, human-readable, sequential IDs.
 
 ## TDD Workflow - MANDATORY
 
@@ -175,23 +167,7 @@ When pain count reaches ~3-5 instances, write a test and implement it.
 
 ### Integration Tests Over Unit Tests
 
-Focus on integration tests via CLI in `tests/integration_test.rs`:
-- Tests run the actual binary
-- Tests verify end-to-end behavior
-- Tests use temporary directories for isolation
-
-```rust
-#[test]
-fn test_feature_X() {
-    let temp = setup_temp_dir();
-    let result = run_command(&["command", "args"], &temp);
-    assert!(result.success);
-    assert!(result.stdout.contains("expected output"));
-    cleanup_temp_dir(temp);
-}
-```
-
-**Why**: Integration tests catch more real-world issues for a CLI tool.
+Focus on integration tests via CLI in `tests/integration_test.rs`. Tests run the binary in temp directories. See existing tests for patterns.
 
 ### Unit Tests
 
@@ -204,6 +180,8 @@ Don't optimize prematurely. Simple file I/O, reading entire files into memory, a
 When performance pain is real (5+ pain count), track it as a task, write a test, then optimize.
 
 ## Git & Self-Hosting
+
+Run `git config core.hooksPath .githooks` to auto-rebuild binary after commits.
 
 ### Commit Format
 

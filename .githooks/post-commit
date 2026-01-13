@@ -1,0 +1,8 @@
+#!/bin/bash
+# Rebuild knecht binary when source files change
+if git diff-tree --no-commit-id --name-only -r HEAD | grep -qE '^(src/|Cargo\.toml)'; then
+    echo "knecht source changed, rebuilding..."
+    cargo build --release --quiet
+    cp target/release/knecht ~/.cargo/bin/knecht
+    echo "knecht binary updated"
+fi
