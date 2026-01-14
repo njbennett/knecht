@@ -2,7 +2,9 @@ use std::fs::{self, OpenOptions};
 use std::io::{self, BufRead, BufReader, Write};
 use std::path::Path;
 use std::fmt;
-use csv::{ReaderBuilder, WriterBuilder};
+
+mod serializer;
+pub use serializer::CsvSerializer;
 
 /// Trait for filesystem operations to allow dependency injection in tests
 pub trait FileSystem {
@@ -96,73 +98,21 @@ impl Task {
 
 pub fn read_tasks_with_fs(fs: &dyn FileSystem) -> Result<Vec<Task>, KnechtError> {
     let path = Path::new(".knecht/tasks");
-    
+
     if !fs.exists(path) {
         return Ok(Vec::new());
     }
-    
+
     let reader = fs.open(path)?;
-    let mut csv_reader = ReaderBuilder::new()
-        .has_headers(false)
-        .flexible(true)
-        .from_reader(reader);
-    
-    let mut tasks = Vec::new();
-    
-    for result in csv_reader.records() {
-        let record = result?;
-        
-        if record.len() >= 3 {
-            // Support formats: id,status,title or id,status,title,description or id,status,title,description,pain_count
-            let description = if record.len() >= 4 && !record[3].is_empty() {
-                Some(record[3].to_string())
-            } else {
-                None
-            };
-            
-            let pain_count = if record.len() >= 5 && !record[4].is_empty() {
-                record[4].parse::<u32>().ok()
-            } else {
-                None
-            };
-            
-            tasks.push(Task {
-                id: record[0].to_string(),
-                status: record[1].to_string(),
-                title: record[2].to_string(),
-                description,
-                pain_count,
-            });
-        }
-        // Skip malformed lines silently
-    }
-    
-    Ok(tasks)
+    CsvSerializer::read(reader)
 }
 
 pub fn write_tasks_with_fs(tasks: &[Task], fs: &dyn FileSystem) -> Result<(), KnechtError> {
     // Ensure .knecht directory exists
     fs.create_dir_all(Path::new(".knecht"))?;
-    
+
     let file = fs.create(Path::new(".knecht/tasks"))?;
-    let mut csv_writer = WriterBuilder::new()
-        .has_headers(false)
-        .from_writer(file);
-    
-    for task in tasks {
-        // Always write 5 fields: id, status, title, description, pain_count
-        csv_writer.write_record([
-            &task.id,
-            &task.status,
-            &task.title,
-            task.description.as_deref().unwrap_or(""),
-            task.pain_count.as_ref().map(|p| p.to_string()).unwrap_or_default().as_str(),
-        ])?;
-    }
-    
-    csv_writer.flush()?;
-    
-    Ok(())
+    CsvSerializer::write(tasks, file)
 }
 
 pub fn get_next_id_with_fs(fs: &dyn FileSystem) -> Result<u32, KnechtError> {
@@ -179,25 +129,21 @@ pub fn get_next_id_with_fs(fs: &dyn FileSystem) -> Result<u32, KnechtError> {
 
 pub fn add_task_with_fs(title: String, description: Option<String>, fs: &dyn FileSystem) -> Result<u32, KnechtError> {
     let next_id = get_next_id_with_fs(fs)?;
-    
+
     // Ensure .knecht directory exists
     fs.create_dir_all(Path::new(".knecht"))?;
-    
+
+    let task = Task {
+        id: next_id.to_string(),
+        status: "open".to_string(),
+        title,
+        description,
+        pain_count: None,
+    };
+
     let file = fs.append(Path::new(".knecht/tasks"))?;
-    let mut csv_writer = WriterBuilder::new()
-        .has_headers(false)
-        .from_writer(file);
-    
-    csv_writer.write_record([
-        &next_id.to_string(),
-        "open",
-        &title,
-        description.as_deref().unwrap_or(""),
-        "",
-    ])?;
-    
-    csv_writer.flush()?;
-    
+    CsvSerializer::append_task(&task, file)?;
+
     Ok(next_id)
 }
 
