@@ -89,6 +89,7 @@ fn cmd_add(args: &[String]) {
     match add_task_with_fs(title, description, &RealFileSystem) {
         Ok(task_id) => {
             println!("Created task-{}", task_id);
+            println!("To make another task blocked by this: knecht block <task> by task-{}", task_id);
         }
         Err(e) => {
             eprintln!("Error: {}", e);

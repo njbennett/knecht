@@ -3205,3 +3205,21 @@ fn add_command_writes_csv_format() {
 
     cleanup_temp_dir(temp);
 }
+
+#[test]
+fn add_output_shows_block_syntax() {
+    let temp = setup_temp_dir();
+    run_command(&["init"], &temp);
+
+    let result = run_command(&["add", "New task"], &temp);
+    assert!(result.success, "add should succeed");
+
+    // Output should show how to make this task a blocker for another task
+    assert!(
+        result.stdout.contains("knecht block") && result.stdout.contains("by task-1"),
+        "add output should show block syntax, got: {}",
+        result.stdout
+    );
+
+    cleanup_temp_dir(temp);
+}
