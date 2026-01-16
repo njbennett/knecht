@@ -3223,3 +3223,20 @@ fn add_output_shows_block_syntax() {
 
     cleanup_temp_dir(temp);
 }
+
+#[test]
+fn deliver_changes_task_status_to_delivered() {
+    with_initialized_repo(|temp| {
+        run_command(&["add", "Task to deliver"], &temp);
+
+        let result = run_command(&["deliver", "task-1"], &temp);
+        assert!(result.success, "deliver command should succeed");
+
+        let show = run_command(&["show", "task-1"], &temp);
+        assert!(
+            show.stdout.contains("delivered"),
+            "Task status should be 'delivered', got: {}",
+            show.stdout
+        );
+    });
+}

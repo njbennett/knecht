@@ -94,6 +94,10 @@ impl Task {
     pub fn mark_done(&mut self) {
         self.status = "done".to_string();
     }
+
+    pub fn mark_delivered(&mut self) {
+        self.status = "delivered".to_string();
+    }
 }
 
 pub fn read_tasks_with_fs(fs: &dyn FileSystem) -> Result<Vec<Task>, KnechtError> {
@@ -201,6 +205,21 @@ pub fn mark_task_done_with_fs(task_id: &str, fs: &dyn FileSystem) -> Result<Task
         }
     }
     
+    Err(KnechtError::TaskNotFound(task_id.to_string()))
+}
+
+pub fn mark_task_delivered_with_fs(task_id: &str, fs: &dyn FileSystem) -> Result<Task, KnechtError> {
+    let mut tasks = read_tasks_with_fs(fs)?;
+
+    for task in &mut tasks {
+        if task.id == task_id {
+            task.mark_delivered();
+            let delivered_task = task.clone();
+            write_tasks_with_fs(&tasks, fs)?;
+            return Ok(delivered_task);
+        }
+    }
+
     Err(KnechtError::TaskNotFound(task_id.to_string()))
 }
 

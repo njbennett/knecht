@@ -28,7 +28,7 @@
 29,done,Replace Magic String with Symbolic Constant: pipe delimiter,Skip: task-28 completed instead. Skip: task-107 completed instead. Skip: task-207 completed instead. Skip: task-49 completed instead. Skip: task-49 completed instead,5
 30,done,Extract Class: TaskSerializer for format parsing/writing,Skip: task-33 completed instead. Skip: task-152 completed instead. Skip: task-208 completed instead,3
 31,done,Restructure to eliminate pipe character validation need,,
-32,open,Consider using clap or similar for CLI argument parsing,,
+32,open,Consider using clap or similar for CLI argument parsing,Skip: task-184 completed instead,1
 33,done,Evaluate migrating from pipe-delimited to JSON Lines format,,
 34,open,Support multi-line descriptions in tasks,,
 35,done,Add 'show' command to display full task details including description,,2
@@ -131,7 +131,7 @@
 181,done,Fix 'knecht next' to prefer unblocked subtasks over parent tasks,"Problem: When task-143 has 5 open subtasks (176-180) with task-175 (blocker) completed, 'knecht next' still suggests task-143 instead of its subtasks. This prevents proper incremental work on large tasks. Root cause: find_next_task_with_fs() only looks at pain count and age, doesn't consider blocker/subtask relationships. Solution: Update next logic to: (1) Check if suggested task has open subtasks, (2) If yes, recursively find the best subtask to work on instead, (3) Only suggest parent when all subtasks are done or blocked. This ensures agents work bottom-up on task hierarchies. Related to task-143 (verification workflow) which revealed this issue.",1
 182,open,Refactor: Consolidate duplicate blocker-reading logic,"Duplicated Code smell: Functions to read blockers file exist in both main.rs (get_blockers_for_task, get_tasks_blocked_by) and task.rs (get_blockers_for_task). The task.rs version uses FileSystem trait for testability, but main.rs versions directly call fs::read_to_string. Extract Method: Move blocker-reading logic to task.rs with FileSystem trait, then have main.rs call those functions via RealFileSystem. This centralizes the logic and makes it all testable. See task-181 where I duplicated this code.",
 183,done,Command exists: 'knecht deliver task-N' is recognized and executes,,
-184,open,Status change: 'knecht deliver task-N' changes task status from open to delivered,,
+184,done,Status change: 'knecht deliver task-N' changes task status from open to delivered,,
 185,open,"Validation: 'knecht deliver' fails gracefully for non-existent, already-delivered, already-done, or invalid task IDs",,
 186,open,"Success message: On successful delivery, output confirms task was marked as delivered",,
 187,open,Workflow guidance: Output includes guidance about verification workflow and suggests 'knecht next',,
@@ -157,3 +157,4 @@
 207,open,Consider closing task-30 (Extract TaskSerializer) - CSV library eliminated need,"Task-30 suggested extracting a TaskSerializer class for format parsing/writing. With task-49 complete, we now use the csv crate which handles serialization. The 'extract serializer' refactoring may no longer be needed since csv::Reader and csv::Writer are already extracted, well-tested serializers. Review task-30 and either close it or update it to reflect CSV-specific refactoring opportunities.",
 208,done,"Show subtask/blocker syntax in knecht add output When an agent runs 'knecht add', the output should mention how to file the task as a subtask or blocker instead (e.g., 'To file as subtask: knecht subtask <parent-id> <title>'). This teaches agents the syntax at the moment they need it, without requiring them to read docs or source code.",,
 209,open,Add help command listing all available commands Running 'knecht help' or 'knecht --help' returns 'Unknown command'. Agents need a way to discover available commands without reading source code. Should list all commands with brief usage.,,
+210,open,Add help/discoverability to CLI No way to discover available commands - knecht with no args or knecht help should list commands with descriptions,,

@@ -1,7 +1,7 @@
 use std::env;
 use std::fs;
 
-use knecht::{add_task_with_fs, delete_task_with_fs, find_next_task_with_fs, find_task_by_id_with_fs, increment_pain_count_with_fs, mark_task_done_with_fs, read_tasks_with_fs, update_task_with_fs, RealFileSystem};
+use knecht::{add_task_with_fs, delete_task_with_fs, find_next_task_with_fs, find_task_by_id_with_fs, increment_pain_count_with_fs, mark_task_delivered_with_fs, mark_task_done_with_fs, read_tasks_with_fs, update_task_with_fs, RealFileSystem};
 
 /// Parses a task ID argument, stripping the "task-" prefix if present.
 /// Accepts both "task-N" and "N" formats, returning just the numeric ID part.
@@ -131,12 +131,19 @@ fn cmd_deliver(args: &[String]) {
         eprintln!("Usage: knecht deliver <task-id>");
         std::process::exit(1);
     }
-    
+
     let task_arg = &args[0];
-    let _task_id = parse_task_id(task_arg);
-    
-    // Minimal implementation - just acknowledge the command
-    println!("deliver command received for task: {}", task_arg);
+    let task_id = parse_task_id(task_arg);
+
+    match mark_task_delivered_with_fs(task_id, &RealFileSystem) {
+        Ok(task) => {
+            println!("✓ task-{} delivered: {}", task.id, task.title);
+        }
+        Err(e) => {
+            eprintln!("Error: {}", e);
+            std::process::exit(1);
+        }
+    }
 }
 
 fn cmd_done(args: &[String]) {
