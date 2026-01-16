@@ -3268,6 +3268,43 @@ fn deliver_changes_task_status_to_delivered() {
 }
 
 #[test]
+fn deliver_fails_for_already_delivered_task() {
+    with_initialized_repo(|temp| {
+        run_command(&["add", "Task to deliver twice"], temp);
+
+        // First delivery should succeed
+        let first = run_command(&["deliver", "task-1"], temp);
+        assert!(first.success, "First deliver should succeed");
+
+        // Second delivery should fail
+        let second = run_command(&["deliver", "task-1"], temp);
+        assert!(!second.success, "Second deliver should fail");
+        assert!(
+            second.stderr.contains("already delivered"),
+            "Error should mention task is already delivered, got: {}",
+            second.stderr
+        );
+    });
+}
+
+#[test]
+fn deliver_fails_for_already_done_task() {
+    with_initialized_repo(|temp| {
+        run_command(&["add", "Task that is done"], temp);
+        run_command(&["done", "task-1"], temp);
+
+        // Trying to deliver a done task should fail
+        let result = run_command(&["deliver", "task-1"], temp);
+        assert!(!result.success, "Deliver of done task should fail");
+        assert!(
+            result.stderr.contains("already done") || result.stderr.contains("already completed"),
+            "Error should mention task is already done, got: {}",
+            result.stderr
+        );
+    });
+}
+
+#[test]
 fn pain_requires_d_flag_for_description() {
     with_initialized_repo(|temp| {
         run_command(&["add", "Task needing pain"], &temp);

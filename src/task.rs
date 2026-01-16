@@ -53,6 +53,8 @@ pub enum KnechtError {
     IoError(io::Error),
     CsvError(csv::Error),
     TaskNotFound(String),
+    TaskAlreadyDelivered(String),
+    TaskAlreadyDone(String),
 }
 
 impl fmt::Display for KnechtError {
@@ -61,6 +63,8 @@ impl fmt::Display for KnechtError {
             KnechtError::IoError(err) => write!(f, "I/O error: {}", err),
             KnechtError::CsvError(err) => write!(f, "CSV error: {}", err),
             KnechtError::TaskNotFound(id) => write!(f, "task-{} not found", id),
+            KnechtError::TaskAlreadyDelivered(id) => write!(f, "task-{} is already delivered", id),
+            KnechtError::TaskAlreadyDone(id) => write!(f, "task-{} is already done", id),
         }
     }
 }
@@ -213,6 +217,12 @@ pub fn mark_task_delivered_with_fs(task_id: &str, fs: &dyn FileSystem) -> Result
 
     for task in &mut tasks {
         if task.id == task_id {
+            if task.status == "delivered" {
+                return Err(KnechtError::TaskAlreadyDelivered(task_id.to_string()));
+            }
+            if task.status == "done" {
+                return Err(KnechtError::TaskAlreadyDone(task_id.to_string()));
+            }
             task.mark_delivered();
             let delivered_task = task.clone();
             write_tasks_with_fs(&tasks, fs)?;
