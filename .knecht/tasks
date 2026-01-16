@@ -28,7 +28,7 @@
 29,done,Replace Magic String with Symbolic Constant: pipe delimiter,Skip: task-28 completed instead. Skip: task-107 completed instead. Skip: task-207 completed instead. Skip: task-49 completed instead. Skip: task-49 completed instead,5
 30,done,Extract Class: TaskSerializer for format parsing/writing,Skip: task-33 completed instead. Skip: task-152 completed instead. Skip: task-208 completed instead,3
 31,done,Restructure to eliminate pipe character validation need,,
-32,open,Consider using clap or similar for CLI argument parsing,Skip: task-184 completed instead. Skip: task-211 completed instead. Skip: task-211 completed instead. Skip: task-134 completed instead,4
+32,done,Consider using clap or similar for CLI argument parsing,Skip: task-184 completed instead. Skip: task-211 completed instead. Skip: task-211 completed instead. Skip: task-134 completed instead,4
 33,done,Evaluate migrating from pipe-delimited to JSON Lines format,,
 34,open,Support multi-line descriptions in tasks,,
 35,done,Add 'show' command to display full task details including description,,2

@@ -1,7 +1,99 @@
-use std::env;
 use std::fs;
 
+use clap::{Parser, Subcommand};
 use knecht::{add_task_with_fs, delete_task_with_fs, find_next_task_with_fs, find_task_by_id_with_fs, increment_pain_count_with_fs, mark_task_delivered_with_fs, mark_task_done_with_fs, read_tasks_with_fs, update_task_with_fs, RealFileSystem};
+
+#[derive(Parser)]
+#[command(name = "knecht")]
+#[command(about = "A git-native task tracker for AI agents", long_about = None)]
+struct Cli {
+    #[command(subcommand)]
+    command: Commands,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    /// Initialize a new knecht repository
+    Init,
+    /// Add a new task
+    Add {
+        /// Task title (can be multiple words)
+        #[arg(required = true, num_args = 1..)]
+        title: Vec<String>,
+        /// Task description
+        #[arg(short, long)]
+        d: Option<String>,
+    },
+    /// List all tasks
+    List,
+    /// Mark a task as done
+    Done {
+        /// Task ID (e.g., task-1 or 1)
+        task_id: String,
+    },
+    /// Mark a task as delivered
+    Deliver {
+        /// Task ID (e.g., task-1 or 1)
+        task_id: String,
+    },
+    /// Delete a task
+    Delete {
+        /// Task ID (e.g., task-1 or 1)
+        task_id: String,
+    },
+    /// Show details of a task
+    Show {
+        /// Task ID (e.g., task-1 or 1)
+        task_id: String,
+    },
+    /// Start working on a task
+    Start {
+        /// Task ID (e.g., task-1 or 1)
+        task_id: String,
+    },
+    /// Increment pain count for a task
+    Pain {
+        /// Task ID (e.g., task-1 or 1)
+        #[arg(short = 't', required = true)]
+        task_id: String,
+        /// Description of the pain instance
+        #[arg(short, required = true)]
+        d: String,
+    },
+    /// Get the next suggested task to work on
+    Next,
+    /// Update a task's title or description
+    Update {
+        /// Task ID (e.g., task-1 or 1)
+        task_id: String,
+        /// New title
+        #[arg(short = 't', long = "title")]
+        title: Option<String>,
+        /// New description
+        #[arg(short, long = "description")]
+        d: Option<String>,
+    },
+    /// Mark a task as blocked by another task
+    Block {
+        /// Task ID to block (e.g., task-1 or 1)
+        task_id: String,
+        /// Must be "by"
+        #[arg(value_parser = clap::builder::PossibleValuesParser::new(["by"]))]
+        by: String,
+        /// Blocker task ID (e.g., task-2 or 2)
+        blocker_id: String,
+    },
+    /// Remove a blocker from a task
+    Unblock {
+        /// Task ID to unblock (e.g., task-1 or 1)
+        task_id: String,
+        /// Must be "from"
+        #[arg(value_parser = clap::builder::PossibleValuesParser::new(["from"]))]
+        from: String,
+        /// Blocker task ID to remove (e.g., task-2 or 2)
+        blocker_id: String,
+    },
+}
 
 /// Parses a task ID argument, stripping the "task-" prefix if present.
 /// Accepts both "task-N" and "N" formats, returning just the numeric ID part.
@@ -10,31 +102,22 @@ fn parse_task_id(task_arg: &str) -> &str {
 }
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
-    
-    if args.len() < 2 {
-        eprintln!("Usage: knecht <command> [args]");
-        std::process::exit(1);
-    }
-    
-    match args[1].as_str() {
-        "init" => cmd_init(),
-        "add" => cmd_add(&args[2..]),
-        "list" => cmd_list(),
-        "done" => cmd_done(&args[2..]),
-        "deliver" => cmd_deliver(&args[2..]),
-        "delete" => cmd_delete(&args[2..]),
-        "show" => cmd_show(&args[2..]),
-        "start" => cmd_start(&args[2..]),
-        "pain" => cmd_pain(&args[2..]),
-        "next" => cmd_next(),
-        "update" => cmd_update(&args[2..]),
-        "block" => cmd_block(&args[2..]),
-        "unblock" => cmd_unblock(&args[2..]),
-        _ => {
-            eprintln!("Unknown command: {}", args[1]);
-            std::process::exit(1);
-        }
+    let cli = Cli::parse();
+
+    match cli.command {
+        Commands::Init => cmd_init(),
+        Commands::Add { title, d } => cmd_add(&title.join(" "), d),
+        Commands::List => cmd_list(),
+        Commands::Done { task_id } => cmd_done(&task_id),
+        Commands::Deliver { task_id } => cmd_deliver(&task_id),
+        Commands::Delete { task_id } => cmd_delete(&task_id),
+        Commands::Show { task_id } => cmd_show(&task_id),
+        Commands::Start { task_id } => cmd_start(&task_id),
+        Commands::Pain { task_id, d } => cmd_pain(&task_id, &d),
+        Commands::Next => cmd_next(),
+        Commands::Update { task_id, title, d } => cmd_update(&task_id, title, d),
+        Commands::Block { task_id, by: _, blocker_id } => cmd_block(&task_id, &blocker_id),
+        Commands::Unblock { task_id, from: _, blocker_id } => cmd_unblock(&task_id, &blocker_id),
     }
 }
 
@@ -43,50 +126,22 @@ fn cmd_init() {
         eprintln!("Failed to create .knecht directory: {}", e);
         std::process::exit(1);
     }
-    
+
     if let Err(e) = fs::write(".knecht/tasks", "") {
         eprintln!("Failed to create tasks file: {}", e);
         std::process::exit(1);
     }
-    
+
     println!("Initialized knecht");
 }
 
-fn cmd_add(args: &[String]) {
-    if args.is_empty() {
-        eprintln!("Usage: knecht add <title> [-d <description>]");
-        std::process::exit(1);
-    }
-    
-    // Parse args to find -d flag
-    let mut title_parts = Vec::new();
-    let mut description = None;
-    let mut i = 0;
-    
-    while i < args.len() {
-        if args[i] == "-d" {
-            // Next args form the description
-            i += 1;
-            let mut desc_parts = Vec::new();
-            while i < args.len() && args[i] != "-d" {
-                desc_parts.push(args[i].clone());
-                i += 1;
-            }
-            description = Some(desc_parts.join(" "));
-        } else {
-            title_parts.push(args[i].clone());
-            i += 1;
-        }
-    }
-    
-    let title = title_parts.join(" ");
-    
+fn cmd_add(title: &str, description: Option<String>) {
     if title.is_empty() {
         eprintln!("Error: Title cannot be empty");
         std::process::exit(1);
     }
-    
-    match add_task_with_fs(title, description, &RealFileSystem) {
+
+    match add_task_with_fs(title.to_string(), description, &RealFileSystem) {
         Ok(task_id) => {
             println!("Created task-{}", task_id);
             println!("To make another task blocked by this: knecht block <task> by task-{}", task_id);
@@ -106,7 +161,7 @@ fn cmd_list() {
             std::process::exit(1);
         }
     };
-    
+
     for task in tasks {
         let checkbox = if task.is_done() { "[x]" } else { "[ ]" };
         let pain_suffix = if let Some(count) = task.pain_count {
@@ -116,7 +171,7 @@ fn cmd_list() {
         };
         println!("{} task-{}  {}{}", checkbox, task.id, task.title, pain_suffix);
     }
-    
+
     // Print usage instructions for agents
     println!();
     println!("Usage instructions:");
@@ -126,13 +181,7 @@ fn cmd_list() {
     println!("  knecht next            - Get suggestion for what to work on next");
 }
 
-fn cmd_deliver(args: &[String]) {
-    if args.is_empty() {
-        eprintln!("Usage: knecht deliver <task-id>");
-        std::process::exit(1);
-    }
-
-    let task_arg = &args[0];
+fn cmd_deliver(task_arg: &str) {
     let task_id = parse_task_id(task_arg);
 
     match mark_task_delivered_with_fs(task_id, &RealFileSystem) {
@@ -146,15 +195,9 @@ fn cmd_deliver(args: &[String]) {
     }
 }
 
-fn cmd_done(args: &[String]) {
-    if args.is_empty() {
-        eprintln!("Usage: knecht done <task-id>");
-        std::process::exit(1);
-    }
-    
-    let task_arg = &args[0];
+fn cmd_done(task_arg: &str) {
     let task_id = parse_task_id(task_arg);
-    
+
     match mark_task_done_with_fs(task_id, &RealFileSystem) {
         Ok(task) => {
             println!("✓ task-{}: {}", task.id, task.title);
@@ -200,15 +243,9 @@ COMMIT YOUR WORK NOW:
     }
 }
 
-fn cmd_show(args: &[String]) {
-    if args.is_empty() {
-        eprintln!("Usage: knecht show <task-id>");
-        std::process::exit(1);
-    }
-    
-    let task_arg = &args[0];
+fn cmd_show(task_arg: &str) {
     let task_id = parse_task_id(task_arg);
-    
+
     match find_task_by_id_with_fs(task_id, &RealFileSystem) {
         Ok(task) => {
             println!("Task: task-{}", task.id);
@@ -217,7 +254,7 @@ fn cmd_show(args: &[String]) {
             if let Some(desc) = &task.description {
                 println!("Description: {}", desc);
             }
-            
+
             // Display blockers
             let blockers = get_blockers_for_task(task_id);
             if !blockers.is_empty() {
@@ -228,7 +265,7 @@ fn cmd_show(args: &[String]) {
                     }
                 }
             }
-            
+
             // Display what this task blocks
             let blocks = get_tasks_blocked_by(task_id);
             if !blocks.is_empty() {
@@ -247,28 +284,22 @@ fn cmd_show(args: &[String]) {
     }
 }
 
-fn cmd_start(args: &[String]) {
-    if args.is_empty() {
-        eprintln!("Usage: knecht start <task-id>");
-        std::process::exit(1);
-    }
-    
-    let task_arg = &args[0];
+fn cmd_start(task_arg: &str) {
     let task_id = parse_task_id(task_arg);
-    
+
     match find_task_by_id_with_fs(task_id, &RealFileSystem) {
         Ok(task) => {
             // Check for open blockers
             let blockers = get_blockers_for_task(task_id);
             let mut open_blockers = Vec::new();
-            
+
             for blocker_id in &blockers {
                 if let Ok(blocker_task) = find_task_by_id_with_fs(blocker_id, &RealFileSystem)
                     && blocker_task.status != "done" {
                         open_blockers.push((blocker_id.clone(), blocker_task));
                     }
             }
-            
+
             if !open_blockers.is_empty() {
                 eprintln!("Error: Cannot start task-{}. It is blocked by the following open tasks:", task_id);
                 for (blocker_id, blocker_task) in &open_blockers {
@@ -278,7 +309,7 @@ fn cmd_start(args: &[String]) {
                 eprintln!("Complete the blocking tasks first, or use 'knecht unblock' to remove the blocker.");
                 std::process::exit(1);
             }
-            
+
             println!("Starting work on task-{}: {}", task.id, task.title);
             if let Some(desc) = &task.description {
                 println!();
@@ -293,52 +324,10 @@ fn cmd_start(args: &[String]) {
     }
 }
 
-fn cmd_pain(args: &[String]) {
-    let mut task_id: Option<&str> = None;
-    let mut description: Option<&str> = None;
-    let mut i = 0;
+fn cmd_pain(task_arg: &str, description: &str) {
+    let task_id = parse_task_id(task_arg);
 
-    while i < args.len() {
-        match args[i].as_str() {
-            "-t" => {
-                if i + 1 >= args.len() {
-                    eprintln!("Error: -t requires a task ID argument");
-                    eprintln!("Usage: knecht pain -t <task-id> -d <description>");
-                    std::process::exit(1);
-                }
-                task_id = Some(parse_task_id(&args[i + 1]));
-                i += 2;
-            }
-            "-d" => {
-                if i + 1 >= args.len() {
-                    eprintln!("Error: -d requires a description argument");
-                    eprintln!("Usage: knecht pain -t <task-id> -d <description>");
-                    std::process::exit(1);
-                }
-                description = Some(&args[i + 1]);
-                i += 2;
-            }
-            _ => {
-                eprintln!("Error: Unexpected argument '{}'", args[i]);
-                eprintln!("Usage: knecht pain -t <task-id> -d <description>");
-                std::process::exit(1);
-            }
-        }
-    }
-
-    if task_id.is_none() {
-        eprintln!("Error: -t <task-id> is required");
-        eprintln!("Usage: knecht pain -t <task-id> -d <description>");
-        std::process::exit(1);
-    }
-
-    if description.is_none() {
-        eprintln!("Error: -d <description> is required to document the pain instance");
-        eprintln!("Usage: knecht pain -t <task-id> -d <description>");
-        std::process::exit(1);
-    }
-
-    match increment_pain_count_with_fs(task_id.unwrap(), description, &RealFileSystem) {
+    match increment_pain_count_with_fs(task_id, Some(description), &RealFileSystem) {
         Ok(task) => {
             println!("Incremented pain count for task-{}: {}", task.id, task.title);
         }
@@ -349,21 +338,15 @@ fn cmd_pain(args: &[String]) {
     }
 }
 
-fn cmd_delete(args: &[String]) {
-    if args.is_empty() {
-        eprintln!("Usage: knecht delete <task-id>");
-        std::process::exit(1);
-    }
-    
-    let task_arg = &args[0];
+fn cmd_delete(task_arg: &str) {
     let task_id = parse_task_id(task_arg);
-    
+
     // Validate that task_id is numeric
     if task_id.parse::<u32>().is_err() {
         eprintln!("Error: Invalid task ID format");
         std::process::exit(1);
     }
-    
+
     match delete_task_with_fs(task_id, &RealFileSystem) {
         Ok(task) => {
             println!("Deleted task-{}: {}", task.id, task.title);
@@ -398,60 +381,26 @@ fn cmd_next() {
     }
 }
 
-fn cmd_update(args: &[String]) {
-    if args.is_empty() {
-        eprintln!("Usage: knecht update <task-id> [--title <title>] [--description <description>]");
-        eprintln!("       knecht update <task-id> [-t <title>] [-d <description>]");
-        std::process::exit(1);
-    }
-    
-    let task_arg = &args[0];
+fn cmd_update(task_arg: &str, new_title: Option<String>, new_description: Option<String>) {
     let task_id = parse_task_id(task_arg);
-    
-    // Parse flags
-    let mut new_title: Option<String> = None;
-    let mut new_description: Option<Option<String>> = None;
-    let mut i = 1;
-    
-    while i < args.len() {
-        match args[i].as_str() {
-            "--title" | "-t" => {
-                if i + 1 >= args.len() {
-                    eprintln!("Error: --title requires a value");
-                    std::process::exit(1);
-                }
-                new_title = Some(args[i + 1].clone());
-                i += 2;
-            }
-            "--description" | "-d" => {
-                if i + 1 >= args.len() {
-                    eprintln!("Error: --description requires a value");
-                    std::process::exit(1);
-                }
-                let desc = args[i + 1].clone();
-                if desc.is_empty() {
-                    new_description = Some(None); // Clear description
-                } else {
-                    new_description = Some(Some(desc));
-                }
-                i += 2;
-            }
-            _ => {
-                eprintln!("Error: Unknown flag '{}'", args[i]);
-                eprintln!("Usage: knecht update <task-id> [--title <title>] [--description <description>]");
-                std::process::exit(1);
-            }
-        }
-    }
-    
+
     // Check that at least one flag was provided
     if new_title.is_none() && new_description.is_none() {
         eprintln!("Error: Must provide at least one of --title or --description");
         eprintln!("Usage: knecht update <task-id> [--title <title>] [--description <description>]");
         std::process::exit(1);
     }
-    
-    match update_task_with_fs(task_id, new_title, new_description, &RealFileSystem) {
+
+    // Convert Option<String> to Option<Option<String>> for description
+    let desc_update = new_description.map(|d| {
+        if d.is_empty() {
+            None // Clear description
+        } else {
+            Some(d)
+        }
+    });
+
+    match update_task_with_fs(task_id, new_title, desc_update, &RealFileSystem) {
         Ok(task) => {
             println!("Updated task-{}", task.id);
         }
@@ -462,50 +411,40 @@ fn cmd_update(args: &[String]) {
     }
 }
 
-fn cmd_block(args: &[String]) {
-    if args.len() < 3 || args[1] != "by" {
-        eprintln!("Usage: knecht block <task-id> by <blocker-task-id>");
-        std::process::exit(1);
-    }
-    
-    let blocked_task_id = parse_task_id(&args[0]);
-    let blocker_task_id = parse_task_id(&args[2]);
-    
+fn cmd_block(blocked_task_arg: &str, blocker_task_arg: &str) {
+    let blocked_task_id = parse_task_id(blocked_task_arg);
+    let blocker_task_id = parse_task_id(blocker_task_arg);
+
     // Verify both tasks exist
     if let Err(err) = find_task_by_id_with_fs(blocked_task_id, &RealFileSystem) {
         eprintln!("Error: {}", err);
         std::process::exit(1);
     }
-    
+
     if let Err(err) = find_task_by_id_with_fs(blocker_task_id, &RealFileSystem) {
         eprintln!("Error: {}", err);
         std::process::exit(1);
     }
-    
+
     // Add blocker relationship
     let blockers_path = ".knecht/blockers";
     let mut content = fs::read_to_string(blockers_path).unwrap_or_default();
-    
+
     let blocker_line = format!("task-{}|task-{}\n", blocked_task_id, blocker_task_id);
     content.push_str(&blocker_line);
-    
+
     if let Err(e) = fs::write(blockers_path, content) {
         eprintln!("Failed to write blockers file: {}", e);
         std::process::exit(1);
     }
-    
+
     println!("Blocker added: task-{} is blocked by task-{}", blocked_task_id, blocker_task_id);
 }
 
-fn cmd_unblock(args: &[String]) {
-    if args.len() < 3 || args[1] != "from" {
-        eprintln!("Usage: knecht unblock <task-id> from <blocker-task-id>");
-        std::process::exit(1);
-    }
-    
-    let blocked_task_id = parse_task_id(&args[0]);
-    let blocker_task_id = parse_task_id(&args[2]);
-    
+fn cmd_unblock(blocked_task_arg: &str, blocker_task_arg: &str) {
+    let blocked_task_id = parse_task_id(blocked_task_arg);
+    let blocker_task_id = parse_task_id(blocker_task_arg);
+
     // Read blockers file
     let blockers_path = ".knecht/blockers";
     let content = match fs::read_to_string(blockers_path) {
@@ -515,33 +454,33 @@ fn cmd_unblock(args: &[String]) {
             std::process::exit(1);
         }
     };
-    
+
     let blocker_line = format!("task-{}|task-{}", blocked_task_id, blocker_task_id);
-    
+
     // Check if the relationship exists
     if !content.contains(&blocker_line) {
         eprintln!("Error: task-{} is not blocked by task-{}", blocked_task_id, blocker_task_id);
         std::process::exit(1);
     }
-    
+
     // Remove the blocker line
     let new_content: String = content
         .lines()
         .filter(|line| *line != blocker_line)
         .collect::<Vec<_>>()
         .join("\n");
-    
+
     let new_content = if new_content.is_empty() {
         String::new()
     } else {
         format!("{}\n", new_content)
     };
-    
+
     if let Err(e) = fs::write(blockers_path, new_content) {
         eprintln!("Failed to write blockers file: {}", e);
         std::process::exit(1);
     }
-    
+
     println!("Blocker removed: task-{} is no longer blocked by task-{}", blocked_task_id, blocker_task_id);
 }
 
@@ -552,7 +491,7 @@ fn get_blockers_for_task(task_id: &str) -> Vec<String> {
         Ok(c) => c,
         Err(_) => return Vec::new(),
     };
-    
+
     let mut blockers = Vec::new();
     for line in content.lines() {
         if line.is_empty() {
@@ -577,7 +516,7 @@ fn get_tasks_blocked_by(task_id: &str) -> Vec<String> {
         Ok(c) => c,
         Err(_) => return Vec::new(),
     };
-    
+
     let mut blocked_tasks = Vec::new();
     for line in content.lines() {
         if line.is_empty() {

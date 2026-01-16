@@ -656,8 +656,8 @@ fn cli_no_args_shows_usage() {
     let result = run_command(&[], &temp);
 
     assert!(!result.success, "Should fail when no command provided");
-    assert!(result.stderr.contains("Usage: knecht <command> [args]"),
-        "Should show usage message");
+    assert!(result.stderr.contains("Usage: knecht"),
+        "Should show usage message, got: {}", result.stderr);
 
     cleanup_temp_dir(temp);
 }
@@ -669,8 +669,8 @@ fn cli_unknown_command_fails() {
     let result = run_command(&["nonexistent"], &temp);
 
     assert!(!result.success, "Should fail for unknown command");
-    assert!(result.stderr.contains("Unknown command: nonexistent"),
-        "Should show unknown command error");
+    assert!(result.stderr.contains("unrecognized subcommand") || result.stderr.contains("nonexistent"),
+        "Should show unknown command error, got: {}", result.stderr);
 
     cleanup_temp_dir(temp);
 }
@@ -681,8 +681,8 @@ fn add_with_no_args_shows_usage() {
         let result = run_command(&["add"], &temp);
 
         assert!(!result.success, "Should fail when add has no args");
-        assert!(result.stderr.contains("Usage: knecht add <title>"),
-            "Should show add usage message");
+        assert!(result.stderr.contains("Usage:") && result.stderr.contains("add"),
+            "Should show add usage message, got: {}", result.stderr);
     });
 }
 
@@ -693,8 +693,9 @@ fn add_with_empty_title_fails() {
         let result = run_command(&["add", "-d", "some description"], &temp);
 
         assert!(!result.success, "Should fail when title is empty");
-        assert!(result.stderr.contains("Error: Title cannot be empty"),
-            "Should show empty title error");
+        // Clap requires title argument, so it shows required argument error
+        assert!(result.stderr.contains("required") || result.stderr.contains("TITLE"),
+            "Should show required title error, got: {}", result.stderr);
     });
 }
 
@@ -704,8 +705,8 @@ fn done_with_no_args_shows_usage() {
         let result = run_command(&["done"], &temp);
 
         assert!(!result.success, "Should fail when done has no args");
-        assert!(result.stderr.contains("Usage: knecht done <task-id>"),
-            "Should show done usage message");
+        assert!(result.stderr.contains("Usage:") && result.stderr.contains("done"),
+            "Should show done usage message, got: {}", result.stderr);
     });
 }
 
@@ -2755,7 +2756,9 @@ fn block_fails_with_malformed_command_no_by() {
         // Try block without "by" keyword
         let result = run_command(&["block", "task-1", "task-2"], &temp);
         assert!(!result.success, "block should fail without 'by' keyword");
-        assert!(result.stderr.contains("Usage:"), "Should show usage: {}", result.stderr);
+        // Clap shows "invalid value" and "possible values: by"
+        assert!(result.stderr.contains("invalid value") || result.stderr.contains("possible values"),
+            "Should show error about invalid value: {}", result.stderr);
     });
 }
 
@@ -2780,7 +2783,9 @@ fn unblock_fails_with_malformed_command_no_from() {
         // Try unblock without "from" keyword
         let result = run_command(&["unblock", "task-1", "task-2"], &temp);
         assert!(!result.success, "unblock should fail without 'from' keyword");
-        assert!(result.stderr.contains("Usage:"), "Should show usage: {}", result.stderr);
+        // Clap shows "invalid value" and "possible values: from"
+        assert!(result.stderr.contains("invalid value") || result.stderr.contains("possible values"),
+            "Should show error about invalid value: {}", result.stderr);
     });
 }
 
@@ -3160,9 +3165,10 @@ fn deliver_command_is_recognized() {
 fn deliver_requires_task_id_argument() {
     with_initialized_repo(|temp| {
         let result = run_command(&["deliver"], temp);
-        
+
         assert!(!result.success);
-        assert!(result.stderr.contains("Usage: knecht deliver <task-id>"));
+        assert!(result.stderr.contains("Usage:") && result.stderr.contains("deliver"),
+            "Should show deliver usage, got: {}", result.stderr);
     });
 }
 
@@ -3352,4 +3358,36 @@ fn pain_without_t_flag_fails() {
         let result = run_command(&["pain", "task-1", "-d", "some description"], &temp);
         assert!(!result.success, "pain command should fail without -t flag");
     });
+}
+
+#[test]
+fn help_flag_shows_usage() {
+    let temp = setup_temp_dir();
+
+    // --help should show usage information and succeed
+    let result = run_command(&["--help"], &temp);
+    assert!(result.success, "--help should succeed, got stderr: {}", result.stderr);
+    assert!(
+        result.stdout.contains("Usage:") || result.stdout.to_lowercase().contains("usage"),
+        "--help should contain 'Usage', got: {}",
+        result.stdout
+    );
+
+    cleanup_temp_dir(temp);
+}
+
+#[test]
+fn subcommand_help_shows_usage() {
+    let temp = setup_temp_dir();
+
+    // help for subcommand should show its usage
+    let result = run_command(&["add", "--help"], &temp);
+    assert!(result.success, "add --help should succeed, got stderr: {}", result.stderr);
+    assert!(
+        result.stdout.contains("add") || result.stdout.contains("Add"),
+        "add --help should mention 'add', got: {}",
+        result.stdout
+    );
+
+    cleanup_temp_dir(temp);
 }
