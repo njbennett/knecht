@@ -635,6 +635,21 @@ fn done_reflection_prompt_uses_actionable_language() {
 }
 
 #[test]
+fn done_shows_commit_reminder() {
+    let temp = setup_temp_dir();
+    run_command(&["init"], &temp);
+    run_command(&["add", "Task to complete"], &temp);
+
+    let result = run_command(&["done", "task-1"], &temp);
+
+    assert!(result.success, "done command should succeed");
+    assert!(result.stdout.contains("COMMIT YOUR WORK NOW:\n   → git add .knecht/tasks <your-changed-files>\n   → Commit the task changes together with your code changes"),
+        "Should show commit reminder with instructions, got: {}", result.stdout);
+
+    cleanup_temp_dir(temp);
+}
+
+#[test]
 fn cli_no_args_shows_usage() {
     let temp = setup_temp_dir();
 

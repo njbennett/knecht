@@ -184,6 +184,13 @@ Create tasks immediately for anything you notice:
 IMPORTANT: If agents are confused, knecht needs to improve. Create tasks NOW, don't just note it.
 
 ================================================================================
+
+COMMIT YOUR WORK NOW:
+   → git add .knecht/tasks <your-changed-files>
+   → Commit the task changes together with your code changes
+   → This keeps task completion and any new tasks bundled with the work that inspired them
+
+================================================================================
 ");
         }
         Err(err) => {
