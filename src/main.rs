@@ -294,15 +294,51 @@ fn cmd_start(args: &[String]) {
 }
 
 fn cmd_pain(args: &[String]) {
-    if args.is_empty() {
-        eprintln!("Usage: knecht pain <task-id>");
+    let mut task_id: Option<&str> = None;
+    let mut description: Option<&str> = None;
+    let mut i = 0;
+
+    while i < args.len() {
+        match args[i].as_str() {
+            "-t" => {
+                if i + 1 >= args.len() {
+                    eprintln!("Error: -t requires a task ID argument");
+                    eprintln!("Usage: knecht pain -t <task-id> -d <description>");
+                    std::process::exit(1);
+                }
+                task_id = Some(parse_task_id(&args[i + 1]));
+                i += 2;
+            }
+            "-d" => {
+                if i + 1 >= args.len() {
+                    eprintln!("Error: -d requires a description argument");
+                    eprintln!("Usage: knecht pain -t <task-id> -d <description>");
+                    std::process::exit(1);
+                }
+                description = Some(&args[i + 1]);
+                i += 2;
+            }
+            _ => {
+                eprintln!("Error: Unexpected argument '{}'", args[i]);
+                eprintln!("Usage: knecht pain -t <task-id> -d <description>");
+                std::process::exit(1);
+            }
+        }
+    }
+
+    if task_id.is_none() {
+        eprintln!("Error: -t <task-id> is required");
+        eprintln!("Usage: knecht pain -t <task-id> -d <description>");
         std::process::exit(1);
     }
-    
-    let task_arg = &args[0];
-    let task_id = parse_task_id(task_arg);
-    
-    match increment_pain_count_with_fs(task_id, &RealFileSystem) {
+
+    if description.is_none() {
+        eprintln!("Error: -d <description> is required to document the pain instance");
+        eprintln!("Usage: knecht pain -t <task-id> -d <description>");
+        std::process::exit(1);
+    }
+
+    match increment_pain_count_with_fs(task_id.unwrap(), description, &RealFileSystem) {
         Ok(task) => {
             println!("Incremented pain count for task-{}: {}", task.id, task.title);
         }

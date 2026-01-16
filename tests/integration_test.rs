@@ -1618,7 +1618,7 @@ fn pain_increments_pain_count_on_task() {
         run_command(&["add", "Fix bug"], &temp);
 
         // Increment pain count (should add it as 1)
-        let result = run_command(&["pain", "task-1"], &temp);
+        let result = run_command(&["pain", "-t", "task-1", "-d", "First occurrence"], &temp);
         assert!(result.success, "pain command should succeed");
 
         // Verify pain count was added as 1
@@ -1630,7 +1630,7 @@ fn pain_increments_pain_count_on_task() {
         );
 
         // Increment again
-        let result2 = run_command(&["pain", "task-1"], &temp);
+        let result2 = run_command(&["pain", "-t", "task-1", "-d", "Second occurrence"], &temp);
         assert!(result2.success, "pain command should succeed again");
 
         // Verify pain count was incremented to 2
@@ -1650,7 +1650,7 @@ fn pain_adds_pain_count_to_task_without_one() {
         run_command(&["add", "Some task"], &temp);
 
         // Increment pain count
-        let result = run_command(&["pain", "task-1"], &temp);
+        let result = run_command(&["pain", "-t", "task-1", "-d", "Pain instance"], &temp);
         assert!(result.success, "pain command should succeed");
 
         // Verify pain count was added
@@ -1666,7 +1666,7 @@ fn pain_adds_pain_count_to_task_without_one() {
 #[test]
 fn pain_fails_on_nonexistent_task() {
     with_initialized_repo(|temp| {
-        let result = run_command(&["pain", "task-999"], &temp);
+        let result = run_command(&["pain", "-t", "task-999", "-d", "Test pain"], &temp);
 
         assert!(!result.success, "pain command should fail on nonexistent task");
         assert!(
@@ -1681,7 +1681,12 @@ fn pain_requires_task_id_argument() {
     with_initialized_repo(|temp| {
         let result = run_command(&["pain"], &temp);
 
-        assert!(!result.success, "pain command should fail without task ID");
+        assert!(!result.success, "pain command should fail without arguments");
+        assert!(
+            result.stderr.contains("-t") || result.stderr.contains("task-id"),
+            "Error should mention -t flag, got: {}",
+            result.stderr
+        );
     });
 }
 
@@ -1692,10 +1697,10 @@ fn pain_on_task_with_description_and_pain_count() {
         run_command(&["add", "Fix critical bug", "-d", "This bug breaks production"], &temp);
 
         // Add pain count
-        run_command(&["pain", "task-1"], &temp);
+        run_command(&["pain", "-t", "task-1", "-d", "First pain"], &temp);
 
         // Increment pain count again
-        let result = run_command(&["pain", "task-1"], &temp);
+        let result = run_command(&["pain", "-t", "task-1", "-d", "Second pain"], &temp);
         assert!(result.success, "pain command should succeed on task with description");
 
         // Verify both description and pain count are preserved
@@ -1723,17 +1728,17 @@ fn next_suggests_task_with_highest_pain_count() {
         run_command(&["add", "Medium pain again"], &temp);
 
         // Set pain counts using pain command
-        run_command(&["pain", "task-2"], &temp);
-        run_command(&["pain", "task-2"], &temp); // pain count: 2
-        
-        run_command(&["pain", "task-3"], &temp);
-        run_command(&["pain", "task-3"], &temp);
-        run_command(&["pain", "task-3"], &temp);
-        run_command(&["pain", "task-3"], &temp);
-        run_command(&["pain", "task-3"], &temp); // pain count: 5
-        
-        run_command(&["pain", "task-5"], &temp);
-        run_command(&["pain", "task-5"], &temp); // pain count: 2
+        run_command(&["pain", "-t", "task-2", "-d", "Pain 1"], &temp);
+        run_command(&["pain", "-t", "task-2", "-d", "Pain 2"], &temp); // pain count: 2
+
+        run_command(&["pain", "-t", "task-3", "-d", "Pain 1"], &temp);
+        run_command(&["pain", "-t", "task-3", "-d", "Pain 2"], &temp);
+        run_command(&["pain", "-t", "task-3", "-d", "Pain 3"], &temp);
+        run_command(&["pain", "-t", "task-3", "-d", "Pain 4"], &temp);
+        run_command(&["pain", "-t", "task-3", "-d", "Pain 5"], &temp); // pain count: 5
+
+        run_command(&["pain", "-t", "task-5", "-d", "Pain 1"], &temp);
+        run_command(&["pain", "-t", "task-5", "-d", "Pain 2"], &temp); // pain count: 2
 
         // Run 'knecht next'
         let result = run_command(&["next"], &temp);
@@ -1766,14 +1771,14 @@ fn next_prefers_older_task_when_pain_counts_equal() {
         run_command(&["add", "Third task"], &temp);
 
         // Set same pain count on all tasks
-        for _ in 0..3 {
-            run_command(&["pain", "task-1"], &temp);
-            run_command(&["pain", "task-2"], &temp);
-            run_command(&["pain", "task-3"], &temp);
+        for i in 0..3 {
+            run_command(&["pain", "-t", "task-1", "-d", &format!("Pain {}", i)], &temp);
+            run_command(&["pain", "-t", "task-2", "-d", &format!("Pain {}", i)], &temp);
+            run_command(&["pain", "-t", "task-3", "-d", &format!("Pain {}", i)], &temp);
         }
 
         let result = run_command(&["next"], &temp);
-        
+
         assert!(result.success, "next command should succeed");
         assert!(
             result.stdout.contains("task-1"),
@@ -1789,13 +1794,13 @@ fn next_skips_done_tasks() {
         // Add tasks
         run_command(&["add", "High pain but done"], &temp);
         run_command(&["add", "Lower pain but open"], &temp);
-        
+
         // Set pain counts
-        for _ in 0..5 {
-            run_command(&["pain", "task-1"], &temp);
+        for i in 0..5 {
+            run_command(&["pain", "-t", "task-1", "-d", &format!("Pain {}", i)], &temp);
         }
-        for _ in 0..2 {
-            run_command(&["pain", "task-2"], &temp);
+        for i in 0..2 {
+            run_command(&["pain", "-t", "task-2", "-d", &format!("Pain {}", i)], &temp);
         }
         
         // Mark first task as done
@@ -1871,13 +1876,13 @@ fn next_displays_task_with_description() {
     with_initialized_repo(|temp| {
         // Add a task with description
         run_command(&["add", "Important task", "-d", "This task has a detailed description explaining what needs to be done"], &temp);
-        
+
         // Add pain to make it more likely to be selected
-        run_command(&["pain", "task-1"], &temp);
-        run_command(&["pain", "task-1"], &temp);
-        
+        run_command(&["pain", "-t", "task-1", "-d", "Pain 1"], &temp);
+        run_command(&["pain", "-t", "task-1", "-d", "Pain 2"], &temp);
+
         let result = run_command(&["next"], &temp);
-        
+
         assert!(result.success, "next command should succeed");
         assert!(result.stdout.contains("task-1"), "Should suggest task-1");
         assert!(result.stdout.contains("Important task"), "Should show title");
@@ -3045,8 +3050,8 @@ fn next_prefers_unblocked_subtasks_over_parent_task() {
     with_initialized_repo(|temp| {
         // Create a parent task with high pain count
         run_command(&["add", "Large feature with verification", "-d", "This is a big task"], &temp);
-        for _ in 0..3 {
-            run_command(&["pain", "task-1"], &temp);
+        for i in 0..3 {
+            run_command(&["pain", "-t", "task-1", "-d", &format!("Pain {}", i)], &temp);
         }
         
         // Create subtasks that block the parent task
@@ -3091,8 +3096,8 @@ fn next_handles_three_level_blocker_tree() {
         // Create a three-level blocker tree like task-143 → task-176 → tasks 184-192
         // Root task with high pain count
         run_command(&["add", "Root feature", "-d", "Top level feature"], &temp);
-        for _ in 0..3 {
-            run_command(&["pain", "task-1"], &temp);
+        for i in 0..3 {
+            run_command(&["pain", "-t", "task-1", "-d", &format!("Pain {}", i)], &temp);
         }
         
         // Middle task (blocks root)
@@ -3253,5 +3258,98 @@ fn deliver_changes_task_status_to_delivered() {
             "Task status should be 'delivered', got: {}",
             show.stdout
         );
+    });
+}
+
+#[test]
+fn pain_requires_d_flag_for_description() {
+    with_initialized_repo(|temp| {
+        run_command(&["add", "Task needing pain"], &temp);
+
+        // Old syntax without -d should fail
+        let result = run_command(&["pain", "-t", "task-1"], &temp);
+        assert!(!result.success, "pain command should fail without -d flag");
+        assert!(
+            result.stderr.contains("-d") || result.stderr.contains("description"),
+            "Error should mention -d flag or description requirement, got: {}",
+            result.stderr
+        );
+    });
+}
+
+#[test]
+fn pain_with_d_flag_increments_and_documents() {
+    with_initialized_repo(|temp| {
+        run_command(&["add", "Task needing pain"], &temp);
+
+        // New syntax with -t and -d should succeed
+        let result = run_command(&["pain", "-t", "task-1", "-d", "Hit this during task-99 work"], &temp);
+        assert!(result.success, "pain command should succeed with -t and -d flags, got stderr: {}", result.stderr);
+
+        // Verify pain count was added
+        let list = run_command(&["list"], &temp);
+        assert!(
+            list.stdout.contains("(pain count: 1)"),
+            "Pain count should be 1, got: {}",
+            list.stdout
+        );
+
+        // Verify description was added to task
+        let show = run_command(&["show", "task-1"], &temp);
+        assert!(
+            show.stdout.contains("Hit this during task-99 work"),
+            "Pain description should be appended to task, got: {}",
+            show.stdout
+        );
+    });
+}
+
+#[test]
+fn pain_appends_multiple_descriptions() {
+    with_initialized_repo(|temp| {
+        run_command(&["add", "Repeated pain task", "-d", "Initial description"], &temp);
+
+        // First pain instance
+        run_command(&["pain", "-t", "task-1", "-d", "First pain instance"], &temp);
+
+        // Second pain instance
+        run_command(&["pain", "-t", "task-1", "-d", "Second pain instance"], &temp);
+
+        // Verify pain count
+        let list = run_command(&["list"], &temp);
+        assert!(
+            list.stdout.contains("(pain count: 2)"),
+            "Pain count should be 2, got: {}",
+            list.stdout
+        );
+
+        // Verify all descriptions are preserved
+        let show = run_command(&["show", "task-1"], &temp);
+        assert!(
+            show.stdout.contains("Initial description"),
+            "Original description should be preserved, got: {}",
+            show.stdout
+        );
+        assert!(
+            show.stdout.contains("First pain instance"),
+            "First pain description should be appended, got: {}",
+            show.stdout
+        );
+        assert!(
+            show.stdout.contains("Second pain instance"),
+            "Second pain description should be appended, got: {}",
+            show.stdout
+        );
+    });
+}
+
+#[test]
+fn pain_without_t_flag_fails() {
+    with_initialized_repo(|temp| {
+        run_command(&["add", "Some task"], &temp);
+
+        // Bare task-id without -t flag should fail
+        let result = run_command(&["pain", "task-1", "-d", "some description"], &temp);
+        assert!(!result.success, "pain command should fail without -t flag");
     });
 }

@@ -117,19 +117,19 @@ fn test_mark_task_done_error_on_write() {
 #[test]
 fn test_increment_pain_count_error_on_read() {
     let fs = TestFileSystem::new().with_file(".knecht/tasks", "1,open,Test,,\n").fail("open");
-    assert!(increment_pain_count_with_fs("1", &fs).is_err());
+    assert!(increment_pain_count_with_fs("1", Some("test description"), &fs).is_err());
 }
 
 #[test]
 fn test_increment_pain_count_error_on_write() {
     let fs = TestFileSystem::new().with_file(".knecht/tasks", "1,open,Test,,\n").fail("write");
-    assert!(increment_pain_count_with_fs("1", &fs).is_err());
+    assert!(increment_pain_count_with_fs("1", Some("test description"), &fs).is_err());
 }
 
 #[test]
 fn test_increment_pain_count_not_found() {
     let fs = TestFileSystem::new().with_file(".knecht/tasks", "1,open,Test,,\n");
-    assert!(increment_pain_count_with_fs("999", &fs).is_err());
+    assert!(increment_pain_count_with_fs("999", Some("test description"), &fs).is_err());
 }
 
 // NOTE: Wrapper functions (write_tasks, get_next_id, add_task, mark_task_done, read_tasks)

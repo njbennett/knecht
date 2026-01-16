@@ -324,19 +324,29 @@ pub fn find_next_task_with_fs(fs: &dyn FileSystem) -> Result<Option<Task>, Knech
     Ok(best_task)
 }
 
-pub fn increment_pain_count_with_fs(task_id: &str, fs: &dyn FileSystem) -> Result<Task, KnechtError> {
+pub fn increment_pain_count_with_fs(task_id: &str, pain_description: Option<&str>, fs: &dyn FileSystem) -> Result<Task, KnechtError> {
     let mut tasks = read_tasks_with_fs(fs)?;
-    
+
     for task in &mut tasks {
         if task.id == task_id {
             // Increment pain_count field
             task.pain_count = Some(task.pain_count.unwrap_or(0) + 1);
+
+            // Append pain description if provided
+            if let Some(desc) = pain_description {
+                let pain_note = format!("Pain: {}", desc);
+                task.description = Some(match &task.description {
+                    Some(existing) => format!("{}\n{}", existing, pain_note),
+                    None => pain_note,
+                });
+            }
+
             let updated_task = task.clone();
             write_tasks_with_fs(&tasks, fs)?;
             return Ok(updated_task);
         }
     }
-    
+
     Err(KnechtError::TaskNotFound(task_id.to_string()))
 }
 
