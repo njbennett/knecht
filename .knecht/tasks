@@ -34,7 +34,7 @@
 35,done,Add 'show' command to display full task details including description,,2
 36,done,Print task description when starting work on a task,,2
 37,done,Add commit reminder to 'knecht done' output,,3
-38,open,Add command to record pain instances on tasks,Skip: task-188 completed instead,2
+38,open,Add command to record pain instances on tasks,Skip: task-188 completed instead. Skip: task-189 completed instead,3
 39,open,"Review README for redundancy, contradictions, and structure",,
 40,open,Add git pre-commit hook to prompt README review on README changes,,
 41,done,Add pre-commit hook to run tests before allowing commit,,
@@ -138,7 +138,7 @@ Pain: Agent ran knecht next, then read .knecht/tasks directly instead of using k
 185,done,"Validation: 'knecht deliver' fails gracefully for non-existent, already-delivered, already-done, or invalid task IDs",,
 186,delivered,"Success message: On successful delivery, output confirms task was marked as delivered",,
 188,done,File format: .knecht/tasks file is updated correctly with 'delivered' status,,
-189,open,Task relationships preserved: Blocked/blocks relationships remain intact after delivery,,
+189,done,Task relationships preserved: Blocked/blocks relationships remain intact after delivery,,
 190,open,"Integration tests exist: Tests cover successful delivery, non-existent task, already-delivered, already-done, invalid ID, and workflow guidance in output",,
 191,open,Consistent with existing commands: Error messages and output format match style of other knecht commands,,
 192,open,"Git-friendly: Changes to .knecht/tasks produce clean, readable diffs",,
@@ -173,3 +173,4 @@ Pain: Agent ran knecht next, then read .knecht/tasks directly instead of using k
 221,open,"Agents dismiss issues as 'not a knecht bug' instead of filing tasks When reflecting on workflow problems, agents rationalize issues away by saying things like 'this isn't really a knecht bug' instead of filing improvement tasks. Example from this session: agent said 'This isn't really a knecht bug - whoever completed task-211 should have also marked task-37 done' when the real issue is knecht could prompt users to review blocked tasks. The reflection prompt should emphasize: if you're explaining why something isn't a bug, that explanation IS the task to file.","Pain: Agent said 'User redirected me on testing approach (test not needed when feature already works) - but that is a judgment call, not a knecht UX bug' and 'No knecht interface issues'",1
 223,open,Agents should check for untracked/uncommitted work from other sessions before committing,"When preparing a commit, agents should run 'git status' and check for untracked files or uncommitted changes that may be from other sessions. If found, ask the user what to do rather than ignoring them or accidentally including them. This prevents: 1) Leaving orphaned files from other sessions, 2) Accidentally committing unrelated work, 3) Losing track of work-in-progress from parallel sessions.",
 224,open,Agent checks for tests after feature is already implemented,"Anti-pattern: When a feature already exists, agent looks for tests 'to make sure' rather than trusting TDD was followed. This wastes time and misunderstands TDD - tests come BEFORE implementation, not after. If feature works, either test exists or it was already done. Pain: task-186 session - agent tried to verify test existed for already-working deliver success message.",
+225,open,Add --status flag to 'knecht list' to filter by task status,Agent tried 'knecht list --status delivered' to see delivered tasks but the flag doesn't exist.,
