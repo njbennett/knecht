@@ -4,22 +4,13 @@ A git-native task tracker designed primarily for AI agents to work in highly str
 
 Named after Joseph Knecht from Hermann Hesse's *The Glass Bead Game* - "knecht" means "servant" in German.
 
-## Design Philosophy
+## Design Principles
 
-**knecht is agent-first.** It's designed to help AI agents:
-- Work incrementally through structured tasks
-- Maintain context across sessions via git-native storage
-- Follow test-driven development workflows
-- Track pain points and make data-driven decisions about features
-
-## Core Principles
-
-1. **Agent-First Design**: Optimize for AI agents working autonomously, not human convenience
-2. **Test-Driven Development**: Every feature starts with a failing test
-3. **Self-Hosting**: We use knecht to build knecht (eating our own dog food)
-4. **Pain-Driven Features**: Features are added only when their absence hurts (track pain counts)
+1. **Agent-First**: Optimize for AI agents working autonomously - programmatic interfaces, structured data, git-native storage
+2. **Test-Driven**: Every feature starts with a failing test
+3. **Self-Hosting**: We use knecht to build knecht
+4. **Pain-Driven**: Features are added only when their absence hurts (track pain counts at ~3-5 before implementing)
 5. **Simplest Possible**: Sequential IDs, CSV files, no complexity
-6. **Structured Workflow**: Guide agents through incremental, testable work
 
 ## Installation
 
@@ -139,19 +130,69 @@ Description: User sessions are expiring too early. Need to investigate token tim
 
 For tasks without descriptions, only the ID, status, and title are shown.
 
-### `knecht pain <task-id>`
+### `knecht pain -t <task-id> -d <description>`
 
-Increment the pain count for a task. Use this when you encounter friction or difficulty with a task - tracking pain helps prioritize work. Tasks with higher pain counts are suggested first by `knecht next`.
+Increment the pain count for a task with a description of why. Use this when you encounter friction or difficulty - tracking pain helps prioritize work. Tasks with higher pain counts are suggested first by `knecht next`.
 
 ```bash
-knecht pain task-1
+knecht pain -t task-1 -d "Had to work around this manually again"
 # or
-knecht pain 1
+knecht pain -t 1 -d "Third time hitting this limitation"
 ```
 
 Output: `Incremented pain count for task-1: Fix the login bug`
 
 The pain count appears in `knecht list` output and is used by `knecht next` to prioritize which tasks to work on. This implements pain-driven development: track what hurts, and fix the things that hurt most.
+
+### `knecht deliver <task-id>`
+
+Mark a task as delivered (ready for verification). This is an intermediate state between `open` and `done` - useful when work is complete but needs review or testing.
+
+```bash
+knecht deliver task-1
+```
+
+### `knecht delete <task-id>`
+
+Remove a task entirely.
+
+```bash
+knecht delete task-1
+```
+
+### `knecht start <task-id>`
+
+Begin work on a task (prints the task details).
+
+```bash
+knecht start task-1
+```
+
+### `knecht update <task-id> [-t <title>] [-d <description>]`
+
+Update a task's title and/or description.
+
+```bash
+knecht update task-1 -t "New title"
+knecht update task-1 -d "New description"
+knecht update task-1 -t "New title" -d "And new description"
+```
+
+### `knecht block <task-id> <blocker-id>`
+
+Mark a task as blocked by another task. Blocked tasks won't be suggested by `knecht next` until their blocker is resolved.
+
+```bash
+knecht block task-2 task-1  # task-2 is blocked by task-1
+```
+
+### `knecht unblock <task-id> <blocker-id>`
+
+Remove a blocker from a task.
+
+```bash
+knecht unblock task-2 task-1
+```
 
 ## Data Format
 
@@ -219,9 +260,9 @@ YAGNI (You Ain't Gonna Need It). Sequential integers work fine for a personal ta
 
 Simplicity and standards. CSV is a well-understood format with robust parsing libraries. It's readable, editable, git-friendly, and handles special characters (commas, pipes, quotes) correctly out of the box.
 
-### Why no dependencies/blockers/subtasks in v0.1?
+### How do blockers work?
 
-Pain-driven development. We'll add these features when we actually feel the pain of not having them while using knecht.
+Blockers were added when we felt the pain of needing them. Use `knecht block` to mark dependencies between tasks. `knecht next` won't suggest blocked tasks until their blockers are resolved. Subtasks aren't a separate feature - just use blockers to express dependencies.
 
 ### Why Rust?
 
@@ -250,15 +291,13 @@ cargo build --release
 
 ## Roadmap
 
-Features will be added based on actual pain points. Possible future additions:
+Features are added based on actual pain points. Possible future additions:
 
 - Filter tasks by status: `knecht list --status open`
-- Blocked-by relationships: `knecht add "Deploy" --blocked-by task-3`
-- Ready work detection: `knecht ready`
 - JSON output for agents: `knecht list --json`
 - Story/epic references
 
-But we won't add these until we actually need them.
+We won't add these until we actually need them.
 
 ## License
 
@@ -303,7 +342,7 @@ knecht list
 
 **Converted:**
 - Beads IDs (alphanumeric) → Sequential numbers (1, 2, 3...)
-- Status `in_progress` → `open` (knecht only has open/done)
+- Status `in_progress` → `open` (knecht has open/delivered/done)
 
 **Dropped (Intentionally):**
 - Priorities (0-4) - Can be expressed in task titles if needed
@@ -331,9 +370,9 @@ $ bd list --json | beads2knecht
 # - DROP: priorities, issue_types, timestamps, dependencies
 # - Keep: id, status, title, description
 #
-1|open|Fix authentication bug
-2|done|Add user registration|Implement user registration with email verification
-3|open|Refactor database layer
+1,open,Fix authentication bug,,
+2,done,Add user registration,"Implement user registration with email verification",
+3,open,Refactor database layer,,
 
 === MIGRATION COMPLETE ===
 Tasks converted: 3
@@ -349,6 +388,8 @@ LOST INFORMATION:
   bug: 1 tasks
   task: 2 tasks
 ```
+
+Note: The migration tool may need to be rebuilt to output current CSV format.
 
 #### Tips for Migration
 
