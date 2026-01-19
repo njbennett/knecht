@@ -224,6 +224,11 @@ Create tasks immediately for anything you notice:
 
 4. Did you notice anything new that was difficult about working with the codebase while you did this work? Is there anything in the work you just did that we should refactor? Make a list of the refactoring opportunities. Where you can, use named refactors from Martin Fowler's Refactoring, or Michael Feather's Working Effectively with Legacy Code. Check knecht to see if anything similar has already been filed, and if so, increase the pain count on those tasks.
 
+5. Are you about to say 'this isn't really a knecht bug'?
+   → STOP. That explanation IS the task to file.
+   → Describe what knecht could do differently to prevent this confusion.
+   → Your reasoning about why something isn't knecht's problem is exactly what knecht should fix.
+
 IMPORTANT: If agents are confused, knecht needs to improve. Create tasks NOW, don't just note it.
 
 ================================================================================

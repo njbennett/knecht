@@ -635,6 +635,31 @@ fn done_reflection_prompt_uses_actionable_language() {
 }
 
 #[test]
+fn done_reflection_warns_against_dismissing_issues() {
+    // ACCEPTANCE CRITERIA for task-221:
+    // The reflection prompt should warn agents against dismissing issues as "not a knecht bug".
+    // The key insight: if you're explaining why something isn't knecht's problem,
+    // that explanation IS the task to file.
+    let temp = setup_temp_dir();
+    run_command(&["init"], &temp);
+    run_command(&["add", "Task to complete"], &temp);
+
+    let result = run_command(&["done", "task-1"], &temp);
+
+    assert!(result.success, "done command should succeed");
+
+    // Check for the exact guidance text about not dismissing issues
+    assert!(result.stdout.contains("5. Are you about to say 'this isn't really a knecht bug'?"),
+        "Should include question about dismissing issues as not a knecht bug");
+    assert!(result.stdout.contains("→ STOP. That explanation IS the task to file."),
+        "Should tell agent to stop and file the explanation as a task");
+    assert!(result.stdout.contains("→ Describe what knecht could do differently to prevent this confusion."),
+        "Should ask agent to describe what knecht could do differently");
+
+    cleanup_temp_dir(temp);
+}
+
+#[test]
 fn done_shows_commit_reminder() {
     let temp = setup_temp_dir();
     run_command(&["init"], &temp);
