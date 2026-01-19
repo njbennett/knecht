@@ -3428,3 +3428,29 @@ fn subcommand_help_shows_usage() {
 
     cleanup_temp_dir(temp);
 }
+
+#[test]
+fn deliver_success_message_matches_done_format() {
+    // Task-191: deliver and done should have consistent success message format
+    with_initialized_repo(|temp| {
+        run_command(&["add", "Task one"], &temp);
+        run_command(&["add", "Task two"], &temp);
+
+        let done_result = run_command(&["done", "task-1"], &temp);
+        let deliver_result = run_command(&["deliver", "task-2"], &temp);
+
+        // Both should start with "✓ task-N: Title" format
+        // done shows: "✓ task-1: Task one"
+        // deliver should show: "✓ task-2: Task two" (not "✓ task-2 delivered: Task two")
+        assert!(
+            done_result.stdout.contains("✓ task-1: Task one"),
+            "done should output '✓ task-1: Task one', got: {}",
+            done_result.stdout
+        );
+        assert!(
+            deliver_result.stdout.contains("✓ task-2: Task two"),
+            "deliver should output '✓ task-2: Task two' (matching done format), got: {}",
+            deliver_result.stdout
+        );
+    });
+}

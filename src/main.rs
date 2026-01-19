@@ -186,7 +186,7 @@ fn cmd_deliver(task_arg: &str) {
 
     match mark_task_delivered_with_fs(task_id, &RealFileSystem) {
         Ok(task) => {
-            println!("✓ task-{} delivered: {}", task.id, task.title);
+            println!("✓ task-{}: {}", task.id, task.title);
         }
         Err(e) => {
             eprintln!("Error: {}", e);
