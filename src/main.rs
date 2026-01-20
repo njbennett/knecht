@@ -209,42 +209,15 @@ fn cmd_done(task_arg: &str) {
     match mark_task_done_with_fs(task_id, &RealFileSystem) {
         Ok(task) => {
             println!("✓ task-{}: {}", task.id, task.title);
-            println!();
             print!("
 ================================================================================
-STOP - REQUIRED REFLECTION - You MUST answer these questions before continuing
+REFLECTION REQUIRED
 ================================================================================
 
-This is NOT optional informational text. This is REQUIRED work.
-Create tasks immediately for anything you notice:
+Run: /reflect
 
-1. Did you notice anything missing from knecht's interface during this work?
-   → If YOU were confused about workflow or what to do next, that's a KNECHT UX BUG.
-   → Create a task describing what knecht should have told you but didn't.
-
-2. Did the user have to correct or redirect you about anything?
-   → That's a KNECHT UX BUG, not just 'you misunderstood'.
-   → Create a task: How could knecht's output have prevented this confusion?
-
-3. Did you read .knecht/tasks directly or use grep instead of knecht commands?
-   → That's a KNECHT UX BUG - the interface should be better than raw file access.
-   → Create a task: What's missing from knecht's output that made you bypass it?
-
-4. Did you notice anything new that was difficult about working with the codebase while you did this work? Is there anything in the work you just did that we should refactor? Make a list of the refactoring opportunities. Where you can, use named refactors from Martin Fowler's Refactoring, or Michael Feather's Working Effectively with Legacy Code. Check knecht to see if anything similar has already been filed, and if so, increase the pain count on those tasks.
-
-5. Are you about to say 'this isn't really a knecht bug'?
-   → STOP. That explanation IS the task to file.
-   → Describe what knecht could do differently to prevent this confusion.
-   → Your reasoning about why something isn't knecht's problem is exactly what knecht should fix.
-
-IMPORTANT: If agents are confused, knecht needs to improve. Create tasks NOW, don't just note it.
-
-================================================================================
-
-COMMIT YOUR WORK NOW:
-   → git add .knecht/tasks <your-changed-files>
-   → Commit the task changes together with your code changes
-   → This keeps task completion and any new tasks bundled with the work that inspired them
+This loads the reflection skill which will guide you through required questions
+about this work session. You MUST complete reflection before continuing.
 
 ================================================================================
 ");
