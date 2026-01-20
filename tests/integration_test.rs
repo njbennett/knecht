@@ -3600,3 +3600,37 @@ fn list_shows_delivered_tasks_with_distinct_marker() {
             delivered_line);
     });
 }
+
+#[test]
+fn next_prioritizes_delivered_tasks_over_open_tasks() {
+    with_initialized_repo(|temp| {
+        // Add several open tasks with varying pain counts
+        run_command(&["add", "High pain open task"], &temp);
+        run_command(&["pain", "-t", "task-1", "-d", "Pain 1"], &temp);
+        run_command(&["pain", "-t", "task-1", "-d", "Pain 2"], &temp);
+        run_command(&["pain", "-t", "task-1", "-d", "Pain 3"], &temp); // pain count: 3
+
+        run_command(&["add", "Low pain delivered task"], &temp);
+        run_command(&["deliver", "task-2"], &temp); // delivered with no pain
+
+        run_command(&["add", "Medium pain open task"], &temp);
+        run_command(&["pain", "-t", "task-3", "-d", "Pain 1"], &temp);
+        run_command(&["pain", "-t", "task-3", "-d", "Pain 2"], &temp); // pain count: 2
+
+        // Even though task-1 has higher pain count, next should suggest task-2
+        // because delivered tasks take priority over open tasks
+        let result = run_command(&["next"], &temp);
+
+        assert!(result.success, "next command should succeed");
+        assert!(
+            result.stdout.contains("task-2"),
+            "Should suggest delivered task-2 over higher-pain open tasks, got: {}",
+            result.stdout
+        );
+        assert!(
+            result.stdout.contains("Low pain delivered task"),
+            "Should show the delivered task title, got: {}",
+            result.stdout
+        );
+    });
+}

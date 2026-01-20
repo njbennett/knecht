@@ -302,27 +302,40 @@ fn find_best_blocker(task_id: &str, tasks: &[Task], fs: &dyn FileSystem) -> Opti
     Some(best_blocker)
 }
 
-pub fn find_next_task_with_fs(fs: &dyn FileSystem) -> Result<Option<Task>, KnechtError> {
-    let tasks = read_tasks_with_fs(fs)?;
-    
-    // Filter to open tasks only
-    let open_tasks: Vec<_> = tasks.iter()
-        .filter(|t| t.status == "open")
-        .collect();
-    
-    if open_tasks.is_empty() {
-        return Ok(None);
-    }
-    
-    // Find task with highest pain count, preferring older tasks on tie
-    let best_task = open_tasks.iter()
+/// Find the best task from a list by highest pain count, preferring older tasks on tie
+fn find_best_by_priority(tasks: &[&Task]) -> Option<Task> {
+    tasks.iter()
         .max_by_key(|t| {
             let pain = t.pain_count.unwrap_or(0);
             let id_num: i32 = t.id.parse().unwrap_or(0);
             (pain, -id_num)
         })
-        .map(|t| (*t).clone());
-    
+        .map(|t| (*t).clone())
+}
+
+pub fn find_next_task_with_fs(fs: &dyn FileSystem) -> Result<Option<Task>, KnechtError> {
+    let tasks = read_tasks_with_fs(fs)?;
+
+    // First, check for delivered tasks (needing verification) - they take priority
+    let delivered_tasks: Vec<_> = tasks.iter()
+        .filter(|t| t.status == "delivered")
+        .collect();
+
+    if !delivered_tasks.is_empty() {
+        return Ok(find_best_by_priority(&delivered_tasks));
+    }
+
+    // Otherwise, fall back to open tasks
+    let open_tasks: Vec<_> = tasks.iter()
+        .filter(|t| t.status == "open")
+        .collect();
+
+    if open_tasks.is_empty() {
+        return Ok(None);
+    }
+
+    let best_task = find_best_by_priority(&open_tasks);
+
     // If the best task has open blockers, find the best blocker to work on instead
     if let Some(ref task) = best_task
         && has_open_blockers(&task.id, &tasks, fs) {
@@ -330,7 +343,7 @@ pub fn find_next_task_with_fs(fs: &dyn FileSystem) -> Result<Option<Task>, Knech
             let blocker = find_best_blocker(&task.id, &tasks, fs).unwrap();
             return Ok(Some(blocker));
         }
-    
+
     Ok(best_task)
 }
 
