@@ -163,7 +163,13 @@ fn cmd_list() {
     };
 
     for task in tasks {
-        let checkbox = if task.is_done() { "[x]" } else { "[ ]" };
+        let checkbox = if task.is_done() {
+            "[x]"
+        } else if task.status == "delivered" {
+            "[>]"
+        } else {
+            "[ ]"
+        };
         let pain_suffix = if let Some(count) = task.pain_count {
             format!(" (pain count: {})", count)
         } else {

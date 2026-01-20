@@ -3566,3 +3566,37 @@ fn precommit_hook_prompts_readme_review_on_readme_changes() {
 
     cleanup_temp_dir(temp);
 }
+
+#[test]
+fn list_shows_delivered_tasks_with_distinct_marker() {
+    // task-178: Delivered tasks should have a visual marker different from open tasks
+    with_initialized_repo(|temp| {
+        // Create tasks with all three statuses
+        let tasks_path = temp.join(".knecht/tasks");
+        fs::write(&tasks_path, "1,open,\"Open task\",,\n2,delivered,\"Delivered task\",,\n3,done,\"Done task\",,\n").unwrap();
+
+        let result = run_command(&["list"], &temp);
+        assert!(result.success, "list should succeed: {}", result.stderr);
+
+        // Find the lines for each task
+        let lines: Vec<&str> = result.stdout.lines().collect();
+        let open_line = lines.iter().find(|l| l.contains("Open task")).expect("Should have open task line");
+        let delivered_line = lines.iter().find(|l| l.contains("Delivered task")).expect("Should have delivered task line");
+        let done_line = lines.iter().find(|l| l.contains("Done task")).expect("Should have done task line");
+
+        // Open tasks should show [ ]
+        assert!(open_line.contains("[ ]"), "Open task should show [ ], got: {}", open_line);
+
+        // Done tasks should show [x]
+        assert!(done_line.contains("[x]"), "Done task should show [x], got: {}", done_line);
+
+        // Delivered tasks should NOT show [ ] (the same as open)
+        // They should have a distinct marker like [>]
+        assert!(!delivered_line.contains("[ ]"),
+            "Delivered task should NOT show [ ] (same as open). Should have distinct marker. Got: {}",
+            delivered_line);
+        assert!(delivered_line.contains("[>]"),
+            "Delivered task should show [>] marker, got: {}",
+            delivered_line);
+    });
+}
