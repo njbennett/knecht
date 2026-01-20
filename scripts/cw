@@ -227,7 +227,12 @@ main() {
     cd "$WORKTREE_PATH"
     # Run command, capturing exit status but not failing the script
     set +e
-    $CW_COMMAND
+    # If branch name looks like a task (task-N), pass it as initial prompt
+    if [[ "$BRANCH_NAME" =~ ^task-[0-9]+$ ]]; then
+        $CW_COMMAND "knecht $BRANCH_NAME"
+    else
+        $CW_COMMAND
+    fi
     local cmd_status=$?
     set -e
 
