@@ -36,7 +36,7 @@
 37,done,Add commit reminder to 'knecht done' output,,3
 38,done,Add command to record pain instances on tasks,Skip: task-188 completed instead. Skip: task-189 completed instead,3
 39,done,"Review README for redundancy, contradictions, and structure",Skip: task-190 completed instead. Skip: task-229 completed instead. Skip: task-229 completed instead. Skip: task-229 completed instead. Skip: task-191 completed instead. Skip: task-221 completed instead,6
-40,open,Add git pre-commit hook to prompt README review on README changes,Skip: task-219 completed instead. Skip: task-235 completed instead,2
+40,open,Add git pre-commit hook to prompt README review on README changes,Skip: task-219 completed instead. Skip: task-235 completed instead. Skip: task-236 completed instead,3
 41,done,Add pre-commit hook to run tests before allowing commit,,
 42,done,Add test coverage check to pre-commit hook requiring 100% coverage,,
 43,done,Add command to update task title and description,"Currently updating task titles or descriptions requires manually editing .knecht/tasks file. Need command like 'knecht update task-43 --title ""New title"" --description ""New desc""' or 'knecht update task-43 -d ""Updated description""'. Pain count: 2 (instances: task-36 used awk to update task-116 and task-119 descriptions, current session manually edited task-122 title to add pain count)",3
@@ -248,4 +248,5 @@ Pain: Should fix quickly - bug that affects data integrity",3
 233,open,Add ability to sort tasks by pain count,No way to find tasks with highest pain. Have to grep and manually filter closed tasks. Should be able to do something like 'knecht list --sort pain' to see what has accumulated the most pain.,
 234,open,beads2knecht still outputs pipe format instead of CSV,The beads2knecht tool outputs pipe-delimited format but knecht now uses CSV. The tool's strategy message also says 'in 4th pipe-delimited field'. Update the tool to output correct CSV format.,
 235,done,cw script passes task context to Claude when branch name matches task-N pattern,"When you run cw task-48, Claude now starts with 'knecht task-48' as the initial prompt so it knows what task to work on immediately.",
-236,open,cw script should only fetch origin and rebase onto origin/main if origin exists,"currently knecht doesn't have a remote repository so the cw task fails to clean up after itself, it will have one in the future so it should still try to do this but then it should fall back on rebasing locally",
+236,done,cw script should only fetch origin and rebase onto origin/main if origin exists,"currently knecht doesn't have a remote repository so the cw task fails to clean up after itself, it will have one in the future so it should still try to do this but then it should fall back on rebasing locally",
+237,open,"Add automated tests for cw script (or rewrite in Rust) The cw bash script lacks automated tests. Options: (1) Write tests using Rust's test runner that invoke the script, or (2) Rewrite the script in Rust for better testability. Defer until pain accumulates.",,

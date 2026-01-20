@@ -77,6 +77,10 @@ get_repo_name() {
     basename "$(git rev-parse --show-toplevel)"
 }
 
+has_origin_remote() {
+    git remote | grep -q '^origin$'
+}
+
 cleanup_worktree() {
     # Guard against double cleanup
     if [[ "$CLEANUP_DONE" == "true" ]]; then
@@ -115,9 +119,20 @@ cleanup_worktree() {
     if has_commits_on_branch "$MAIN_BRANCH" "$BRANCH_NAME"; then
         info "Found commits on $BRANCH_NAME, attempting merge..."
 
-        # Fetch and rebase onto latest main
-        info "Fetching origin and rebasing onto $MAIN_BRANCH..."
-        if ! (cd "$WORKTREE_PATH" && git fetch origin && git rebase "origin/$MAIN_BRANCH"); then
+        # Rebase onto latest main (fetch from origin first if available)
+        local rebase_target="$MAIN_BRANCH"
+        if has_origin_remote; then
+            info "Fetching origin and rebasing onto origin/$MAIN_BRANCH..."
+            if ! (cd "$WORKTREE_PATH" && git fetch origin); then
+                warn "Fetch failed! Continuing with local $MAIN_BRANCH..."
+            else
+                rebase_target="origin/$MAIN_BRANCH"
+            fi
+        else
+            info "No origin remote, rebasing onto local $MAIN_BRANCH..."
+        fi
+
+        if ! (cd "$WORKTREE_PATH" && git rebase "$rebase_target"); then
             warn "Rebase failed! Aborting rebase..."
             (cd "$WORKTREE_PATH" && git rebase --abort 2>/dev/null || true)
             warn ""
@@ -125,7 +140,11 @@ cleanup_worktree() {
             warn ""
             warn "To resolve:"
             warn "  cd $WORKTREE_PATH"
-            warn "  git fetch origin && git rebase origin/$MAIN_BRANCH"
+            if has_origin_remote; then
+                warn "  git fetch origin && git rebase origin/$MAIN_BRANCH"
+            else
+                warn "  git rebase $MAIN_BRANCH"
+            fi
             warn "  # resolve conflicts, then: git rebase --continue"
             warn "  cd $MAIN_WORKTREE"
             warn "  git merge --ff-only $BRANCH_NAME"
