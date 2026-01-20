@@ -3479,3 +3479,90 @@ fn deliver_success_message_matches_done_format() {
         );
     });
 }
+
+#[test]
+fn precommit_hook_prompts_readme_review_on_readme_changes() {
+    // Task-40: Pre-commit hook should prompt user to review README when it changes
+    let temp = setup_temp_dir();
+
+    // Initialize git repo
+    let git_init = Command::new("git")
+        .args(["init"])
+        .current_dir(&temp)
+        .output()
+        .expect("Failed to run git init");
+    assert!(git_init.status.success(), "git init failed");
+
+    // Configure git user for commits
+    Command::new("git")
+        .args(["config", "user.email", "test@test.com"])
+        .current_dir(&temp)
+        .output()
+        .expect("Failed to configure git email");
+    Command::new("git")
+        .args(["config", "user.name", "Test User"])
+        .current_dir(&temp)
+        .output()
+        .expect("Failed to configure git name");
+
+    // Set up hooks directory and copy our pre-commit hook
+    let hooks_dir = temp.join(".githooks");
+    fs::create_dir_all(&hooks_dir).unwrap();
+
+    // Copy the pre-commit hook from the project
+    let project_hook = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(".githooks/pre-commit");
+    let test_hook = hooks_dir.join("pre-commit");
+    fs::copy(&project_hook, &test_hook).expect("Failed to copy pre-commit hook");
+
+    // Configure git to use our hooks directory
+    Command::new("git")
+        .args(["config", "core.hooksPath", ".githooks"])
+        .current_dir(&temp)
+        .output()
+        .expect("Failed to configure hooks path");
+
+    // Create initial commit without README
+    fs::write(temp.join("file.txt"), "initial content").unwrap();
+    Command::new("git")
+        .args(["add", "file.txt"])
+        .current_dir(&temp)
+        .output()
+        .expect("Failed to stage file");
+    Command::new("git")
+        .args(["commit", "-m", "initial commit"])
+        .current_dir(&temp)
+        .output()
+        .expect("Failed to create initial commit");
+
+    // Now create README.md and commit it
+    fs::write(temp.join("README.md"), "# Test Project\n\nThis is a test.").unwrap();
+    Command::new("git")
+        .args(["add", "README.md"])
+        .current_dir(&temp)
+        .output()
+        .expect("Failed to stage README");
+
+    // Commit and capture output - the pre-commit hook should print a reminder
+    let commit_output = Command::new("git")
+        .args(["commit", "-m", "add readme"])
+        .current_dir(&temp)
+        .output()
+        .expect("Failed to commit");
+
+    let stdout = String::from_utf8_lossy(&commit_output.stdout);
+    let stderr = String::from_utf8_lossy(&commit_output.stderr);
+    let combined_output = format!("{}{}", stdout, stderr);
+
+    // The hook should output a reminder about reviewing README
+    assert!(
+        combined_output.contains("README") && combined_output.contains("review"),
+        "Pre-commit hook should prompt README review when README changes.\n\
+         Expected output containing 'README' and 'review'.\n\
+         Got stdout: {}\n\
+         Got stderr: {}",
+        stdout,
+        stderr
+    );
+
+    cleanup_temp_dir(temp);
+}

@@ -1,0 +1,12 @@
+#!/bin/bash
+# Pre-commit hook: prompt README review when README changes
+
+# Check if README.md is staged for commit
+if git diff --cached --name-only | grep -q '^README\.md$'; then
+    echo ""
+    echo "================================"
+    echo "README.md is being committed."
+    echo "Please review the changes to ensure documentation is accurate."
+    echo "================================"
+    echo ""
+fi

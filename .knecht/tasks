@@ -36,7 +36,7 @@
 37,done,Add commit reminder to 'knecht done' output,,3
 38,done,Add command to record pain instances on tasks,Skip: task-188 completed instead. Skip: task-189 completed instead,3
 39,done,"Review README for redundancy, contradictions, and structure",Skip: task-190 completed instead. Skip: task-229 completed instead. Skip: task-229 completed instead. Skip: task-229 completed instead. Skip: task-191 completed instead. Skip: task-221 completed instead,6
-40,open,Add git pre-commit hook to prompt README review on README changes,Skip: task-219 completed instead. Skip: task-235 completed instead. Skip: task-236 completed instead,3
+40,done,Add git pre-commit hook to prompt README review on README changes,Skip: task-219 completed instead. Skip: task-235 completed instead. Skip: task-236 completed instead,3
 41,done,Add pre-commit hook to run tests before allowing commit,,
 42,done,Add test coverage check to pre-commit hook requiring 100% coverage,,
 43,done,Add command to update task title and description,"Currently updating task titles or descriptions requires manually editing .knecht/tasks file. Need command like 'knecht update task-43 --title ""New title"" --description ""New desc""' or 'knecht update task-43 -d ""Updated description""'. Pain count: 2 (instances: task-36 used awk to update task-116 and task-119 descriptions, current session manually edited task-122 title to add pain count)",3
