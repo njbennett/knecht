@@ -81,6 +81,15 @@ has_origin_remote() {
     git remote | grep -q '^origin$'
 }
 
+is_in_rebase() {
+    # Check if a directory is currently in a rebase state
+    # Works correctly with worktrees by using git-path
+    local dir="$1"
+    local rebase_dir
+    rebase_dir=$(cd "$dir" && git rev-parse --git-path rebase-merge 2>/dev/null) || return 1
+    [[ -d "$rebase_dir" ]]
+}
+
 cleanup_worktree() {
     # Guard against double cleanup
     if [[ "$CLEANUP_DONE" == "true" ]]; then
@@ -133,24 +142,41 @@ cleanup_worktree() {
         fi
 
         if ! (cd "$WORKTREE_PATH" && git rebase "$rebase_target"); then
-            warn "Rebase failed! Aborting rebase..."
-            (cd "$WORKTREE_PATH" && git rebase --abort 2>/dev/null || true)
-            warn ""
-            warn "Manual resolution needed. Worktree preserved at: $WORKTREE_PATH"
-            warn ""
-            warn "To resolve:"
-            warn "  cd $WORKTREE_PATH"
-            if has_origin_remote; then
-                warn "  git fetch origin && git rebase origin/$MAIN_BRANCH"
-            else
-                warn "  git rebase $MAIN_BRANCH"
+            info "Rebase conflict detected. Starting Claude to help resolve..."
+            info ""
+
+            # Run claude in the worktree to resolve conflicts
+            cd "$WORKTREE_PATH"
+            set +e
+            $CW_COMMAND "Resolve the merge conflicts from rebasing onto $rebase_target. Use 'git status' to see conflicted files, edit them to resolve, then 'git add' and 'git rebase --continue'."
+            local resolve_status=$?
+            set -e
+            cd "$MAIN_WORKTREE"
+
+            # Check if rebase was completed
+            if is_in_rebase "$WORKTREE_PATH"; then
+                # Still in rebase state - not resolved
+                warn "Rebase not completed. Aborting..."
+                (cd "$WORKTREE_PATH" && git rebase --abort 2>/dev/null || true)
+                warn ""
+                warn "Manual resolution needed. Worktree preserved at: $WORKTREE_PATH"
+                warn ""
+                warn "To resolve:"
+                warn "  cd $WORKTREE_PATH"
+                if has_origin_remote; then
+                    warn "  git fetch origin && git rebase origin/$MAIN_BRANCH"
+                else
+                    warn "  git rebase $MAIN_BRANCH"
+                fi
+                warn "  # resolve conflicts, then: git rebase --continue"
+                warn "  cd $MAIN_WORKTREE"
+                warn "  git merge --ff-only $BRANCH_NAME"
+                warn "  git worktree remove $WORKTREE_PATH"
+                warn "  git branch -d $BRANCH_NAME"
+                return 1
             fi
-            warn "  # resolve conflicts, then: git rebase --continue"
-            warn "  cd $MAIN_WORKTREE"
-            warn "  git merge --ff-only $BRANCH_NAME"
-            warn "  git worktree remove $WORKTREE_PATH"
-            warn "  git branch -d $BRANCH_NAME"
-            return 1
+
+            info "Rebase completed successfully!"
         fi
 
         # Merge into main
