@@ -3634,3 +3634,79 @@ fn next_prioritizes_delivered_tasks_over_open_tasks() {
         );
     });
 }
+
+// task-213: Allow agents to claim tasks they are working on
+
+#[test]
+fn start_changes_task_status_to_claimed() {
+    // When an agent starts a task, the status should change from "open" to "claimed"
+    with_initialized_repo(|temp| {
+        // Add a task
+        run_command(&["add", "Task to claim"], &temp);
+
+        // Start the task
+        let result = run_command(&["start", "task-1"], &temp);
+        assert!(result.success, "start should succeed: {}", result.stderr);
+
+        // Verify the status changed to "claimed"
+        let show_result = run_command(&["show", "task-1"], &temp);
+        assert!(show_result.stdout.contains("Status: claimed"),
+            "Task status should be 'claimed' after start, got: {}", show_result.stdout);
+    });
+}
+
+#[test]
+fn next_skips_claimed_tasks() {
+    // claimed tasks should be skipped by knecht next, just like done tasks
+    with_initialized_repo(|temp| {
+        // Add two tasks
+        run_command(&["add", "First task"], &temp);
+        run_command(&["add", "Second task"], &temp);
+
+        // Claim the first task
+        run_command(&["start", "task-1"], &temp);
+
+        // next should suggest the second task, not the first
+        let result = run_command(&["next"], &temp);
+        assert!(result.success, "next should succeed: {}", result.stderr);
+        assert!(result.stdout.contains("task-2"),
+            "next should skip claimed task and suggest task-2, got: {}", result.stdout);
+        assert!(!result.stdout.contains("task-1"),
+            "next should not suggest claimed task-1, got: {}", result.stdout);
+    });
+}
+
+#[test]
+fn list_shows_claimed_tasks_with_distinct_marker() {
+    // Claimed tasks should have a visual marker distinct from open/done/delivered
+    with_initialized_repo(|temp| {
+        // Add a task and claim it
+        run_command(&["add", "Claimed task"], &temp);
+        run_command(&["start", "task-1"], &temp);
+
+        let result = run_command(&["list"], &temp);
+        assert!(result.success, "list should succeed: {}", result.stderr);
+
+        // Claimed tasks should show [~] to indicate in-progress
+        let claimed_line = result.stdout.lines()
+            .find(|l| l.contains("Claimed task"))
+            .expect("Should have claimed task line");
+        assert!(claimed_line.contains("[~]"),
+            "Claimed task should show [~] marker, got: {}", claimed_line);
+    });
+}
+
+#[test]
+fn next_handles_all_tasks_claimed() {
+    // When all tasks are claimed, next should indicate no available tasks
+    with_initialized_repo(|temp| {
+        // Add and claim all tasks
+        run_command(&["add", "Only task"], &temp);
+        run_command(&["start", "task-1"], &temp);
+
+        let result = run_command(&["next"], &temp);
+        assert!(result.success, "next should succeed: {}", result.stderr);
+        assert!(result.stdout.contains("No open tasks") || result.stdout.contains("no open tasks"),
+            "Should indicate no open tasks when all are claimed, got: {}", result.stdout);
+    });
+}

@@ -1,7 +1,7 @@
 use std::fs;
 
 use clap::{Parser, Subcommand};
-use knecht::{add_task_with_fs, delete_task_with_fs, find_next_task_with_fs, find_task_by_id_with_fs, increment_pain_count_with_fs, mark_task_delivered_with_fs, mark_task_done_with_fs, read_tasks_with_fs, update_task_with_fs, RealFileSystem};
+use knecht::{add_task_with_fs, delete_task_with_fs, find_next_task_with_fs, find_task_by_id_with_fs, increment_pain_count_with_fs, mark_task_claimed_with_fs, mark_task_delivered_with_fs, mark_task_done_with_fs, read_tasks_with_fs, update_task_with_fs, RealFileSystem};
 
 #[derive(Parser)]
 #[command(name = "knecht")]
@@ -167,6 +167,8 @@ fn cmd_list() {
             "[x]"
         } else if task.status == "delivered" {
             "[>]"
+        } else if task.status == "claimed" {
+            "[~]"
         } else {
             "[ ]"
         };
@@ -299,7 +301,7 @@ fn cmd_start(task_arg: &str) {
     let task_id = parse_task_id(task_arg);
 
     match find_task_by_id_with_fs(task_id, &RealFileSystem) {
-        Ok(task) => {
+        Ok(_task) => {
             // Check for open blockers
             let blockers = get_blockers_for_task(task_id);
             let mut open_blockers = Vec::new();
@@ -321,11 +323,20 @@ fn cmd_start(task_arg: &str) {
                 std::process::exit(1);
             }
 
-            println!("Starting work on task-{}: {}", task.id, task.title);
-            if let Some(desc) = &task.description {
-                println!();
-                println!("Description:");
-                println!("{}", desc);
+            // Claim the task by changing status to "claimed"
+            match mark_task_claimed_with_fs(task_id, &RealFileSystem) {
+                Ok(claimed_task) => {
+                    println!("Starting work on task-{}: {}", claimed_task.id, claimed_task.title);
+                    if let Some(desc) = &claimed_task.description {
+                        println!();
+                        println!("Description:");
+                        println!("{}", desc);
+                    }
+                }
+                Err(err) => {
+                    eprintln!("Error claiming task: {}", err);
+                    std::process::exit(1);
+                }
             }
         }
         Err(err) => {

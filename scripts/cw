@@ -231,6 +231,19 @@ main() {
         die "Worktree path already exists: $WORKTREE_PATH"
     fi
 
+    # If branch name looks like a task (task-N), claim it before creating worktree
+    # This commits the claim to main branch so other agents see it
+    if [[ "$BRANCH_NAME" =~ ^task-[0-9]+$ ]]; then
+        info "Claiming $BRANCH_NAME before starting worktree..."
+        if ! knecht start "$BRANCH_NAME" >/dev/null 2>&1; then
+            die "Failed to claim $BRANCH_NAME. Task may not exist or may be blocked."
+        fi
+        # Commit the claim to main branch
+        git add .knecht/tasks
+        git commit -m "Claim $BRANCH_NAME"
+        info "Claimed $BRANCH_NAME (committed to $MAIN_BRANCH)"
+    fi
+
     # Create worktree
     info "Creating worktree at $WORKTREE_PATH on branch $BRANCH_NAME..."
     git worktree add "$WORKTREE_PATH" -b "$BRANCH_NAME"
