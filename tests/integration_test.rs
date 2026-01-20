@@ -573,40 +573,25 @@ fn beads2knecht_reports_lost_information() {
 // not as informational text to skip past.
 
 fn done_shows_refactoring_reflection_prompt() {
-    let temp = setup_temp_dir();
-    run_command(&["init"], &temp);
-    run_command(&["add", "Task to complete"], &temp);
+    // task-221: Reflection content moved to /reflect skill file
+    // This test now verifies the skill file contains the expected guidance
+    let skill_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join(".claude/commands/reflect.md");
 
-    let result = run_command(&["done", "task-1"], &temp);
+    let skill_content = fs::read_to_string(&skill_path)
+        .expect("Reflect skill file should exist at .claude/commands/reflect.md");
 
-    assert!(result.success, "done command should succeed");
-    assert!(result.stdout.contains("✓ task-1"), "Should show completed task");
-    assert!(result.stdout.contains("STOP - REQUIRED REFLECTION"),
-        "Should have explicit reflection prompt header");
-    assert!(result.stdout.contains("Did you notice anything missing from knecht's interface"),
-        "Should ask about missing interface features");
-    assert!(result.stdout.contains("If YOU were confused about workflow or what to do next, that's a KNECHT UX BUG"),
-        "Should explicitly state that agent confusion is a knecht UX bug");
-    assert!(result.stdout.contains("Did the user have to correct or redirect you"),
+    // Verify the skill file contains key reflection questions
+    assert!(skill_content.contains("What friction did you encounter"),
+        "Should ask about friction");
+    assert!(skill_content.contains("Did the user correct or redirect you"),
         "Should ask about user corrections");
-    assert!(result.stdout.contains("That's a KNECHT UX BUG, not just 'you misunderstood'"),
-        "Should explicitly state that user corrections indicate knecht UX bugs");
-    assert!(result.stdout.contains("Did you read .knecht/tasks directly or use grep instead of knecht commands"),
-        "Should ask about bypassing knecht interface");
-    assert!(result.stdout.contains("Did you notice anything new that was difficult about working with the codebase"),
-        "Should ask about codebase difficulties");
-    assert!(result.stdout.contains("Martin Fowler's Refactoring"),
-        "Should mention Martin Fowler's Refactoring");
-    assert!(result.stdout.contains("Michael Feather's Working Effectively with Legacy Code"),
-        "Should mention Michael Feathers' book");
-    assert!(result.stdout.contains("Check knecht to see if anything similar has already been filed"),
-        "Should remind to check existing tasks");
-    assert!(result.stdout.contains("increase the pain count"),
-        "Should mention increasing pain count");
-    assert!(result.stdout.contains("If agents are confused, knecht needs to improve. Create tasks NOW"),
-        "Should emphasize that agent confusion means knecht needs improvement");
-
-    cleanup_temp_dir(temp);
+    assert!(skill_content.contains("What IS a knecht bug"),
+        "Should explain what qualifies as a knecht bug");
+    assert!(skill_content.contains("REQUIRED ACTION"),
+        "Should have required action section");
+    assert!(skill_content.contains("knecht add") && skill_content.contains("knecht pain"),
+        "Should mention knecht commands to file tasks");
 }
 
 #[test]
@@ -637,41 +622,43 @@ fn done_reflection_prompt_uses_actionable_language() {
 #[test]
 fn done_reflection_warns_against_dismissing_issues() {
     // ACCEPTANCE CRITERIA for task-221:
-    // The reflection prompt should warn agents against dismissing issues as "not a knecht bug".
+    // The reflection skill should warn agents against dismissing issues as "not a knecht bug".
     // The key insight: if you're explaining why something isn't knecht's problem,
     // that explanation IS the task to file.
-    let temp = setup_temp_dir();
-    run_command(&["init"], &temp);
-    run_command(&["add", "Task to complete"], &temp);
+    let skill_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join(".claude/commands/reflect.md");
 
-    let result = run_command(&["done", "task-1"], &temp);
+    let skill_content = fs::read_to_string(&skill_path)
+        .expect("Reflect skill file should exist at .claude/commands/reflect.md");
 
-    assert!(result.success, "done command should succeed");
-
-    // Check for the exact guidance text about not dismissing issues
-    assert!(result.stdout.contains("5. Are you about to say 'this isn't really a knecht bug'?"),
-        "Should include question about dismissing issues as not a knecht bug");
-    assert!(result.stdout.contains("→ STOP. That explanation IS the task to file."),
-        "Should tell agent to stop and file the explanation as a task");
-    assert!(result.stdout.contains("→ Describe what knecht could do differently to prevent this confusion."),
-        "Should ask agent to describe what knecht could do differently");
-
-    cleanup_temp_dir(temp);
+    // Check for the anti-dismissal guidance (task-221 core feature)
+    assert!(skill_content.contains("Anti-Dismissal Rule"),
+        "Should have anti-dismissal rule section");
+    assert!(skill_content.contains("this isn't really a knecht bug"),
+        "Should mention the problematic thought pattern");
+    assert!(skill_content.contains("STOP"),
+        "Should tell agent to stop when having dismissive thoughts");
+    assert!(skill_content.contains("File it AS a task anyway"),
+        "Should tell agent to file it as a task regardless");
+    assert!(skill_content.contains("Your reasoning about why it's not knecht's problem IS the task content"),
+        "Should explain that the reasoning itself is the task content");
 }
 
 #[test]
 fn done_shows_commit_reminder() {
-    let temp = setup_temp_dir();
-    run_command(&["init"], &temp);
-    run_command(&["add", "Task to complete"], &temp);
+    // Commit reminder is now in the /reflect skill file
+    let skill_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join(".claude/commands/reflect.md");
 
-    let result = run_command(&["done", "task-1"], &temp);
+    let skill_content = fs::read_to_string(&skill_path)
+        .expect("Reflect skill file should exist at .claude/commands/reflect.md");
 
-    assert!(result.success, "done command should succeed");
-    assert!(result.stdout.contains("COMMIT YOUR WORK NOW:\n   → git add .knecht/tasks <your-changed-files>\n   → Commit the task changes together with your code changes"),
-        "Should show commit reminder with instructions, got: {}", result.stdout);
-
-    cleanup_temp_dir(temp);
+    assert!(skill_content.contains("Commit Reminder"),
+        "Should have commit reminder section");
+    assert!(skill_content.contains("git add .knecht/tasks"),
+        "Should show git add command");
+    assert!(skill_content.contains("git commit"),
+        "Should show git commit command");
 }
 
 #[test]
@@ -3708,5 +3695,19 @@ fn next_handles_all_tasks_claimed() {
         assert!(result.success, "next should succeed: {}", result.stderr);
         assert!(result.stdout.contains("No open tasks") || result.stdout.contains("no open tasks"),
             "Should indicate no open tasks when all are claimed, got: {}", result.stdout);
+    });
+}
+
+#[test]
+fn done_instructs_agent_to_run_reflect_skill() {
+    // task-221: Instead of inline reflection prompts, instruct agent to run /reflect skill
+    with_initialized_repo(|temp| {
+        run_command(&["add", "Task to complete"], &temp);
+
+        let result = run_command(&["done", "task-1"], &temp);
+
+        assert!(result.success, "done should succeed: {}", result.stderr);
+        assert!(result.stdout.contains("/reflect"),
+            "Should instruct agent to run /reflect skill, got: {}", result.stdout);
     });
 }
