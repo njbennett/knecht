@@ -36,7 +36,7 @@
 37,done,Add commit reminder to 'knecht done' output,,3
 38,done,Add command to record pain instances on tasks,Skip: task-188 completed instead. Skip: task-189 completed instead,3
 39,done,"Review README for redundancy, contradictions, and structure",Skip: task-190 completed instead. Skip: task-229 completed instead. Skip: task-229 completed instead. Skip: task-229 completed instead. Skip: task-191 completed instead. Skip: task-221 completed instead,6
-40,open,Add git pre-commit hook to prompt README review on README changes,,
+40,open,Add git pre-commit hook to prompt README review on README changes,Skip: task-219 completed instead,1
 41,done,Add pre-commit hook to run tests before allowing commit,,
 42,done,Add test coverage check to pre-commit hook requiring 100% coverage,,
 43,done,Add command to update task title and description,"Currently updating task titles or descriptions requires manually editing .knecht/tasks file. Need command like 'knecht update task-43 --title ""New title"" --description ""New desc""' or 'knecht update task-43 -d ""Updated description""'. Pain count: 2 (instances: task-36 used awk to update task-116 and task-119 descriptions, current session manually edited task-122 title to add pain count)",3
@@ -175,7 +175,7 @@ Pain: StoryTime agent read .knecht/tasks directly because task had empty descrip
 216,open,"Examine the CLAUDE.md and knecht's built in prompts (such as the prompt that displays when we run ) and consider whether any of them could be Claude skills, or use other features of Claude code. Propose a design.",,
 217,open,Read the description of the Makado method and propose a design for implementing the Makado method with knecht and with Claude skills and/or hooks.,,
 218,open,Track skips separately from pain counts,"Currently when 'knecht done' is run on a non-oldest task, the skip is recorded by incrementing the skipped task's pain count and appending 'Skip: task-X completed instead' to its description. This conflates two different concepts: (1) Pain: explicit user feedback that a feature's absence hurts, (2) Skips: automatic tracking of when a task was passed over. These should be tracked separately since they measure different things. Consider adding a skip_count field or separate skip tracking. Related to task-134 which added mandatory pain documentation.",
-219,open,Figure out how to get agents using knecht to consistently start work in a new git worktree for parallel agent execution,"## Problem
+219,done,Figure out how to get agents using knecht to consistently start work in a new git worktree for parallel agent execution,"## Problem
 Claude sessions can't effectively manage worktrees themselves - shell doesn't persist cd, so must prefix every command with path.
 
 ## Solution

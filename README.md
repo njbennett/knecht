@@ -224,6 +224,59 @@ git add .knecht/tasks
 git commit -m "Update task status"
 ```
 
+## Parallel Sessions with `cw` (Claude Worktree)
+
+The `cw` script enables parallel Claude agent sessions using git worktrees. Each session works in an isolated branch that gets merged back to main when the session ends.
+
+### Installation
+
+```bash
+# Option 1: Run directly from the scripts directory
+./scripts/cw
+
+# Option 2: Symlink to your PATH
+ln -s $(pwd)/scripts/cw /usr/local/bin/cw
+
+# Option 3: Copy to your dotfiles
+cp scripts/cw ~/.local/bin/cw
+```
+
+### Usage
+
+```bash
+cw [branch-name]   # If no branch-name, generates work-YYYYMMDD-HHMMSS
+```
+
+### What it does
+
+**On start:**
+1. Detects main branch (main/master)
+2. Verifies main worktree is clean
+3. Creates worktree: `../reponame-branchname`
+4. Runs `claude` (or `$CW_COMMAND`) in the worktree
+
+**On claude exit:**
+1. Checks for uncommitted changes (warns and preserves worktree if dirty)
+2. If commits exist: fetches, rebases onto main, fast-forward merges
+3. Removes worktree and branch
+
+### Edge cases
+
+| Scenario | Behavior |
+|----------|----------|
+| Uncommitted changes | Warns, leaves worktree intact, shows manual cleanup commands |
+| Rebase conflicts | Aborts rebase, warns, leaves worktree for manual resolution |
+| No commits made | Cleans up worktree without merge |
+| Ctrl+C during session | Traps signal, runs cleanup logic |
+
+### Configuration
+
+- `CW_COMMAND` - Override the command to run (default: `claude`)
+
+```bash
+CW_COMMAND="claude --model opus" cw my-feature
+```
+
 ## Examples
 
 ### Track a feature from start to finish

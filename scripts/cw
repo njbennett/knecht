@@ -1,0 +1,241 @@
+#!/usr/bin/env bash
+#
+# cw - Claude Worktree wrapper
+#
+# Creates a git worktree for parallel Claude agent sessions, runs claude,
+# then handles cleanup (rebase, merge, worktree removal) on exit.
+#
+# Usage: cw [branch-name]
+#   If no branch-name provided, generates: work-YYYYMMDD-HHMMSS
+#
+# Environment:
+#   CW_COMMAND - Command to run instead of 'claude' (default: claude)
+
+set -euo pipefail
+
+# --- Configuration ---
+CW_COMMAND="${CW_COMMAND:-claude}"
+
+# --- State variables ---
+MAIN_WORKTREE=""
+MAIN_BRANCH=""
+WORKTREE_PATH=""
+BRANCH_NAME=""
+CLEANUP_DONE=false
+
+# --- Helper functions ---
+
+die() {
+    echo "error: $*" >&2
+    exit 1
+}
+
+warn() {
+    echo "warning: $*" >&2
+}
+
+info() {
+    echo "$*"
+}
+
+detect_main_branch() {
+    # Try to get the default branch from origin
+    local ref
+    if ref=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null); then
+        basename "$ref"
+        return 0
+    fi
+
+    # Fallback: check for common names
+    if git show-ref --verify --quiet refs/heads/main 2>/dev/null; then
+        echo "main"
+        return 0
+    fi
+
+    if git show-ref --verify --quiet refs/heads/master 2>/dev/null; then
+        echo "master"
+        return 0
+    fi
+
+    die "Could not detect main branch (tried origin/HEAD, main, master)"
+}
+
+has_uncommitted_changes() {
+    # Returns 0 (true) if there are uncommitted changes
+    ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null
+}
+
+has_commits_on_branch() {
+    local base="$1"
+    local branch="$2"
+    local count
+    count=$(git rev-list --count "$base".."$branch" 2>/dev/null || echo "0")
+    [[ "$count" -gt 0 ]]
+}
+
+get_repo_name() {
+    basename "$(git rev-parse --show-toplevel)"
+}
+
+cleanup_worktree() {
+    # Guard against double cleanup
+    if [[ "$CLEANUP_DONE" == "true" ]]; then
+        return
+    fi
+    CLEANUP_DONE=true
+
+    info ""
+    info "--- Cleanup ---"
+
+    # Check if worktree still exists
+    if [[ ! -d "$WORKTREE_PATH" ]]; then
+        info "Worktree already removed."
+        return 0
+    fi
+
+    # Check for uncommitted changes in worktree
+    if (cd "$WORKTREE_PATH" && has_uncommitted_changes); then
+        warn "Uncommitted changes in worktree!"
+        warn "Leaving worktree intact at: $WORKTREE_PATH"
+        warn ""
+        warn "To resume work:"
+        warn "  cd $WORKTREE_PATH"
+        warn ""
+        warn "To cleanup manually:"
+        warn "  cd $WORKTREE_PATH && git status"
+        warn "  git add . && git commit -m 'WIP'"
+        warn "  # or: git checkout -- ."
+        warn "  cd $MAIN_WORKTREE"
+        warn "  git worktree remove $WORKTREE_PATH"
+        warn "  git branch -d $BRANCH_NAME"
+        return 1
+    fi
+
+    # Check if there are any commits on the branch
+    if has_commits_on_branch "$MAIN_BRANCH" "$BRANCH_NAME"; then
+        info "Found commits on $BRANCH_NAME, attempting merge..."
+
+        # Fetch and rebase onto latest main
+        info "Fetching origin and rebasing onto $MAIN_BRANCH..."
+        if ! (cd "$WORKTREE_PATH" && git fetch origin && git rebase "origin/$MAIN_BRANCH"); then
+            warn "Rebase failed! Aborting rebase..."
+            (cd "$WORKTREE_PATH" && git rebase --abort 2>/dev/null || true)
+            warn ""
+            warn "Manual resolution needed. Worktree preserved at: $WORKTREE_PATH"
+            warn ""
+            warn "To resolve:"
+            warn "  cd $WORKTREE_PATH"
+            warn "  git fetch origin && git rebase origin/$MAIN_BRANCH"
+            warn "  # resolve conflicts, then: git rebase --continue"
+            warn "  cd $MAIN_WORKTREE"
+            warn "  git merge --ff-only $BRANCH_NAME"
+            warn "  git worktree remove $WORKTREE_PATH"
+            warn "  git branch -d $BRANCH_NAME"
+            return 1
+        fi
+
+        # Merge into main
+        info "Merging $BRANCH_NAME into $MAIN_BRANCH..."
+        cd "$MAIN_WORKTREE"
+        if ! git merge --ff-only "$BRANCH_NAME"; then
+            warn "Fast-forward merge failed!"
+            warn "Worktree preserved at: $WORKTREE_PATH"
+            warn ""
+            warn "To resolve:"
+            warn "  cd $MAIN_WORKTREE"
+            warn "  git merge $BRANCH_NAME"
+            warn "  git worktree remove $WORKTREE_PATH"
+            warn "  git branch -d $BRANCH_NAME"
+            return 1
+        fi
+        info "Merged $BRANCH_NAME into $MAIN_BRANCH"
+    else
+        info "No commits on $BRANCH_NAME, skipping merge."
+    fi
+
+    # Remove worktree and branch
+    info "Removing worktree..."
+    cd "$MAIN_WORKTREE"
+    git worktree remove "$WORKTREE_PATH"
+    git branch -d "$BRANCH_NAME"
+
+    info "Cleanup complete."
+    return 0
+}
+
+handle_signal() {
+    info ""
+    info "Caught signal, cleaning up..."
+    cleanup_worktree
+    exit 130
+}
+
+# --- Main ---
+
+main() {
+    # Must be in a git repo
+    git rev-parse --git-dir >/dev/null 2>&1 || die "Not in a git repository"
+
+    # Determine main worktree and branch
+    MAIN_WORKTREE="$(git rev-parse --show-toplevel)"
+    MAIN_BRANCH="$(detect_main_branch)"
+
+    # Ensure we're in the main worktree, not already in a worktree
+    local git_common_dir
+    git_common_dir="$(git rev-parse --git-common-dir)"
+    local git_dir
+    git_dir="$(git rev-parse --git-dir)"
+    if [[ "$git_common_dir" != "$git_dir" ]]; then
+        die "Already in a worktree. Run cw from the main repository."
+    fi
+
+    # Check that main worktree is clean
+    cd "$MAIN_WORKTREE"
+    if has_uncommitted_changes; then
+        die "Main worktree has uncommitted changes. Commit or stash first."
+    fi
+
+    # Determine branch name
+    if [[ $# -ge 1 ]]; then
+        BRANCH_NAME="$1"
+    else
+        BRANCH_NAME="work-$(date +%Y%m%d-%H%M%S)"
+    fi
+
+    # Determine worktree path (sibling directory)
+    local repo_name
+    repo_name="$(get_repo_name)"
+    WORKTREE_PATH="$(dirname "$MAIN_WORKTREE")/${repo_name}-${BRANCH_NAME}"
+
+    # Check worktree path doesn't already exist
+    if [[ -e "$WORKTREE_PATH" ]]; then
+        die "Worktree path already exists: $WORKTREE_PATH"
+    fi
+
+    # Create worktree
+    info "Creating worktree at $WORKTREE_PATH on branch $BRANCH_NAME..."
+    git worktree add "$WORKTREE_PATH" -b "$BRANCH_NAME"
+
+    # Set up signal handler
+    trap handle_signal INT TERM
+
+    # Run claude in the worktree
+    info "Starting $CW_COMMAND in worktree..."
+    info "Exit the session to trigger cleanup and merge."
+    info ""
+
+    cd "$WORKTREE_PATH"
+    # Run command, capturing exit status but not failing the script
+    set +e
+    $CW_COMMAND
+    local cmd_status=$?
+    set -e
+
+    info ""
+    info "$CW_COMMAND exited with status $cmd_status"
+
+    # Cleanup
+    cleanup_worktree
+}
+
+main "$@"
