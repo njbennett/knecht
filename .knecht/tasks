@@ -292,9 +292,11 @@ Pain: Agents complete tasks without reflecting - missing learning opportunities
 Pain: Core knecht feature unusable by actual users",4
 254,open,"Update CLAUDE.md with examples of common knecht commands including knecht pain -t task-N -d ""description""",,
 255,open,"Investigate whether removing or changing the 'For more information, try --help' hint in error messages improves agent behavior (agents may interpret it as 'usage shown is incomplete')",,
-256,open,"Create a journal agent persona/mode for Claude - observes, asks questions, files tasks, adds pain, but doesn't implement anything","Create a journal agent persona/mode for Claude - observes, asks questions, files tasks, adds pain, but doesn't implement anything. Use case: User uses journal mode to observe knecht agent usage patterns and capture insights without the agent trying to implement fixes.",1
+256,open,"Create a journal agent persona/mode for Claude - observes, asks questions, files tasks, adds pain, but doesn't implement anything","Create a journal agent persona/mode for Claude - observes, asks questions, files tasks, adds pain, but doesn't implement anything. Use case: User uses journal mode to observe knecht agent usage patterns and capture insights without the agent trying to implement fixes.
+Pain: Wanted journal mode to discuss merge commit workflow issue without implementing",2
 257,open,Bug: 'knecht list' panics with 'failed printing to stdout: Broken pipe' when output is piped to head or other commands that close early,,
 258,open,Bug: Merge cleanup claude session doesn't complete - fails to move work to main and clean up worktree/branch,"task-244 implemented launching a claude session for merge cleanup, but the session doesn't actually finish the job. User still has orphaned worktree with work that wasn't moved to main, and the branch wasn't cleaned up.
 Pain: Blocking parallel agent workflow - worktrees accumulate without cleanup
 Pain: User has to manually clean up after every failed merge session
 Pain: Urgent: breaks core cw workflow for parallel agents",3
+259,open,"cw script creates merge commits when local main is behind origin After rebasing branch onto origin/main, the script tries to merge into local main which may be behind origin. This causes ff-only to fail, and the fallback instructions tell user to do a regular merge (creating merge commit). Fix: update local main with 'git pull --ff-only' before attempting the branch merge.",,
