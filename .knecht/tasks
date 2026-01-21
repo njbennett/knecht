@@ -132,7 +132,11 @@ Pain: Acceptance criteria 'Output should guide user to verification workflow' wa
 170,open,Pre-commit hook coverage failure doesn't show which lines are uncovered,"During task-11, the pre-commit hook showed '99.76% coverage' but didn't indicate which lines were uncovered. Agent had to run additional commands to debug. The pre-commit output should either: (1) Show the specific uncovered lines/regions when coverage fails, (2) Provide the exact command to run to see details, (3) Generate and reference the HTML report path. This would make coverage failures actionable instead of requiring manual investigation. Pain count: 1 (task-11 session)",
 171,open,"Agents misunderstand pain-driven development: implement at 3-5, but CREATE TASK at pain=1","During task-11 reflection, agent said 'pain count = 1, so not worth a task yet' and didn't create a task. User corrected: 'If you don't create a task in this session then we won't ever see if there are more instances.' The confusion: Tasks should be created IMMEDIATELY when pain is felt (to track and count it). The 3-5 pain count threshold is for IMPLEMENTING the feature, not for creating the task. This needs to be clarified in .rules file or made more prominent in knecht's reflection prompt. Without immediate task creation, pain tracking doesn't work because there's no task to increment. Pain count: 1 (task-11 session). Note: This is similar to task-126 but from a different angle - task-126 was about agents deferring task creation, this is about agents misunderstanding the threshold.",
 172,open,Consider renaming knecht - pronunciation concerns,"User feedback: 'I find I'm not happy with the name ""knecht."" I'm not confident in pronouncing it.' The name 'knecht' may be a barrier to adoption if users are uncomfortable saying it. Consider alternative names that are: (1) Easy to pronounce in English, (2) Short and memorable, (3) Relate to the tool's purpose (task tracking, agent workflows, git-native), (4) Available as a crate name on crates.io. Before implementing any rename, assess impact: source code, tests, documentation, .rules file, git history, user migration path. Pain count: 1 (user expressed discomfort with current name)",1
-173,open,Rename to reflect tracking and prioritizing tidying work,"User clarified naming requirement: 'I'd like the name to reflect that it's about tracking and prioritizing tidying work in a project.' This adds to the concerns in task-172 (pronunciation issues). The tool is fundamentally about tracking refactoring, cleanup, and maintenance tasks - the 'tidying work' of a project. Name should evoke: organizing, cleaning up, maintaining, refactoring, prioritizing technical debt. Possible naming themes: cleanup/tidy tools, organizing/sorting, maintenance/upkeep, housekeeping. Examples to consider: tidy, sweep, mend, prune, groom, maintain. Pain count: 2 (combines with task-172 pronunciation concern)",
+173,open,Rename to reflect tracking and prioritizing tidying work,"DECISION: Rename to 'tendrils' with command 'tend' or 'td'.
+
+Rationale: Tendrils captures both the gardening/tending metaphor (ongoing care, cultivation) and the spiral/cyclical nature of recursive self-improvement. The tool is a system for recursive self-improvement of a codebase, tracking pain (pain snake style), and prioritizing refactors.
+
+Previous context: User clarified naming requirement: 'I'd like the name to reflect that it's about tracking and prioritizing tidying work in a project.' Tool is fundamentally about tracking refactoring, cleanup, and maintenance tasks.",1
 174,open,Inconsistent task ID validation across commands,"cmd_delete validates that task_id.parse::<u32>() succeeds before calling library function, but cmd_done, cmd_show, cmd_start, cmd_pain, and cmd_update do not. This leads to inconsistent error messages for invalid task IDs (e.g., 'knecht delete abc' vs 'knecht done abc'). Should either: 1) All commands validate upfront (consistent UX), 2) No commands validate (let library handle it), or 3) Document why delete is special. Discovered during task-118 reflection. Refactoring: Make Error Handling Consistent (related to Extract Method pattern from task-119).",
 175,done,Add 'delivered' status to Task data model,"Foundation for delivered→verified workflow. Update Task struct, file format parsing/writing, and all tests to handle three statuses: open, delivered, done. This blocks all other subtasks for task-143.",
 176,done,Add 'knecht deliver' command to mark tasks as delivered,Replaces current usage of 'knecht done'. Marks task as delivered (ready for verification). Output should guide user to verification workflow.,
@@ -269,7 +273,8 @@ Pain: User had to grep list results to find high-pain tasks, landed on a deliver
 243,open,Update cw script to start claude in plan mode,"Investigate if claude CLI supports starting in plan mode. If so, update cw script to use it. This would help agents understand context before diving into implementation.
 Pain: Agent started working on task-177 without plan mode, user had to manually /plan
 Pain: User had to explicitly request journal mode instead of agent starting in observational mode
-Pain: User had to manually tell 3rd session to plan - repeated friction across multiple sessions",3
+Pain: User had to manually tell 3rd session to plan - repeated friction across multiple sessions
+Pain: New cw session immediately started implementing instead of building a plan for review",4
 244,done,cw script should start a claude session to resolve merge conflicts,"Pain: Merge cleanup claude session launched but didn't complete - didn't move work to main, didn't clean up worktree or branch",1
 245,open,No visibility into worktrees with unmerged work from other sessions,"Pain: task-213 had a lingering worktree with committed but unmerged work. User had to remember it existed and ask 'What's the work in task-213?' Neither knecht nor cw surfaced this information. When cw cleanup fails (e.g., due to merge conflicts), the worktree is preserved but there's no mechanism to discover it later. This leads to orphaned work that may be forgotten.
 Pain: When cw-managed claude session exits with uncommitted changes, there's no good recovery path except manually manipulating the worktree. Need a way to surface and recover uncommitted work.
@@ -295,7 +300,8 @@ Pain: Core knecht feature unusable by actual users",4
 254,open,"Update CLAUDE.md with examples of common knecht commands including knecht pain -t task-N -d ""description""",,
 255,open,"Investigate whether removing or changing the 'For more information, try --help' hint in error messages improves agent behavior (agents may interpret it as 'usage shown is incomplete')",,
 256,open,"Create a journal agent persona/mode for Claude - observes, asks questions, files tasks, adds pain, but doesn't implement anything","Create a journal agent persona/mode for Claude - observes, asks questions, files tasks, adds pain, but doesn't implement anything. Use case: User uses journal mode to observe knecht agent usage patterns and capture insights without the agent trying to implement fixes.
-Pain: Wanted journal mode to discuss merge commit workflow issue without implementing",2
+Pain: Wanted journal mode to discuss merge commit workflow issue without implementing
+Pain: User wanted to use journal mode to discuss allowed commands in settings",3
 257,open,Bug: 'knecht list' panics with 'failed printing to stdout: Broken pipe' when output is piped to head or other commands that close early,,
 258,open,Bug: Merge cleanup claude session doesn't complete - fails to move work to main and clean up worktree/branch,"task-244 implemented launching a claude session for merge cleanup, but the session doesn't actually finish the job. User still has orphaned worktree with work that wasn't moved to main, and the branch wasn't cleaned up.
 Pain: Blocking parallel agent workflow - worktrees accumulate without cleanup
@@ -353,6 +359,31 @@ A skill is more appropriate because:
 - Agent invents fake blockers instead of trying actual change first
 - During task-127, agent identified 'test brittleness' as a blocker without attempting the work
 - The Mikado Method says: try it, hit REAL blockers, then revert and address them
-- This skill should enforce 'try first' before allowing blocker identification",
+- This skill should enforce 'try first' before allowing blocker identification
+Pain: Two sessions running without a plan, causing excessive permission prompts",1
 262,open,knecht needs 'close as superseded/merged' workflow,"When merging task-129 into task-261, used 'knecht done' which triggered reflection prompts as if real work was completed. Need a way to close tasks as 'superseded by task-X' or 'merged into task-X' without implying the task itself was completed. Could be: knecht close task-129 --superseded-by task-261",
 263,open,Agent should search for related tasks before filing new ones,"When filing task-261 (Mikado skill), agent should have searched for existing Mikado-related tasks first. User had to redirect to combine with task-129. Knecht guidance or workflow should prompt: 'Search for related tasks before adding new ones' - perhaps in the output of knecht add, or as a pre-add check.",
+3j20md,open,Update cw script to run /mikado skill at start of task attempts,"When starting a task with cw, automatically invoke the /mikado skill to set up time-boxed attempts with proper plan mode workflow. This should reduce permission prompts by getting plans filed upfront.",
+ccce0k,open,Rewrite /reflect skill to bias agents toward filing tasks rather than dismissing friction,"Current problem: Agents list friction points but phrase them descriptively, then use 'what IS a knecht bug' framing to dismiss each item. The REQUIRED ACTION section isn't working.
+
+Example output (bad):
+1. What friction did you encounter?
+- Setup friction: The project required mix setup and npm install before tests would run.
+- Test pattern learning: I had to discover that Story.update_state/3 returns a 3-tuple not a 2-tuple.
+- Test setup interference: My first test placement failed because shared setup created interfering state.
+- Multiple assertions rule: Had to refactor from two assertions to one.
+
+3. What IS a knecht bug?
+- Setup requirements - not a knecht bug, documented
+- Test pattern discovery - not a knecht bug, normal exploration
+- Test setup interference - not a knecht bug, normal test organization
+- Multiple assertions rule - not a knecht bug, caught by meta-test
+
+4. REQUIRED ACTION: Nothing to file because friction was normal exploration.
+
+What output SHOULD have been (potential tasks):
+- Document expected return types for Story functions in CLAUDE.md
+- Test setup in split_backlog describe block creates implicit state that interferes with new tests
+
+Fix: Remove 'what IS a knecht bug' framing. Ask agents to convert each friction point into a potential task. Bias toward overeager filing rather than dismissing.
+Pain: Had to explicitly prompt agent 'what tasks would you file' to get actionable list - reflect didn't produce this naturally",1
