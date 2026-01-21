@@ -19,14 +19,14 @@ fn test_read_tasks_error_on_read_line() {
 #[test]
 fn test_write_tasks_error_on_create_dir() {
     let fs = TestFileSystem::new().fail("mkdir");
-    let tasks = vec![Task { id: "1".to_string(), status: "open".to_string(), title: "Test".to_string(), description: None, pain_count: None }];
+    let tasks = vec![Task { id: "1".to_string(), status: "open".to_string(), title: "Test".to_string(), description: None, pain_count: None, acceptance_criteria: None }];
     assert!(write_tasks_with_fs(&tasks, &fs).is_err());
 }
 
 #[test]
 fn test_write_tasks_error_on_create() {
     let fs = TestFileSystem::new().fail("create");
-    let tasks = vec![Task { id: "1".to_string(), status: "open".to_string(), title: "Test".to_string(), description: None, pain_count: None }];
+    let tasks = vec![Task { id: "1".to_string(), status: "open".to_string(), title: "Test".to_string(), description: None, pain_count: None, acceptance_criteria: None }];
     assert!(write_tasks_with_fs(&tasks, &fs).is_err());
 }
 
@@ -34,7 +34,7 @@ fn test_write_tasks_error_on_create() {
 fn test_write_tasks_error_on_flush() {
     // Small task: error occurs at flush() time
     let fs = TestFileSystem::new().fail("write");
-    let tasks = vec![Task { id: "1".to_string(), status: "open".to_string(), title: "Test".to_string(), description: None, pain_count: None }];
+    let tasks = vec![Task { id: "1".to_string(), status: "open".to_string(), title: "Test".to_string(), description: None, pain_count: None, acceptance_criteria: None }];
     assert!(write_tasks_with_fs(&tasks, &fs).is_err());
 }
 
@@ -50,6 +50,7 @@ fn test_write_tasks_error_on_write_record() {
             title: format!("Task {}", i),
             description: Some(large_desc.clone()),
             pain_count: None,
+            acceptance_criteria: None,
         })
         .collect();
     assert!(write_tasks_with_fs(&tasks, &fs).is_err());
@@ -67,20 +68,20 @@ fn test_write_tasks_empty_list() {
 fn test_add_task_error_on_create_dir_and_mkdir() {
     // add_task no longer reads existing tasks (uses random IDs), so test mkdir error
     let fs = TestFileSystem::new().fail("mkdir");
-    assert!(add_task_with_fs("New".to_string(), None, &fs).is_err());
+    assert!(add_task_with_fs("New".to_string(), None, None, &fs).is_err());
 }
 
 #[test]
 fn test_add_task_error_on_append() {
     let fs = TestFileSystem::new().fail("append");
-    assert!(add_task_with_fs("New".to_string(), None, &fs).is_err());
+    assert!(add_task_with_fs("New".to_string(), None, None, &fs).is_err());
 }
 
 #[test]
 fn test_add_task_error_on_flush() {
     // Small task: error occurs at flush() time
     let fs = TestFileSystem::new().fail("write");
-    assert!(add_task_with_fs("New".to_string(), None, &fs).is_err());
+    assert!(add_task_with_fs("New".to_string(), None, None, &fs).is_err());
 }
 
 #[test]
@@ -88,7 +89,7 @@ fn test_add_task_error_on_write_record() {
     // Large description: error occurs during write_record() when buffer overflows
     let fs = TestFileSystem::new().fail("write");
     let large_desc = "x".repeat(10000);
-    assert!(add_task_with_fs("Task".to_string(), Some(large_desc), &fs).is_err());
+    assert!(add_task_with_fs("Task".to_string(), Some(large_desc), None, &fs).is_err());
 }
 
 #[test]
@@ -245,26 +246,26 @@ fn test_delete_task_not_found() {
 #[test]
 fn test_update_task_error_on_read() {
     let fs = TestFileSystem::new().with_file(".knecht/tasks", "1,open,Test,,\n").fail("open");
-    assert!(update_task_with_fs("1", Some("New".to_string()), None, &fs).is_err());
+    assert!(update_task_with_fs("1", Some("New".to_string()), None, None, &fs).is_err());
 }
 
 #[test]
 fn test_update_task_error_on_write() {
     let fs = TestFileSystem::new().with_file(".knecht/tasks", "1,open,Test,,\n").fail("write");
-    assert!(update_task_with_fs("1", Some("New".to_string()), None, &fs).is_err());
+    assert!(update_task_with_fs("1", Some("New".to_string()), None, None, &fs).is_err());
 }
 
 #[test]
 fn test_update_task_not_found() {
     let fs = TestFileSystem::new().with_file(".knecht/tasks", "1,open,Test,,\n");
-    let result = update_task_with_fs("999", Some("New".to_string()), None, &fs);
+    let result = update_task_with_fs("999", Some("New".to_string()), None, None, &fs);
     assert!(result.is_err());
 }
 
 #[test]
 fn test_update_task_title_only() {
     let fs = TestFileSystem::new().with_file(".knecht/tasks", "1,open,OldTitle,,\n");
-    let result = update_task_with_fs("1", Some("NewTitle".to_string()), None, &fs);
+    let result = update_task_with_fs("1", Some("NewTitle".to_string()), None, None, &fs);
     assert!(result.is_ok());
     let task = result.unwrap();
     assert_eq!(task.title, "NewTitle");
@@ -273,7 +274,7 @@ fn test_update_task_title_only() {
 #[test]
 fn test_update_task_description_only() {
     let fs = TestFileSystem::new().with_file(".knecht/tasks", "1,open,Title,OldDesc,\n");
-    let result = update_task_with_fs("1", None, Some(Some("NewDesc".to_string())), &fs);
+    let result = update_task_with_fs("1", None, Some(Some("NewDesc".to_string())), None, &fs);
     assert!(result.is_ok());
     let task = result.unwrap();
     assert_eq!(task.description, Some("NewDesc".to_string()));
@@ -282,7 +283,7 @@ fn test_update_task_description_only() {
 #[test]
 fn test_update_task_clear_description() {
     let fs = TestFileSystem::new().with_file(".knecht/tasks", "1,open,Title,Description,\n");
-    let result = update_task_with_fs("1", None, Some(None), &fs);
+    let result = update_task_with_fs("1", None, Some(None), None, &fs);
     assert!(result.is_ok());
     let task = result.unwrap();
     assert_eq!(task.description, None);
@@ -291,7 +292,7 @@ fn test_update_task_clear_description() {
 #[test]
 fn test_update_task_both_fields() {
     let fs = TestFileSystem::new().with_file(".knecht/tasks", "1,open,OldTitle,OldDesc,\n");
-    let result = update_task_with_fs("1", Some("NewTitle".to_string()), Some(Some("NewDesc".to_string())), &fs);
+    let result = update_task_with_fs("1", Some("NewTitle".to_string()), Some(Some("NewDesc".to_string())), None, &fs);
     assert!(result.is_ok());
     let task = result.unwrap();
     assert_eq!(task.title, "NewTitle");

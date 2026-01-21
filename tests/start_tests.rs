@@ -6,10 +6,41 @@ use common::{cleanup_temp_dir, extract_task_id, run_command, setup_temp_dir, wit
 use std::fs;
 
 #[test]
+fn start_fails_without_acceptance_criteria() {
+    with_initialized_repo(|temp| {
+        // Add a task WITHOUT acceptance criteria
+        let add_result = run_command(&["add", "Task without criteria"], &temp);
+        assert!(add_result.success, "Failed to add task");
+        let task_id = extract_task_id(&add_result.stdout);
+
+        // Try to start - should fail
+        let result = run_command(&["start", &format!("task-{}", task_id)], &temp);
+
+        assert!(!result.success, "start should fail without acceptance criteria");
+        assert!(result.stderr.contains("acceptance criteria") || result.stderr.contains("Acceptance"),
+                "Error should mention acceptance criteria: {}", result.stderr);
+    });
+}
+
+#[test]
+fn start_succeeds_with_acceptance_criteria() {
+    with_initialized_repo(|temp| {
+        // Add a task WITH acceptance criteria
+        let add_result = run_command(&["add", "Task with criteria", "-a", "Tests pass"], &temp);
+        assert!(add_result.success, "Failed to add task");
+        let task_id = extract_task_id(&add_result.stdout);
+
+        // Start should succeed
+        let result = run_command(&["start", &format!("task-{}", task_id)], &temp);
+        assert!(result.success, "start should succeed with acceptance criteria: {}", result.stderr);
+    });
+}
+
+#[test]
 fn start_displays_task_details_with_description() {
     with_initialized_repo(|temp| {
-        // Add a task with description
-        let add_result = run_command(&["add", "Implement feature X", "-d", "This feature should do X, Y, and Z"], &temp);
+        // Add a task with description and acceptance criteria
+        let add_result = run_command(&["add", "Implement feature X", "-d", "This feature should do X, Y, and Z", "-a", "Feature works"], &temp);
         assert!(add_result.success, "Failed to add task");
         let task_id = extract_task_id(&add_result.stdout);
 
@@ -26,8 +57,8 @@ fn start_displays_task_details_with_description() {
 #[test]
 fn start_displays_task_without_description() {
     with_initialized_repo(|temp| {
-        // Add a task without description
-        let add_result = run_command(&["add", "Simple task"], &temp);
+        // Add a task without description but with acceptance criteria
+        let add_result = run_command(&["add", "Simple task", "-a", "Task complete"], &temp);
         assert!(add_result.success, "Failed to add task");
         let task_id = extract_task_id(&add_result.stdout);
 
@@ -68,9 +99,9 @@ fn start_fails_on_nonexistent_task() {
 #[test]
 fn start_fails_when_blocked_by_open_task() {
     with_initialized_repo(|temp| {
-        // Create tasks
-        let r1 = run_command(&["add", "Blocked Task"], &temp);
-        let r2 = run_command(&["add", "Blocker Task"], &temp);
+        // Create tasks with acceptance criteria
+        let r1 = run_command(&["add", "Blocked Task", "-a", "Done"], &temp);
+        let r2 = run_command(&["add", "Blocker Task", "-a", "Done"], &temp);
         let id1 = extract_task_id(&r1.stdout);
         let id2 = extract_task_id(&r2.stdout);
 
@@ -89,9 +120,9 @@ fn start_fails_when_blocked_by_open_task() {
 #[test]
 fn start_succeeds_when_blocker_is_done() {
     with_initialized_repo(|temp| {
-        // Create tasks
-        let r1 = run_command(&["add", "Blocked Task"], &temp);
-        let r2 = run_command(&["add", "Blocker Task"], &temp);
+        // Create tasks with acceptance criteria
+        let r1 = run_command(&["add", "Blocked Task", "-a", "Done"], &temp);
+        let r2 = run_command(&["add", "Blocker Task", "-a", "Done"], &temp);
         let id1 = extract_task_id(&r1.stdout);
         let id2 = extract_task_id(&r2.stdout);
 
@@ -110,7 +141,7 @@ fn start_succeeds_when_blocker_is_done() {
 #[test]
 fn start_succeeds_when_no_blockers() {
     with_initialized_repo(|temp| {
-        let add_result = run_command(&["add", "Normal Task"], &temp);
+        let add_result = run_command(&["add", "Normal Task", "-a", "Done"], &temp);
         let task_id = extract_task_id(&add_result.stdout);
 
         let result = run_command(&["start", &format!("task-{}", task_id)], &temp);
@@ -121,10 +152,10 @@ fn start_succeeds_when_no_blockers() {
 #[test]
 fn start_succeeds_when_all_blockers_are_done() {
     with_initialized_repo(|temp| {
-        // Create tasks
-        let r1 = run_command(&["add", "Blocked Task"], &temp);
-        let r2 = run_command(&["add", "Blocker 1"], &temp);
-        let r3 = run_command(&["add", "Blocker 2"], &temp);
+        // Create tasks with acceptance criteria
+        let r1 = run_command(&["add", "Blocked Task", "-a", "Done"], &temp);
+        let r2 = run_command(&["add", "Blocker 1", "-a", "Done"], &temp);
+        let r3 = run_command(&["add", "Blocker 2", "-a", "Done"], &temp);
         let id1 = extract_task_id(&r1.stdout);
         let id2 = extract_task_id(&r2.stdout);
         let id3 = extract_task_id(&r3.stdout);
@@ -146,8 +177,8 @@ fn start_succeeds_when_all_blockers_are_done() {
 #[test]
 fn start_succeeds_when_blocker_task_is_deleted() {
     with_initialized_repo(|temp| {
-        let r1 = run_command(&["add", "Blocked Task"], &temp);
-        let r2 = run_command(&["add", "Blocker Task"], &temp);
+        let r1 = run_command(&["add", "Blocked Task", "-a", "Done"], &temp);
+        let r2 = run_command(&["add", "Blocker Task", "-a", "Done"], &temp);
         let id1 = extract_task_id(&r1.stdout);
         let id2 = extract_task_id(&r2.stdout);
 
@@ -167,8 +198,8 @@ fn start_succeeds_when_blocker_task_is_deleted() {
 fn start_changes_task_status_to_claimed() {
     // When an agent starts a task, the status should change from "open" to "claimed"
     with_initialized_repo(|temp| {
-        // Add a task
-        let add_result = run_command(&["add", "Task to claim"], &temp);
+        // Add a task with acceptance criteria
+        let add_result = run_command(&["add", "Task to claim", "-a", "Done"], &temp);
         let task_id = extract_task_id(&add_result.stdout);
 
         // Start the task

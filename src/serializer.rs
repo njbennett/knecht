@@ -33,12 +33,19 @@ impl CsvSerializer {
                     None
                 };
 
+                let acceptance_criteria = if record.len() >= 6 && !record[5].is_empty() {
+                    Some(record[5].to_string())
+                } else {
+                    None
+                };
+
                 tasks.push(Task {
                     id: record[0].to_string(),
                     status: record[1].to_string(),
                     title: record[2].to_string(),
                     description,
                     pain_count,
+                    acceptance_criteria,
                 });
             }
             // Skip malformed lines silently
@@ -54,13 +61,15 @@ impl CsvSerializer {
             .from_writer(writer);
 
         for task in tasks {
-            // Always write 5 fields: id, status, title, description, pain_count
+            // Always write 6 fields: id, status, title, description, pain_count, acceptance_criteria
+            let pain_str = task.pain_count.map(|p| p.to_string()).unwrap_or_default();
             csv_writer.write_record([
                 &task.id,
                 &task.status,
                 &task.title,
                 task.description.as_deref().unwrap_or(""),
-                task.pain_count.as_ref().map(|p: &u32| p.to_string()).unwrap_or_default().as_str(),
+                pain_str.as_str(),
+                task.acceptance_criteria.as_deref().unwrap_or(""),
             ])?;
         }
 
@@ -75,12 +84,14 @@ impl CsvSerializer {
             .has_headers(false)
             .from_writer(writer);
 
+        let pain_str = task.pain_count.map(|p| p.to_string()).unwrap_or_default();
         csv_writer.write_record([
             &task.id,
             &task.status,
             &task.title,
             task.description.as_deref().unwrap_or(""),
-            task.pain_count.as_ref().map(|p: &u32| p.to_string()).unwrap_or_default().as_str(),
+            pain_str.as_str(),
+            task.acceptance_criteria.as_deref().unwrap_or(""),
         ])?;
 
         csv_writer.flush()?;

@@ -89,6 +89,7 @@ pub struct Task {
     pub title: String,
     pub description: Option<String>,
     pub pain_count: Option<u32>,
+    pub acceptance_criteria: Option<String>,
 }
 
 impl Task {
@@ -151,7 +152,7 @@ pub fn generate_random_id() -> String {
     id
 }
 
-pub fn add_task_with_fs(title: String, description: Option<String>, fs: &dyn FileSystem) -> Result<String, KnechtError> {
+pub fn add_task_with_fs(title: String, description: Option<String>, acceptance_criteria: Option<String>, fs: &dyn FileSystem) -> Result<String, KnechtError> {
     let new_id = generate_random_id();
 
     // Ensure .knecht directory exists
@@ -163,6 +164,7 @@ pub fn add_task_with_fs(title: String, description: Option<String>, fs: &dyn Fil
         title,
         description,
         pain_count: None,
+        acceptance_criteria,
     };
 
     let file = fs.append(Path::new(".knecht/tasks"))?;
@@ -437,28 +439,35 @@ pub fn update_task_with_fs(
     task_id: &str,
     new_title: Option<String>,
     new_description: Option<Option<String>>,
+    new_acceptance_criteria: Option<Option<String>>,
     fs: &dyn FileSystem
 ) -> Result<Task, KnechtError> {
     let mut tasks = read_tasks_with_fs(fs)?;
-    
+
     for task in &mut tasks {
         if task.id == task_id {
             // Update title if provided
             if let Some(title) = new_title {
                 task.title = title;
             }
-            
+
             // Update description if provided
             // None = no change, Some(None) = clear description, Some(Some(desc)) = set description
             if let Some(desc_opt) = new_description {
                 task.description = desc_opt;
             }
-            
+
+            // Update acceptance_criteria if provided
+            // None = no change, Some(None) = clear criteria, Some(Some(criteria)) = set criteria
+            if let Some(criteria_opt) = new_acceptance_criteria {
+                task.acceptance_criteria = criteria_opt;
+            }
+
             let updated_task = task.clone();
             write_tasks_with_fs(&tasks, fs)?;
             return Ok(updated_task);
         }
     }
-    
+
     Err(KnechtError::TaskNotFound(task_id.to_string()))
 }

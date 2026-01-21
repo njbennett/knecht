@@ -358,8 +358,8 @@ fn next_prioritizes_delivered_tasks_over_open_tasks() {
 fn next_skips_claimed_tasks() {
     // claimed tasks should be skipped by knecht next, just like done tasks
     with_initialized_repo(|temp| {
-        // Add two tasks
-        let r1 = run_command(&["add", "First task"], &temp);
+        // Add two tasks (first needs acceptance criteria for start to succeed)
+        let r1 = run_command(&["add", "First task", "-a", "Can be started"], &temp);
         let r2 = run_command(&["add", "Second task"], &temp);
         let id1 = extract_task_id(&r1.stdout);
         let id2 = extract_task_id(&r2.stdout);
@@ -381,8 +381,8 @@ fn next_skips_claimed_tasks() {
 fn next_handles_all_tasks_claimed() {
     // When all tasks are claimed, next should indicate no available tasks
     with_initialized_repo(|temp| {
-        // Add and claim all tasks
-        let add_result = run_command(&["add", "Only task"], &temp);
+        // Add and claim all tasks (needs acceptance criteria for start to succeed)
+        let add_result = run_command(&["add", "Only task", "-a", "Can be started"], &temp);
         let task_id = extract_task_id(&add_result.stdout);
         run_command(&["start", &format!("task-{}", task_id)], &temp);
 

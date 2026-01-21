@@ -177,8 +177,8 @@ fn list_shows_delivered_tasks_with_distinct_marker() {
 fn list_shows_claimed_tasks_with_distinct_marker() {
     // Claimed tasks should have a visual marker distinct from open/done/delivered
     with_initialized_repo(|temp| {
-        // Add a task and claim it
-        let add_result = run_command(&["add", "Claimed task"], &temp);
+        // Add a task and claim it (needs acceptance criteria for start to succeed)
+        let add_result = run_command(&["add", "Claimed task", "-a", "Can be started"], &temp);
         let task_id = extract_task_id(&add_result.stdout);
         run_command(&["start", &format!("task-{}", task_id)], &temp);
 

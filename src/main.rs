@@ -23,6 +23,9 @@ enum Commands {
         /// Task description
         #[arg(short, long)]
         d: Option<String>,
+        /// Acceptance criteria
+        #[arg(short, long = "acceptance-criteria")]
+        a: Option<String>,
     },
     /// List all tasks
     List,
@@ -72,6 +75,9 @@ enum Commands {
         /// New description
         #[arg(short, long = "description")]
         d: Option<String>,
+        /// Acceptance criteria
+        #[arg(short, long = "acceptance-criteria")]
+        a: Option<String>,
     },
     /// Mark a task as blocked by another task
     Block {
@@ -106,7 +112,7 @@ fn main() {
 
     match cli.command {
         Commands::Init => cmd_init(),
-        Commands::Add { title, d } => cmd_add(&title.join(" "), d),
+        Commands::Add { title, d, a } => cmd_add(&title.join(" "), d, a),
         Commands::List => cmd_list(),
         Commands::Done { task_id } => cmd_done(&task_id),
         Commands::Deliver { task_id } => cmd_deliver(&task_id),
@@ -115,7 +121,7 @@ fn main() {
         Commands::Start { task_id } => cmd_start(&task_id),
         Commands::Pain { task_id, d } => cmd_pain(&task_id, &d),
         Commands::Next => cmd_next(),
-        Commands::Update { task_id, title, d } => cmd_update(&task_id, title, d),
+        Commands::Update { task_id, title, d, a } => cmd_update(&task_id, title, d, a),
         Commands::Block { task_id, by: _, blocker_id } => cmd_block(&task_id, &blocker_id),
         Commands::Unblock { task_id, from: _, blocker_id } => cmd_unblock(&task_id, &blocker_id),
     }
@@ -135,13 +141,13 @@ fn cmd_init() {
     println!("Initialized knecht");
 }
 
-fn cmd_add(title: &str, description: Option<String>) {
+fn cmd_add(title: &str, description: Option<String>, acceptance_criteria: Option<String>) {
     if title.is_empty() {
         eprintln!("Error: Title cannot be empty");
         std::process::exit(1);
     }
 
-    match add_task_with_fs(title.to_string(), description, &RealFileSystem) {
+    match add_task_with_fs(title.to_string(), description, acceptance_criteria, &RealFileSystem) {
         Ok(task_id) => {
             println!("Created task-{}", task_id);
             println!("To make another task blocked by this: knecht block <task> by task-{}", task_id);
@@ -240,6 +246,9 @@ fn cmd_show(task_arg: &str) {
             if let Some(desc) = &task.description {
                 println!("Description: {}", desc);
             }
+            if let Some(criteria) = &task.acceptance_criteria {
+                println!("Acceptance Criteria:\n{}", criteria);
+            }
 
             // Display blockers
             let blockers = get_blockers_for_task(task_id);
@@ -274,7 +283,16 @@ fn cmd_start(task_arg: &str) {
     let task_id = parse_task_id(task_arg);
 
     match find_task_by_id_with_fs(task_id, &RealFileSystem) {
-        Ok(_task) => {
+        Ok(task) => {
+            // Check for acceptance criteria
+            if task.acceptance_criteria.is_none() {
+                eprintln!("Error: Cannot start task-{}. No acceptance criteria defined.", task_id);
+                eprintln!();
+                eprintln!("Add acceptance criteria first:");
+                eprintln!("  knecht update task-{} --acceptance-criteria \"<criteria>\"", task_id);
+                std::process::exit(1);
+            }
+
             // Check for open blockers
             let blockers = get_blockers_for_task(task_id);
             let mut open_blockers = Vec::new();
@@ -370,13 +388,13 @@ fn cmd_next() {
     }
 }
 
-fn cmd_update(task_arg: &str, new_title: Option<String>, new_description: Option<String>) {
+fn cmd_update(task_arg: &str, new_title: Option<String>, new_description: Option<String>, new_acceptance_criteria: Option<String>) {
     let task_id = parse_task_id(task_arg);
 
     // Check that at least one flag was provided
-    if new_title.is_none() && new_description.is_none() {
-        eprintln!("Error: Must provide at least one of --title or --description");
-        eprintln!("Usage: knecht update <task-id> [--title <title>] [--description <description>]");
+    if new_title.is_none() && new_description.is_none() && new_acceptance_criteria.is_none() {
+        eprintln!("Error: Must provide at least one of --title, --description, or --acceptance-criteria");
+        eprintln!("Usage: knecht update <task-id> [--title <title>] [--description <description>] [--acceptance-criteria <criteria>]");
         std::process::exit(1);
     }
 
@@ -389,7 +407,16 @@ fn cmd_update(task_arg: &str, new_title: Option<String>, new_description: Option
         }
     });
 
-    match update_task_with_fs(task_id, new_title, desc_update, &RealFileSystem) {
+    // Convert Option<String> to Option<Option<String>> for acceptance_criteria
+    let criteria_update = new_acceptance_criteria.map(|c| {
+        if c.is_empty() {
+            None // Clear acceptance criteria
+        } else {
+            Some(c)
+        }
+    });
+
+    match update_task_with_fs(task_id, new_title, desc_update, criteria_update, &RealFileSystem) {
         Ok(task) => {
             println!("Updated task-{}", task.id);
         }

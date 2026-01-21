@@ -62,7 +62,7 @@ fn block_command_fails_on_nonexistent_blocker() {
 fn unblock_removes_blocker_relationship() {
     with_initialized_repo(|temp| {
         // Create tasks and blocker
-        let r1 = run_command(&["add", "Blocked Task"], &temp);
+        let r1 = run_command(&["add", "Blocked Task", "-a", "Can be started"], &temp);
         let r2 = run_command(&["add", "Blocker Task"], &temp);
         let id1 = extract_task_id(&r1.stdout);
         let id2 = extract_task_id(&r2.stdout);
@@ -103,8 +103,8 @@ fn unblock_fails_when_relationship_does_not_exist() {
 #[test]
 fn multiple_blockers_all_prevent_start() {
     with_initialized_repo(|temp| {
-        // Create tasks
-        let r1 = run_command(&["add", "Blocked Task"], &temp);
+        // Create tasks (blocked task needs acceptance criteria so start fails due to blockers, not missing criteria)
+        let r1 = run_command(&["add", "Blocked Task", "-a", "Can be started"], &temp);
         let r2 = run_command(&["add", "Blocker 1"], &temp);
         let r3 = run_command(&["add", "Blocker 2"], &temp);
         let id1 = extract_task_id(&r1.stdout);
@@ -343,7 +343,7 @@ fn unblock_fails_when_file_exists_but_relationship_not_found() {
 #[test]
 fn unblock_removes_last_blocker_leaving_empty_file() {
     with_initialized_repo(|temp| {
-        let r1 = run_command(&["add", "Task A"], &temp);
+        let r1 = run_command(&["add", "Task A", "-a", "Can be started"], &temp);
         let r2 = run_command(&["add", "Task B"], &temp);
         let id1 = extract_task_id(&r1.stdout);
         let id2 = extract_task_id(&r2.stdout);
