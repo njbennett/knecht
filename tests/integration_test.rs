@@ -56,6 +56,17 @@ where
     cleanup_temp_dir(temp);
 }
 
+/// Extracts the task ID from command output like "Created task-abc123"
+fn extract_task_id(output: &str) -> String {
+    output
+        .lines()
+        .find(|l| l.contains("task-"))
+        .and_then(|l| l.split("task-").nth(1))
+        .map(|s| s.split_whitespace().next().unwrap_or(""))
+        .unwrap_or("")
+        .to_string()
+}
+
 #[test]
 fn can_create_and_list_a_task() {
     let temp = setup_temp_dir();
@@ -68,12 +79,13 @@ fn can_create_and_list_a_task() {
     // Add a task
     let add_result = run_command(&["add", "Write first test"], &temp);
     assert!(add_result.success, "add command failed: {}", add_result.stderr);
-    assert!(add_result.stdout.contains("task-1"), "Expected 'task-1' in output, got: {}", add_result.stdout);
+    let task_id = extract_task_id(&add_result.stdout);
+    assert!(!task_id.is_empty(), "Expected task ID in output, got: {}", add_result.stdout);
 
     // List tasks
     let list_result = run_command(&["list"], &temp);
     assert!(list_result.success, "list command failed: {}", list_result.stderr);
-    assert!(list_result.stdout.contains("task-1"), "Expected 'task-1' in list output");
+    assert!(list_result.stdout.contains(&format!("task-{}", task_id)), "Expected task ID in list output");
     assert!(list_result.stdout.contains("Write first test"), "Expected task title in list output");
     assert!(list_result.stdout.contains("[ ]"), "Expected open checkbox [ ] in list output");
 
@@ -92,25 +104,44 @@ fn init_creates_tasks_file() {
 }
 
 #[test]
-fn add_creates_sequential_ids() {
+fn add_creates_unique_alphanumeric_ids() {
     with_initialized_repo(|temp| {
         let r1 = run_command(&["add", "First task"], &temp);
-        assert!(r1.stdout.contains("task-1"), "First task should be task-1");
-
         let r2 = run_command(&["add", "Second task"], &temp);
-        assert!(r2.stdout.contains("task-2"), "Second task should be task-2");
+
+        let id1 = extract_task_id(&r1.stdout);
+        let id2 = extract_task_id(&r2.stdout);
+
+        // IDs are 6 alphanumeric characters
+        assert_eq!(id1.len(), 6, "ID should be 6 chars, got: '{}'", id1);
+        assert!(
+            id1.chars().all(|c| c.is_ascii_alphanumeric()),
+            "ID should be alphanumeric, got: '{}'",
+            id1
+        );
+
+        assert_eq!(id2.len(), 6, "ID should be 6 chars, got: '{}'", id2);
+        assert!(
+            id2.chars().all(|c| c.is_ascii_alphanumeric()),
+            "ID should be alphanumeric, got: '{}'",
+            id2
+        );
+
+        assert_ne!(id1, id2, "IDs should be unique");
     });
 }
 
 #[test]
 fn list_shows_all_tasks() {
     with_initialized_repo(|temp| {
-        run_command(&["add", "Task one"], &temp);
-        run_command(&["add", "Task two"], &temp);
+        let r1 = run_command(&["add", "Task one"], &temp);
+        let r2 = run_command(&["add", "Task two"], &temp);
+        let id1 = extract_task_id(&r1.stdout);
+        let id2 = extract_task_id(&r2.stdout);
 
         let result = run_command(&["list"], &temp);
-        assert!(result.stdout.contains("task-1"), "Should show task-1");
-        assert!(result.stdout.contains("task-2"), "Should show task-2");
+        assert!(result.stdout.contains(&format!("task-{}", id1)), "Should show first task ID");
+        assert!(result.stdout.contains(&format!("task-{}", id2)), "Should show second task ID");
         assert!(result.stdout.contains("Task one"), "Should show first task title");
         assert!(result.stdout.contains("Task two"), "Should show second task title");
     });
@@ -119,9 +150,10 @@ fn list_shows_all_tasks() {
 #[test]
 fn done_marks_task_complete() {
     with_initialized_repo(|temp| {
-        run_command(&["add", "Task to complete"], &temp);
+        let add_result = run_command(&["add", "Task to complete"], &temp);
+        let task_id = extract_task_id(&add_result.stdout);
 
-        let result = run_command(&["done", "task-1"], &temp);
+        let result = run_command(&["done", &format!("task-{}", task_id)], &temp);
         assert!(result.success, "done command should succeed");
 
         let list = run_command(&["list"], &temp);
@@ -298,14 +330,15 @@ fn add_task_with_description() {
         // Add task with description using -d flag
         let result = run_command(&["add", "Implement feature X", "-d", "This is a longer description of the feature"], &temp);
         assert!(result.success, "add with description should succeed: {}", result.stderr);
-        assert!(result.stdout.contains("task-1"), "Should create task-1");
+        let task_id = extract_task_id(&result.stdout);
+        assert!(!task_id.is_empty(), "Should create a task");
 
         // Verify task file contains description in proper CSV format: id,status,title,description,pain_count
         let tasks_content = fs::read_to_string(temp.join(".knecht/tasks"))
             .expect("Failed to read tasks file");
 
-        // Expected CSV format: 1,open,"Implement feature X","This is a longer description of the feature",
-        assert!(tasks_content.contains("1,open"), "Should have CSV format with id and status");
+        // Expected CSV format: <id>,open,"Implement feature X","This is a longer description of the feature",
+        assert!(tasks_content.contains(&format!("{},open", task_id)), "Should have CSV format with id and status");
         assert!(tasks_content.contains("Implement feature X"), "Should contain title");
         assert!(tasks_content.contains("This is a longer description of the feature"), "Should contain description");
 
@@ -598,9 +631,10 @@ fn done_shows_refactoring_reflection_prompt() {
 fn done_reflection_prompt_uses_actionable_language() {
     let temp = setup_temp_dir();
     run_command(&["init"], &temp);
-    run_command(&["add", "Task to complete"], &temp);
+    let add_result = run_command(&["add", "Task to complete"], &temp);
+    let task_id = extract_task_id(&add_result.stdout);
 
-    let result = run_command(&["done", "task-1"], &temp);
+    let result = run_command(&["done", &format!("task-{}", task_id)], &temp);
 
     assert!(result.success, "done command should succeed");
     
@@ -835,10 +869,11 @@ fn done_marks_task_without_description_complete() {
     run_command(&["init"], &temp);
 
     // Add task without description
-    run_command(&["add", "Task without description"], &temp);
+    let add_result = run_command(&["add", "Task without description"], &temp);
+    let task_id = extract_task_id(&add_result.stdout);
 
     // Mark it done
-    let result = run_command(&["done", "task-1"], &temp);
+    let result = run_command(&["done", &format!("task-{}", task_id)], &temp);
     assert!(result.success, "done command should succeed");
 
     // Verify it was marked done
@@ -921,15 +956,16 @@ fn done_marks_task_with_description_complete() {
     run_command(&["init"], &temp);
 
     // Add task with description
-    run_command(&["add", "Task with description", "-d", "This is the description"], &temp);
+    let add_result = run_command(&["add", "Task with description", "-d", "This is the description"], &temp);
+    let task_id = extract_task_id(&add_result.stdout);
 
     // Mark it done
-    let result = run_command(&["done", "task-1"], &temp);
+    let result = run_command(&["done", &format!("task-{}", task_id)], &temp);
     assert!(result.success, "done command should succeed");
 
     // Verify it was marked done and still has description
     let tasks_content = fs::read_to_string(temp.join(".knecht/tasks")).unwrap();
-    assert!(tasks_content.contains("1,done"), "Task should be marked done");
+    assert!(tasks_content.contains(&format!("{},done", task_id)), "Task should be marked done");
     assert!(tasks_content.contains("Task with description"), "Should preserve title");
     assert!(tasks_content.contains("This is the description"), "Should preserve description");
 
@@ -1490,13 +1526,14 @@ fn show_displays_task_with_description() {
 
     // Initialize and add a task with description
     run_command(&["init"], &temp);
-    run_command(&["add", "Task title", "-d", "This is a detailed description"], &temp);
+    let add_result = run_command(&["add", "Task title", "-d", "This is a detailed description"], &temp);
+    let task_id = extract_task_id(&add_result.stdout);
 
     // Run show command
-    let result = run_command(&["show", "task-1"], &temp);
+    let result = run_command(&["show", &format!("task-{}", task_id)], &temp);
 
     assert!(result.success, "show command should succeed");
-    assert!(result.stdout.contains("task-1"), "should show task ID");
+    assert!(result.stdout.contains(&format!("task-{}", task_id)), "should show task ID");
     assert!(result.stdout.contains("Task title"), "should show title");
     assert!(result.stdout.contains("This is a detailed description"), "should show description");
     assert!(result.stdout.contains("open"), "should show status");
@@ -1510,13 +1547,14 @@ fn show_displays_task_without_description() {
 
     // Initialize and add a task without description
     run_command(&["init"], &temp);
-    run_command(&["add", "Simple task"], &temp);
+    let add_result = run_command(&["add", "Simple task"], &temp);
+    let task_id = extract_task_id(&add_result.stdout);
 
     // Run show command
-    let result = run_command(&["show", "task-1"], &temp);
+    let result = run_command(&["show", &format!("task-{}", task_id)], &temp);
 
     assert!(result.success, "show command should succeed");
-    assert!(result.stdout.contains("task-1"), "should show task ID");
+    assert!(result.stdout.contains(&format!("task-{}", task_id)), "should show task ID");
     assert!(result.stdout.contains("Simple task"), "should show title");
     assert!(result.stdout.contains("open"), "should show status");
 
@@ -1572,12 +1610,13 @@ fn start_displays_task_details_with_description() {
         // Add a task with description
         let add_result = run_command(&["add", "Implement feature X", "-d", "This feature should do X, Y, and Z"], &temp);
         assert!(add_result.success, "Failed to add task");
+        let task_id = extract_task_id(&add_result.stdout);
 
         // Start working on the task
-        let result = run_command(&["start", "task-1"], &temp);
+        let result = run_command(&["start", &format!("task-{}", task_id)], &temp);
 
         assert!(result.success, "start command should succeed");
-        assert!(result.stdout.contains("task-1"), "should show task ID");
+        assert!(result.stdout.contains(&format!("task-{}", task_id)), "should show task ID");
         assert!(result.stdout.contains("Implement feature X"), "should show task title");
         assert!(result.stdout.contains("This feature should do X, Y, and Z"), "should show task description");
     });
@@ -1589,12 +1628,13 @@ fn start_displays_task_without_description() {
         // Add a task without description
         let add_result = run_command(&["add", "Simple task"], &temp);
         assert!(add_result.success, "Failed to add task");
+        let task_id = extract_task_id(&add_result.stdout);
 
         // Start working on the task
-        let result = run_command(&["start", "task-1"], &temp);
+        let result = run_command(&["start", &format!("task-{}", task_id)], &temp);
 
         assert!(result.success, "start command should succeed");
-        assert!(result.stdout.contains("task-1"), "should show task ID");
+        assert!(result.stdout.contains(&format!("task-{}", task_id)), "should show task ID");
         assert!(result.stdout.contains("Simple task"), "should show task title");
         assert!(!result.stdout.contains("Description:"), "should not show description label when no description");
     });
@@ -1628,10 +1668,11 @@ fn start_fails_on_nonexistent_task() {
 fn pain_increments_pain_count_on_task() {
     with_initialized_repo(|temp| {
         // Add a task without pain count
-        run_command(&["add", "Fix bug"], &temp);
+        let add_result = run_command(&["add", "Fix bug"], &temp);
+        let task_id = extract_task_id(&add_result.stdout);
 
         // Increment pain count (should add it as 1)
-        let result = run_command(&["pain", "-t", "task-1", "-d", "First occurrence"], &temp);
+        let result = run_command(&["pain", "-t", &format!("task-{}", task_id), "-d", "First occurrence"], &temp);
         assert!(result.success, "pain command should succeed");
 
         // Verify pain count was added as 1
@@ -1643,7 +1684,7 @@ fn pain_increments_pain_count_on_task() {
         );
 
         // Increment again
-        let result2 = run_command(&["pain", "-t", "task-1", "-d", "Second occurrence"], &temp);
+        let result2 = run_command(&["pain", "-t", &format!("task-{}", task_id), "-d", "Second occurrence"], &temp);
         assert!(result2.success, "pain command should succeed again");
 
         // Verify pain count was incremented to 2
@@ -1660,10 +1701,11 @@ fn pain_increments_pain_count_on_task() {
 fn pain_adds_pain_count_to_task_without_one() {
     with_initialized_repo(|temp| {
         // Add a task without pain count
-        run_command(&["add", "Some task"], &temp);
+        let add_result = run_command(&["add", "Some task"], &temp);
+        let task_id = extract_task_id(&add_result.stdout);
 
         // Increment pain count
-        let result = run_command(&["pain", "-t", "task-1", "-d", "Pain instance"], &temp);
+        let result = run_command(&["pain", "-t", &format!("task-{}", task_id), "-d", "Pain instance"], &temp);
         assert!(result.success, "pain command should succeed");
 
         // Verify pain count was added
@@ -1707,17 +1749,18 @@ fn pain_requires_task_id_argument() {
 fn pain_on_task_with_description_and_pain_count() {
     with_initialized_repo(|temp| {
         // Add a task with description
-        run_command(&["add", "Fix critical bug", "-d", "This bug breaks production"], &temp);
+        let add_result = run_command(&["add", "Fix critical bug", "-d", "This bug breaks production"], &temp);
+        let task_id = extract_task_id(&add_result.stdout);
 
         // Add pain count
-        run_command(&["pain", "-t", "task-1", "-d", "First pain"], &temp);
+        run_command(&["pain", "-t", &format!("task-{}", task_id), "-d", "First pain"], &temp);
 
         // Increment pain count again
-        let result = run_command(&["pain", "-t", "task-1", "-d", "Second pain"], &temp);
+        let result = run_command(&["pain", "-t", &format!("task-{}", task_id), "-d", "Second pain"], &temp);
         assert!(result.success, "pain command should succeed on task with description");
 
         // Verify both description and pain count are preserved
-        let show = run_command(&["show", "task-1"], &temp);
+        let show = run_command(&["show", &format!("task-{}", task_id)], &temp);
         assert!(show.stdout.contains("Fix critical bug"), "Title should be preserved");
         assert!(show.stdout.contains("This bug breaks production"), "Description should be preserved");
 
@@ -1735,36 +1778,34 @@ fn next_suggests_task_with_highest_pain_count() {
     with_initialized_repo(|temp| {
         // Add tasks
         run_command(&["add", "Low priority task"], &temp);
-        run_command(&["add", "Medium pain task"], &temp);
-        run_command(&["add", "High pain task"], &temp);
+        let r2 = run_command(&["add", "Medium pain task"], &temp);
+        let r3 = run_command(&["add", "High pain task"], &temp);
         run_command(&["add", "Another low priority"], &temp);
-        run_command(&["add", "Medium pain again"], &temp);
+        let r5 = run_command(&["add", "Medium pain again"], &temp);
+        let id2 = extract_task_id(&r2.stdout);
+        let id3 = extract_task_id(&r3.stdout);
+        let id5 = extract_task_id(&r5.stdout);
 
         // Set pain counts using pain command
-        run_command(&["pain", "-t", "task-2", "-d", "Pain 1"], &temp);
-        run_command(&["pain", "-t", "task-2", "-d", "Pain 2"], &temp); // pain count: 2
+        run_command(&["pain", "-t", &format!("task-{}", id2), "-d", "Pain 1"], &temp);
+        run_command(&["pain", "-t", &format!("task-{}", id2), "-d", "Pain 2"], &temp); // pain count: 2
 
-        run_command(&["pain", "-t", "task-3", "-d", "Pain 1"], &temp);
-        run_command(&["pain", "-t", "task-3", "-d", "Pain 2"], &temp);
-        run_command(&["pain", "-t", "task-3", "-d", "Pain 3"], &temp);
-        run_command(&["pain", "-t", "task-3", "-d", "Pain 4"], &temp);
-        run_command(&["pain", "-t", "task-3", "-d", "Pain 5"], &temp); // pain count: 5
+        run_command(&["pain", "-t", &format!("task-{}", id3), "-d", "Pain 1"], &temp);
+        run_command(&["pain", "-t", &format!("task-{}", id3), "-d", "Pain 2"], &temp);
+        run_command(&["pain", "-t", &format!("task-{}", id3), "-d", "Pain 3"], &temp);
+        run_command(&["pain", "-t", &format!("task-{}", id3), "-d", "Pain 4"], &temp);
+        run_command(&["pain", "-t", &format!("task-{}", id3), "-d", "Pain 5"], &temp); // pain count: 5
 
-        run_command(&["pain", "-t", "task-5", "-d", "Pain 1"], &temp);
-        run_command(&["pain", "-t", "task-5", "-d", "Pain 2"], &temp); // pain count: 2
+        run_command(&["pain", "-t", &format!("task-{}", id5), "-d", "Pain 1"], &temp);
+        run_command(&["pain", "-t", &format!("task-{}", id5), "-d", "Pain 2"], &temp); // pain count: 2
 
         // Run 'knecht next'
         let result = run_command(&["next"], &temp);
 
         assert!(result.success, "next command should succeed");
         assert!(
-            result.stdout.contains("task-3"),
-            "Should suggest task-3 with highest pain count, got: {}",
-            result.stdout
-        );
-        assert!(
             result.stdout.contains("High pain task"),
-            "Should show the task title, got: {}",
+            "Should suggest task with highest pain count, got: {}",
             result.stdout
         );
         assert!(
@@ -1779,23 +1820,29 @@ fn next_suggests_task_with_highest_pain_count() {
 fn next_prefers_older_task_when_pain_counts_equal() {
     with_initialized_repo(|temp| {
         // Add tasks
-        run_command(&["add", "First task"], &temp);
-        run_command(&["add", "Second task"], &temp);
-        run_command(&["add", "Third task"], &temp);
+        let r1 = run_command(&["add", "First task"], &temp);
+        let r2 = run_command(&["add", "Second task"], &temp);
+        let r3 = run_command(&["add", "Third task"], &temp);
+        let id1 = extract_task_id(&r1.stdout);
+        let id2 = extract_task_id(&r2.stdout);
+        let id3 = extract_task_id(&r3.stdout);
 
         // Set same pain count on all tasks
         for i in 0..3 {
-            run_command(&["pain", "-t", "task-1", "-d", &format!("Pain {}", i)], &temp);
-            run_command(&["pain", "-t", "task-2", "-d", &format!("Pain {}", i)], &temp);
-            run_command(&["pain", "-t", "task-3", "-d", &format!("Pain {}", i)], &temp);
+            run_command(&["pain", "-t", &format!("task-{}", id1), "-d", &format!("Pain {}", i)], &temp);
+            run_command(&["pain", "-t", &format!("task-{}", id2), "-d", &format!("Pain {}", i)], &temp);
+            run_command(&["pain", "-t", &format!("task-{}", id3), "-d", &format!("Pain {}", i)], &temp);
         }
 
         let result = run_command(&["next"], &temp);
 
         assert!(result.success, "next command should succeed");
+        // Find which ID is lexicographically smallest (that's the tiebreaker)
+        let ids = [&id1, &id2, &id3];
+        let smallest_id = ids.iter().min().unwrap();
         assert!(
-            result.stdout.contains("task-1"),
-            "Should suggest oldest task (task-1) when pain counts equal, got: {}",
+            result.stdout.contains(&format!("task-{}", smallest_id)),
+            "Should suggest task with lexicographically smallest ID when pain counts equal, got: {}",
             result.stdout
         );
     });
@@ -1805,27 +1852,29 @@ fn next_prefers_older_task_when_pain_counts_equal() {
 fn next_skips_done_tasks() {
     with_initialized_repo(|temp| {
         // Add tasks
-        run_command(&["add", "High pain but done"], &temp);
-        run_command(&["add", "Lower pain but open"], &temp);
+        let r1 = run_command(&["add", "High pain but done"], &temp);
+        let r2 = run_command(&["add", "Lower pain but open"], &temp);
+        let id1 = extract_task_id(&r1.stdout);
+        let id2 = extract_task_id(&r2.stdout);
 
         // Set pain counts
         for i in 0..5 {
-            run_command(&["pain", "-t", "task-1", "-d", &format!("Pain {}", i)], &temp);
+            run_command(&["pain", "-t", &format!("task-{}", id1), "-d", &format!("Pain {}", i)], &temp);
         }
         for i in 0..2 {
-            run_command(&["pain", "-t", "task-2", "-d", &format!("Pain {}", i)], &temp);
+            run_command(&["pain", "-t", &format!("task-{}", id2), "-d", &format!("Pain {}", i)], &temp);
         }
-        
+
         // Mark first task as done
-        run_command(&["done", "task-1"], &temp);
+        run_command(&["done", &format!("task-{}", id1)], &temp);
 
         let result = run_command(&["next"], &temp);
-        
+
         assert!(result.success, "next command should succeed");
         assert!(
-            result.stdout.contains("task-2"),
-            "Should skip done tasks and suggest task-2, got: {}",
-            result.stdout
+            result.stdout.contains(&format!("task-{}", id2)),
+            "Should skip done tasks and suggest task-{}, got: {}",
+            id2, result.stdout
         );
     });
 }
@@ -1834,8 +1883,9 @@ fn next_skips_done_tasks() {
 fn next_handles_no_open_tasks() {
     with_initialized_repo(|temp| {
         // Add and complete a task
-        run_command(&["add", "Only task"], &temp);
-        run_command(&["done", "task-1"], &temp);
+        let add_result = run_command(&["add", "Only task"], &temp);
+        let task_id = extract_task_id(&add_result.stdout);
+        run_command(&["done", &format!("task-{}", task_id)], &temp);
 
         let result = run_command(&["next"], &temp);
 
@@ -1888,16 +1938,17 @@ fn next_fails_gracefully_when_tasks_file_unreadable() {
 fn next_displays_task_with_description() {
     with_initialized_repo(|temp| {
         // Add a task with description
-        run_command(&["add", "Important task", "-d", "This task has a detailed description explaining what needs to be done"], &temp);
+        let add_result = run_command(&["add", "Important task", "-d", "This task has a detailed description explaining what needs to be done"], &temp);
+        let task_id = extract_task_id(&add_result.stdout);
 
         // Add pain to make it more likely to be selected
-        run_command(&["pain", "-t", "task-1", "-d", "Pain 1"], &temp);
-        run_command(&["pain", "-t", "task-1", "-d", "Pain 2"], &temp);
+        run_command(&["pain", "-t", &format!("task-{}", task_id), "-d", "Pain 1"], &temp);
+        run_command(&["pain", "-t", &format!("task-{}", task_id), "-d", "Pain 2"], &temp);
 
         let result = run_command(&["next"], &temp);
 
         assert!(result.success, "next command should succeed");
-        assert!(result.stdout.contains("task-1"), "Should suggest task-1");
+        assert!(result.stdout.contains(&format!("task-{}", task_id)), "Should suggest the task");
         assert!(result.stdout.contains("Important task"), "Should show title");
         assert!(
             result.stdout.contains("This task has a detailed description"),
@@ -1912,14 +1963,17 @@ fn next_displays_task_with_description() {
 fn next_with_zero_pain_count() {
     with_initialized_repo(|temp| {
         // Add tasks - one will have pain_count 0 (no pain added), one will be without pain_count
-        run_command(&["add", "Task with no pain"], &temp);
-        run_command(&["add", "Another task"], &temp);
-        
+        let r1 = run_command(&["add", "Task with no pain"], &temp);
+        let r2 = run_command(&["add", "Another task"], &temp);
+        let id1 = extract_task_id(&r1.stdout);
+        let id2 = extract_task_id(&r2.stdout);
+
         let result = run_command(&["next"], &temp);
-        
+
         assert!(result.success, "next command should succeed");
-        // Should suggest task-1 (older task when both have no pain)
-        assert!(result.stdout.contains("task-1"), "Should suggest task-1");
+        // Should suggest task with smaller ID (tiebreaker when both have no pain)
+        let smaller_id = if id1 < id2 { &id1 } else { &id2 };
+        assert!(result.stdout.contains(&format!("task-{}", smaller_id)), "Should suggest task with smaller ID");
         // Should not show pain count line when pain is 0 or None
         assert!(
             !result.stdout.contains("pain count:"),
@@ -1932,31 +1986,34 @@ fn next_with_zero_pain_count() {
 #[test]
 fn done_increments_pain_on_skipped_top_task() {
     with_initialized_repo(|temp| {
-        // Create task-1 which is the oldest
-        run_command(&["add", "Primary feature work"], &temp);
-        
-        // Create task-2 (newer task)
-        run_command(&["add", "Minor improvement"], &temp);
-        
-        // Complete task-2 instead of task-1 (skipping the oldest task)
-        let done_result = run_command(&["done", "task-2"], &temp);
+        // Create two tasks
+        let r1 = run_command(&["add", "Primary feature work"], &temp);
+        let r2 = run_command(&["add", "Minor improvement"], &temp);
+        let id1 = extract_task_id(&r1.stdout);
+        let id2 = extract_task_id(&r2.stdout);
+
+        // Determine which ID is lexicographically smaller (that's the "top" task for tiebreaker)
+        let (top_id, other_id) = if id1 < id2 { (&id1, &id2) } else { (&id2, &id1) };
+
+        // Complete the non-top task (skipping the top task)
+        let done_result = run_command(&["done", &format!("task-{}", other_id)], &temp);
         assert!(done_result.success, "done should succeed");
-        
-        // Check that task-1's pain count increased (it was skipped)
+
+        // Check that top task's pain count increased (it was skipped)
         let list_result = run_command(&["list"], &temp);
-        let task1_line = list_result.stdout.lines()
-            .find(|line| line.contains("task-1"))
-            .expect("Should find task-1 in list output");
-        
+        let top_task_line = list_result.stdout.lines()
+            .find(|line| line.contains(&format!("task-{}", top_id)))
+            .expect("Should find top task in list output");
+
         // Pain should have incremented from 0 to 1
-        assert!(task1_line.contains("(pain count: 1)"),
-            "task-1 pain should increment to 1 when skipped, got: {}", task1_line);
-        
-        // Check task-1's description mentions it was skipped
-        let show_result = run_command(&["show", "task-1"], &temp);
-        assert!(show_result.stdout.contains("Skip: task-2 completed instead") ||
+        assert!(top_task_line.contains("(pain count: 1)"),
+            "top task pain should increment to 1 when skipped, got: {}", top_task_line);
+
+        // Check top task's description mentions it was skipped
+        let show_result = run_command(&["show", &format!("task-{}", top_id)], &temp);
+        assert!(show_result.stdout.contains(&format!("Skip: task-{} completed instead", other_id)) ||
                 show_result.stdout.contains("Skip:"),
-            "task-1 description should note it was skipped, got: {}", show_result.stdout);
+            "top task description should note it was skipped, got: {}", show_result.stdout);
     });
 }
 
@@ -1964,43 +2021,56 @@ fn done_increments_pain_on_skipped_top_task() {
 fn done_on_oldest_task_does_not_increment_pain() {
     with_initialized_repo(|temp| {
         // Create two tasks
-        run_command(&["add", "Oldest task"], &temp);
-        run_command(&["add", "Newer task"], &temp);
-        
-        // Complete task-1 (the oldest task - not skipping it)
-        let done_result = run_command(&["done", "task-1"], &temp);
+        let r1 = run_command(&["add", "First task"], &temp);
+        let r2 = run_command(&["add", "Second task"], &temp);
+        let id1 = extract_task_id(&r1.stdout);
+        let id2 = extract_task_id(&r2.stdout);
+
+        // Determine which ID is lexicographically smaller (that's the "top" task)
+        let (top_id, other_id) = if id1 < id2 { (&id1, &id2) } else { (&id2, &id1) };
+
+        // Complete the top task (not skipping it)
+        let done_result = run_command(&["done", &format!("task-{}", top_id)], &temp);
         assert!(done_result.success);
-        
-        // Verify task-2 still has no pain (it wasn't skipped - we did the oldest first)
+
+        // Verify other task still has no pain (it wasn't skipped - we did the top first)
         let list_result = run_command(&["list"], &temp);
-        let task2_line = list_result.stdout.lines()
-            .find(|line| line.contains("task-2"))
-            .expect("Should find task-2");
-        
-        assert!(!task2_line.contains("pain count:"),
-            "task-2 should have no pain when oldest task was completed, got: {}", task2_line);
+        let other_task_line = list_result.stdout.lines()
+            .find(|line| line.contains(&format!("task-{}", other_id)))
+            .expect("Should find other task");
+
+        assert!(!other_task_line.contains("pain count:"),
+            "other task should have no pain when top task was completed, got: {}", other_task_line);
     });
 }
 
 #[test]
 fn done_increments_pain_on_task_with_existing_description() {
     with_initialized_repo(|temp| {
-        // Create task-1 (oldest) with a description
-        run_command(&["add", "Primary feature", "-d", "Original description"], &temp);
-        
-        // Create task-2 (newer)
-        run_command(&["add", "Minor task"], &temp);
-        
-        // Complete task-2, skipping task-1
-        let done_result = run_command(&["done", "task-2"], &temp);
+        // Create first task with a description
+        let r1 = run_command(&["add", "Primary feature", "-d", "Original description"], &temp);
+        let id1 = extract_task_id(&r1.stdout);
+
+        // Create second task
+        let r2 = run_command(&["add", "Minor task"], &temp);
+        let id2 = extract_task_id(&r2.stdout);
+
+        // Determine which ID is lexicographically smaller (that's the "top" task)
+        let (top_id, other_id) = if id1 < id2 { (&id1, &id2) } else { (&id2, &id1) };
+
+        // Complete the non-top task, skipping the top task
+        let done_result = run_command(&["done", &format!("task-{}", other_id)], &temp);
         assert!(done_result.success);
-        
-        // Verify task-1's pain incremented and skip note was appended to existing description
-        let show_result = run_command(&["show", "task-1"], &temp);
-        assert!(show_result.stdout.contains("Original description"),
-            "Should preserve original description");
-        assert!(show_result.stdout.contains("Skip: task-2 completed instead"),
-            "Should append skip note to existing description, got: {}", show_result.stdout);
+
+        // Verify top task's pain incremented and skip note was appended to existing description
+        let show_result = run_command(&["show", &format!("task-{}", top_id)], &temp);
+        // Only the task with description (id1) will have "Original description"
+        if top_id == &id1 {
+            assert!(show_result.stdout.contains("Original description"),
+                "Should preserve original description");
+        }
+        assert!(show_result.stdout.contains(&format!("Skip: task-{} completed instead", other_id)),
+            "Should append skip note to description, got: {}", show_result.stdout);
     });
 }
 
@@ -2032,18 +2102,19 @@ fn list_includes_usage_instructions_for_agents() {
 #[test]
 fn delete_removes_existing_task() {
     with_initialized_repo(|temp| {
-        run_command(&["add", "Task to delete"], &temp);
+        let r1 = run_command(&["add", "Task to delete"], &temp);
         run_command(&["add", "Task to keep"], &temp);
+        let id1 = extract_task_id(&r1.stdout);
 
-        let result = run_command(&["delete", "task-1"], &temp);
+        let result = run_command(&["delete", &format!("task-{}", id1)], &temp);
         assert!(result.success, "delete command should succeed");
         assert!(
-            result.stdout.contains("Deleted task-1"),
+            result.stdout.contains(&format!("Deleted task-{}", id1)),
             "Should show confirmation message, got: {}",
             result.stdout
         );
 
-        // Verify task-1 is gone and task-2 remains
+        // Verify deleted task is gone and other task remains
         let list = run_command(&["list"], &temp);
         assert!(!list.stdout.contains("Task to delete"), "Deleted task should not appear in list");
         assert!(list.stdout.contains("Task to keep"), "Other tasks should remain");
@@ -2053,12 +2124,14 @@ fn delete_removes_existing_task() {
 #[test]
 fn delete_accepts_id_without_prefix() {
     with_initialized_repo(|temp| {
-        run_command(&["add", "Task to delete"], &temp);
+        let add_result = run_command(&["add", "Task to delete"], &temp);
+        let task_id = extract_task_id(&add_result.stdout);
 
-        let result = run_command(&["delete", "1"], &temp);
-        assert!(result.success, "delete should accept numeric ID without 'task-' prefix");
+        // Delete should accept ID without 'task-' prefix
+        let result = run_command(&["delete", &task_id], &temp);
+        assert!(result.success, "delete should accept ID without 'task-' prefix");
         assert!(
-            result.stdout.contains("Deleted task-1"),
+            result.stdout.contains(&format!("Deleted task-{}", task_id)),
             "Should show confirmation with task- prefix, got: {}",
             result.stdout
         );
@@ -2068,11 +2141,14 @@ fn delete_accepts_id_without_prefix() {
 #[test]
 fn delete_preserves_other_tasks() {
     with_initialized_repo(|temp| {
-        run_command(&["add", "First task"], &temp);
-        run_command(&["add", "Second task"], &temp);
-        run_command(&["add", "Third task"], &temp);
+        let r1 = run_command(&["add", "First task"], &temp);
+        let r2 = run_command(&["add", "Second task"], &temp);
+        let r3 = run_command(&["add", "Third task"], &temp);
+        let _id1 = extract_task_id(&r1.stdout);
+        let id2 = extract_task_id(&r2.stdout);
+        let _id3 = extract_task_id(&r3.stdout);
 
-        run_command(&["delete", "task-2"], &temp);
+        run_command(&["delete", &format!("task-{}", id2)], &temp);
 
         let list = run_command(&["list"], &temp);
         assert!(list.stdout.contains("First task"), "First task should remain");
@@ -2084,12 +2160,13 @@ fn delete_preserves_other_tasks() {
 #[test]
 fn delete_works_for_done_tasks() {
     with_initialized_repo(|temp| {
-        run_command(&["add", "Completed task"], &temp);
-        run_command(&["done", "task-1"], &temp);
+        let add_result = run_command(&["add", "Completed task"], &temp);
+        let task_id = extract_task_id(&add_result.stdout);
+        run_command(&["done", &format!("task-{}", task_id)], &temp);
 
-        let result = run_command(&["delete", "task-1"], &temp);
+        let result = run_command(&["delete", &format!("task-{}", task_id)], &temp);
         assert!(result.success, "Should be able to delete done tasks");
-        assert!(result.stdout.contains("Deleted task-1"));
+        assert!(result.stdout.contains(&format!("Deleted task-{}", task_id)));
     });
 }
 
@@ -2109,11 +2186,12 @@ fn delete_fails_on_nonexistent_task() {
 #[test]
 fn delete_fails_with_invalid_task_id() {
     with_initialized_repo(|temp| {
+        // With alphanumeric IDs, "abc" is a valid format but will be "not found"
         let result = run_command(&["delete", "task-abc"], &temp);
-        assert!(!result.success, "delete with invalid ID should fail");
+        assert!(!result.success, "delete with nonexistent ID should fail");
         assert!(
-            result.stderr.contains("Invalid") || result.stderr.contains("invalid"),
-            "Should mention invalid ID, got: {}",
+            result.stderr.contains("not found") || result.stderr.contains("Not found"),
+            "Should mention not found, got: {}",
             result.stderr
         );
     });
@@ -2135,10 +2213,11 @@ fn delete_requires_task_id_argument() {
 #[test]
 fn delete_can_delete_first_task() {
     with_initialized_repo(|temp| {
-        run_command(&["add", "First"], &temp);
+        let r1 = run_command(&["add", "First"], &temp);
         run_command(&["add", "Second"], &temp);
+        let id1 = extract_task_id(&r1.stdout);
 
-        let result = run_command(&["delete", "task-1"], &temp);
+        let result = run_command(&["delete", &format!("task-{}", id1)], &temp);
         assert!(result.success, "Should be able to delete first task");
 
         let list = run_command(&["list"], &temp);
@@ -2151,9 +2230,10 @@ fn delete_can_delete_first_task() {
 fn delete_can_delete_last_task() {
     with_initialized_repo(|temp| {
         run_command(&["add", "First"], &temp);
-        run_command(&["add", "Last"], &temp);
+        let r2 = run_command(&["add", "Last"], &temp);
+        let id2 = extract_task_id(&r2.stdout);
 
-        let result = run_command(&["delete", "task-2"], &temp);
+        let result = run_command(&["delete", &format!("task-{}", id2)], &temp);
         assert!(result.success, "Should be able to delete last task");
 
         let list = run_command(&["list"], &temp);
@@ -2165,9 +2245,10 @@ fn delete_can_delete_last_task() {
 #[test]
 fn delete_can_delete_only_task() {
     with_initialized_repo(|temp| {
-        run_command(&["add", "Only task"], &temp);
+        let add_result = run_command(&["add", "Only task"], &temp);
+        let task_id = extract_task_id(&add_result.stdout);
 
-        let result = run_command(&["delete", "task-1"], &temp);
+        let result = run_command(&["delete", &format!("task-{}", task_id)], &temp);
         assert!(result.success, "Should be able to delete when only one task exists");
 
         let list = run_command(&["list"], &temp);
@@ -2178,19 +2259,22 @@ fn delete_can_delete_only_task() {
 #[test]
 fn delete_maintains_file_format() {
     with_initialized_repo(|temp| {
-        run_command(&["add", "Task one", "-d", "Description with | pipe"], &temp);
-        run_command(&["add", "Task two"], &temp);
-        run_command(&["add", "Task three", "-d", "Another description"], &temp);
-        run_command(&["done", "task-2"], &temp);
+        let r1 = run_command(&["add", "Task one", "-d", "Description with | pipe"], &temp);
+        let r2 = run_command(&["add", "Task two"], &temp);
+        let r3 = run_command(&["add", "Task three", "-d", "Another description"], &temp);
+        let id1 = extract_task_id(&r1.stdout);
+        let id2 = extract_task_id(&r2.stdout);
+        let id3 = extract_task_id(&r3.stdout);
+        run_command(&["done", &format!("task-{}", id2)], &temp);
 
-        run_command(&["delete", "task-2"], &temp);
+        run_command(&["delete", &format!("task-{}", id2)], &temp);
 
         // Verify remaining tasks are still properly formatted
-        let show1 = run_command(&["show", "task-1"], &temp);
+        let show1 = run_command(&["show", &format!("task-{}", id1)], &temp);
         assert!(show1.success);
         assert!(show1.stdout.contains("Description with | pipe"));
 
-        let show3 = run_command(&["show", "task-3"], &temp);
+        let show3 = run_command(&["show", &format!("task-{}", id3)], &temp);
         assert!(show3.success);
         assert!(show3.stdout.contains("Another description"));
     });
@@ -2200,15 +2284,16 @@ fn delete_maintains_file_format() {
 fn update_title_only() {
     with_initialized_repo(|temp| {
         // Add a task
-        run_command(&["add", "Old Title"], &temp);
+        let add_result = run_command(&["add", "Old Title"], &temp);
+        let task_id = extract_task_id(&add_result.stdout);
 
         // Update the title
-        let result = run_command(&["update", "task-1", "--title", "New Title"], &temp);
+        let result = run_command(&["update", &format!("task-{}", task_id), "--title", "New Title"], &temp);
         assert!(result.success, "update command should succeed: {}", result.stderr);
-        assert!(result.stdout.contains("Updated task-1"), "Should show success message");
+        assert!(result.stdout.contains(&format!("Updated task-{}", task_id)), "Should show success message");
 
         // Verify the title was updated
-        let show = run_command(&["show", "task-1"], &temp);
+        let show = run_command(&["show", &format!("task-{}", task_id)], &temp);
         assert!(show.success);
         assert!(show.stdout.contains("New Title"), "Title should be updated");
         assert!(!show.stdout.contains("Old Title"), "Old title should be gone");
@@ -2224,14 +2309,15 @@ fn update_title_only() {
 fn update_description_only() {
     with_initialized_repo(|temp| {
         // Add a task with a description
-        run_command(&["add", "Task Title", "-d", "Old description"], &temp);
+        let add_result = run_command(&["add", "Task Title", "-d", "Old description"], &temp);
+        let task_id = extract_task_id(&add_result.stdout);
 
         // Update only the description
-        let result = run_command(&["update", "task-1", "--description", "New description"], &temp);
+        let result = run_command(&["update", &format!("task-{}", task_id), "--description", "New description"], &temp);
         assert!(result.success, "update command should succeed: {}", result.stderr);
 
         // Verify the description was updated but title unchanged
-        let show = run_command(&["show", "task-1"], &temp);
+        let show = run_command(&["show", &format!("task-{}", task_id)], &temp);
         assert!(show.success);
         assert!(show.stdout.contains("Task Title"), "Title should be unchanged");
         assert!(show.stdout.contains("New description"), "Description should be updated");
@@ -2243,14 +2329,15 @@ fn update_description_only() {
 fn update_add_description_to_task_without_one() {
     with_initialized_repo(|temp| {
         // Add a task without description
-        run_command(&["add", "Task without description"], &temp);
+        let add_result = run_command(&["add", "Task without description"], &temp);
+        let task_id = extract_task_id(&add_result.stdout);
 
         // Add a description
-        let result = run_command(&["update", "task-1", "--description", "New description added"], &temp);
+        let result = run_command(&["update", &format!("task-{}", task_id), "--description", "New description added"], &temp);
         assert!(result.success, "update command should succeed: {}", result.stderr);
 
         // Verify the description was added
-        let show = run_command(&["show", "task-1"], &temp);
+        let show = run_command(&["show", &format!("task-{}", task_id)], &temp);
         assert!(show.success);
         assert!(show.stdout.contains("New description added"), "Description should be added");
     });
@@ -2260,14 +2347,15 @@ fn update_add_description_to_task_without_one() {
 fn update_both_title_and_description() {
     with_initialized_repo(|temp| {
         // Add a task with both
-        run_command(&["add", "Old Title", "-d", "Old description"], &temp);
+        let add_result = run_command(&["add", "Old Title", "-d", "Old description"], &temp);
+        let task_id = extract_task_id(&add_result.stdout);
 
         // Update both
-        let result = run_command(&["update", "task-1", "--title", "New Title", "--description", "New description"], &temp);
+        let result = run_command(&["update", &format!("task-{}", task_id), "--title", "New Title", "--description", "New description"], &temp);
         assert!(result.success, "update command should succeed: {}", result.stderr);
 
         // Verify both were updated
-        let show = run_command(&["show", "task-1"], &temp);
+        let show = run_command(&["show", &format!("task-{}", task_id)], &temp);
         assert!(show.success);
         assert!(show.stdout.contains("New Title"), "Title should be updated");
         assert!(show.stdout.contains("New description"), "Description should be updated");
@@ -2280,14 +2368,15 @@ fn update_both_title_and_description() {
 fn update_with_short_flags() {
     with_initialized_repo(|temp| {
         // Add a task
-        run_command(&["add", "Old Title"], &temp);
+        let add_result = run_command(&["add", "Old Title"], &temp);
+        let task_id = extract_task_id(&add_result.stdout);
 
         // Update using short flags
-        let result = run_command(&["update", "task-1", "-t", "New Title", "-d", "New description"], &temp);
+        let result = run_command(&["update", &format!("task-{}", task_id), "-t", "New Title", "-d", "New description"], &temp);
         assert!(result.success, "update with short flags should succeed: {}", result.stderr);
 
         // Verify updates
-        let show = run_command(&["show", "task-1"], &temp);
+        let show = run_command(&["show", &format!("task-{}", task_id)], &temp);
         assert!(show.success);
         assert!(show.stdout.contains("New Title"), "Title should be updated");
         assert!(show.stdout.contains("New description"), "Description should be updated");
@@ -2298,14 +2387,15 @@ fn update_with_short_flags() {
 fn update_clear_description() {
     with_initialized_repo(|temp| {
         // Add a task with description
-        run_command(&["add", "Task Title", "-d", "Description to remove"], &temp);
+        let add_result = run_command(&["add", "Task Title", "-d", "Description to remove"], &temp);
+        let task_id = extract_task_id(&add_result.stdout);
 
         // Clear the description
-        let result = run_command(&["update", "task-1", "--description", ""], &temp);
+        let result = run_command(&["update", &format!("task-{}", task_id), "--description", ""], &temp);
         assert!(result.success, "update should succeed: {}", result.stderr);
 
         // Verify description is gone
-        let show = run_command(&["show", "task-1"], &temp);
+        let show = run_command(&["show", &format!("task-{}", task_id)], &temp);
         assert!(show.success);
         assert!(show.stdout.contains("Task Title"), "Title should remain");
         assert!(!show.stdout.contains("Description to remove"), "Description should be removed");
@@ -2328,10 +2418,11 @@ fn update_nonexistent_task() {
 fn update_no_flags_provided() {
     with_initialized_repo(|temp| {
         // Add a task
-        run_command(&["add", "Task Title"], &temp);
+        let add_result = run_command(&["add", "Task Title"], &temp);
+        let task_id = extract_task_id(&add_result.stdout);
 
         // Try to update without providing any flags
-        let result = run_command(&["update", "task-1"], &temp);
+        let result = run_command(&["update", &format!("task-{}", task_id)], &temp);
         assert!(!result.success, "update should fail when no flags provided");
         assert!(result.stderr.contains("title") || result.stderr.contains("description"), "Error should mention required flags");
     });
@@ -2341,15 +2432,16 @@ fn update_no_flags_provided() {
 fn update_preserves_status() {
     with_initialized_repo(|temp| {
         // Add and complete a task
-        run_command(&["add", "Done Task"], &temp);
-        run_command(&["done", "task-1"], &temp);
+        let add_result = run_command(&["add", "Done Task"], &temp);
+        let task_id = extract_task_id(&add_result.stdout);
+        run_command(&["done", &format!("task-{}", task_id)], &temp);
 
         // Update the title
-        let result = run_command(&["update", "task-1", "--title", "Updated Done Task"], &temp);
+        let result = run_command(&["update", &format!("task-{}", task_id), "--title", "Updated Done Task"], &temp);
         assert!(result.success, "update should succeed: {}", result.stderr);
 
         // Verify status is still done
-        let show = run_command(&["show", "task-1"], &temp);
+        let show = run_command(&["show", &format!("task-{}", task_id)], &temp);
         assert!(show.success);
         assert!(show.stdout.contains("done"), "Status should still be done");
         assert!(show.stdout.contains("Updated Done Task"), "Title should be updated");
@@ -2360,22 +2452,25 @@ fn update_preserves_status() {
 fn update_only_affects_target_task() {
     with_initialized_repo(|temp| {
         // Add multiple tasks
-        run_command(&["add", "Task One"], &temp);
-        run_command(&["add", "Task Two"], &temp);
-        run_command(&["add", "Task Three"], &temp);
+        let r1 = run_command(&["add", "Task One"], &temp);
+        let r2 = run_command(&["add", "Task Two"], &temp);
+        let r3 = run_command(&["add", "Task Three"], &temp);
+        let id1 = extract_task_id(&r1.stdout);
+        let id2 = extract_task_id(&r2.stdout);
+        let id3 = extract_task_id(&r3.stdout);
 
         // Update only task-2
-        let result = run_command(&["update", "task-2", "--title", "Updated Task Two"], &temp);
+        let result = run_command(&["update", &format!("task-{}", id2), "--title", "Updated Task Two"], &temp);
         assert!(result.success, "update should succeed: {}", result.stderr);
 
         // Verify only task-2 was changed
-        let show1 = run_command(&["show", "task-1"], &temp);
+        let show1 = run_command(&["show", &format!("task-{}", id1)], &temp);
         assert!(show1.stdout.contains("Task One"), "Task 1 should be unchanged");
 
-        let show2 = run_command(&["show", "task-2"], &temp);
+        let show2 = run_command(&["show", &format!("task-{}", id2)], &temp);
         assert!(show2.stdout.contains("Updated Task Two"), "Task 2 should be updated");
 
-        let show3 = run_command(&["show", "task-3"], &temp);
+        let show3 = run_command(&["show", &format!("task-{}", id3)], &temp);
         assert!(show3.stdout.contains("Task Three"), "Task 3 should be unchanged");
     });
 }
@@ -2430,14 +2525,15 @@ fn update_fails_with_unknown_flag() {
 fn update_handles_special_characters() {
     with_initialized_repo(|temp| {
         // Add a task
-        run_command(&["add", "Simple Title"], &temp);
+        let add_result = run_command(&["add", "Simple Title"], &temp);
+        let task_id = extract_task_id(&add_result.stdout);
 
         // Update with special characters (pipe is tricky for our format)
-        let result = run_command(&["update", "task-1", "--title", "Title with | pipe", "--description", "Description with special chars: | and newlines"], &temp);
+        let result = run_command(&["update", &format!("task-{}", task_id), "--title", "Title with | pipe", "--description", "Description with special chars: | and newlines"], &temp);
         assert!(result.success, "update should handle special characters: {}", result.stderr);
 
         // Verify the special characters are preserved
-        let show = run_command(&["show", "task-1"], &temp);
+        let show = run_command(&["show", &format!("task-{}", task_id)], &temp);
         assert!(show.success);
         assert!(show.stdout.contains("Title with | pipe"), "Pipe in title should be preserved");
         assert!(show.stdout.contains("Description with special chars: | and newlines"), "Pipe in description should be preserved");
@@ -2452,32 +2548,35 @@ fn update_handles_special_characters() {
 fn block_command_creates_blocker_relationship() {
     with_initialized_repo(|temp| {
         // Create two tasks
-        run_command(&["add", "Task A"], &temp);
-        run_command(&["add", "Task B"], &temp);
+        let r1 = run_command(&["add", "Task A"], &temp);
+        let r2 = run_command(&["add", "Task B"], &temp);
+        let id1 = extract_task_id(&r1.stdout);
+        let id2 = extract_task_id(&r2.stdout);
 
-        // Create blocker: task-1 is blocked by task-2
-        let result = run_command(&["block", "task-1", "by", "task-2"], &temp);
+        // Create blocker: task-id1 is blocked by task-id2
+        let result = run_command(&["block", &format!("task-{}", id1), "by", &format!("task-{}", id2)], &temp);
         assert!(result.success, "block command should succeed: {}", result.stderr);
         assert!(result.stdout.contains("Blocker added"), "Should confirm blocker added");
-        assert!(result.stdout.contains("task-1") && result.stdout.contains("task-2"), 
+        assert!(result.stdout.contains(&format!("task-{}", id1)) && result.stdout.contains(&format!("task-{}", id2)),
                 "Should mention both tasks");
 
         // Verify blockers file exists and contains the relationship
         let blockers_path = temp.join(".knecht/blockers");
         assert!(blockers_path.exists(), "blockers file should be created");
-        
+
         let content = fs::read_to_string(&blockers_path).unwrap();
-        assert!(content.contains("task-1|task-2"), "Should store blocker relationship");
+        assert!(content.contains(&format!("task-{}|task-{}", id1, id2)), "Should store blocker relationship");
     });
 }
 
 #[test]
 fn block_command_fails_on_nonexistent_task() {
     with_initialized_repo(|temp| {
-        run_command(&["add", "Task A"], &temp);
+        let r1 = run_command(&["add", "Task A"], &temp);
+        let id1 = extract_task_id(&r1.stdout);
 
         // Try to block nonexistent task
-        let result = run_command(&["block", "task-999", "by", "task-1"], &temp);
+        let result = run_command(&["block", "task-999", "by", &format!("task-{}", id1)], &temp);
         assert!(!result.success, "block command should fail for nonexistent task");
         assert!(result.stderr.contains("does not exist") || result.stderr.contains("not found"),
                 "Should have helpful error message: {}", result.stderr);
@@ -2487,10 +2586,11 @@ fn block_command_fails_on_nonexistent_task() {
 #[test]
 fn block_command_fails_on_nonexistent_blocker() {
     with_initialized_repo(|temp| {
-        run_command(&["add", "Task A"], &temp);
+        let r1 = run_command(&["add", "Task A"], &temp);
+        let id1 = extract_task_id(&r1.stdout);
 
         // Try to block by nonexistent task
-        let result = run_command(&["block", "task-1", "by", "task-999"], &temp);
+        let result = run_command(&["block", &format!("task-{}", id1), "by", "task-999"], &temp);
         assert!(!result.success, "block command should fail for nonexistent blocker");
         assert!(result.stderr.contains("does not exist") || result.stderr.contains("not found"),
                 "Should have helpful error message: {}", result.stderr);
@@ -2501,20 +2601,23 @@ fn block_command_fails_on_nonexistent_blocker() {
 fn show_displays_blockers() {
     with_initialized_repo(|temp| {
         // Create tasks
-        run_command(&["add", "Blocked Task"], &temp);
-        run_command(&["add", "Blocker Task"], &temp);
-        run_command(&["add", "Another Blocker"], &temp);
+        let r1 = run_command(&["add", "Blocked Task"], &temp);
+        let r2 = run_command(&["add", "Blocker Task"], &temp);
+        let r3 = run_command(&["add", "Another Blocker"], &temp);
+        let id1 = extract_task_id(&r1.stdout);
+        let id2 = extract_task_id(&r2.stdout);
+        let id3 = extract_task_id(&r3.stdout);
 
         // Create blocker relationships
-        run_command(&["block", "task-1", "by", "task-2"], &temp);
-        run_command(&["block", "task-1", "by", "task-3"], &temp);
+        run_command(&["block", &format!("task-{}", id1), "by", &format!("task-{}", id2)], &temp);
+        run_command(&["block", &format!("task-{}", id1), "by", &format!("task-{}", id3)], &temp);
 
         // Check show output
-        let result = run_command(&["show", "task-1"], &temp);
+        let result = run_command(&["show", &format!("task-{}", id1)], &temp);
         assert!(result.success, "show command should succeed");
         assert!(result.stdout.contains("Blocked by:"), "Should have 'Blocked by:' section");
-        assert!(result.stdout.contains("task-2"), "Should show task-2 as blocker");
-        assert!(result.stdout.contains("task-3"), "Should show task-3 as blocker");
+        assert!(result.stdout.contains(&format!("task-{}", id2)), "Should show blocker task ID");
+        assert!(result.stdout.contains(&format!("task-{}", id3)), "Should show blocker task ID");
         assert!(result.stdout.contains("Blocker Task"), "Should show blocker task title");
     });
 }
@@ -2523,20 +2626,23 @@ fn show_displays_blockers() {
 fn show_displays_what_task_blocks() {
     with_initialized_repo(|temp| {
         // Create tasks
-        run_command(&["add", "Blocker Task"], &temp);
-        run_command(&["add", "Blocked Task A"], &temp);
-        run_command(&["add", "Blocked Task B"], &temp);
+        let r1 = run_command(&["add", "Blocker Task"], &temp);
+        let r2 = run_command(&["add", "Blocked Task A"], &temp);
+        let r3 = run_command(&["add", "Blocked Task B"], &temp);
+        let id1 = extract_task_id(&r1.stdout);
+        let id2 = extract_task_id(&r2.stdout);
+        let id3 = extract_task_id(&r3.stdout);
 
-        // task-1 blocks both task-2 and task-3
-        run_command(&["block", "task-2", "by", "task-1"], &temp);
-        run_command(&["block", "task-3", "by", "task-1"], &temp);
+        // task-id1 blocks both task-id2 and task-id3
+        run_command(&["block", &format!("task-{}", id2), "by", &format!("task-{}", id1)], &temp);
+        run_command(&["block", &format!("task-{}", id3), "by", &format!("task-{}", id1)], &temp);
 
-        // Check show output for task-1
-        let result = run_command(&["show", "task-1"], &temp);
+        // Check show output for task-id1
+        let result = run_command(&["show", &format!("task-{}", id1)], &temp);
         assert!(result.success, "show command should succeed");
         assert!(result.stdout.contains("Blocks:"), "Should have 'Blocks:' section");
-        assert!(result.stdout.contains("task-2"), "Should show task-2 is blocked");
-        assert!(result.stdout.contains("task-3"), "Should show task-3 is blocked");
+        assert!(result.stdout.contains(&format!("task-{}", id2)), "Should show blocked task ID");
+        assert!(result.stdout.contains(&format!("task-{}", id3)), "Should show blocked task ID");
     });
 }
 
@@ -2544,18 +2650,20 @@ fn show_displays_what_task_blocks() {
 fn start_fails_when_blocked_by_open_task() {
     with_initialized_repo(|temp| {
         // Create tasks
-        run_command(&["add", "Blocked Task"], &temp);
-        run_command(&["add", "Blocker Task"], &temp);
+        let r1 = run_command(&["add", "Blocked Task"], &temp);
+        let r2 = run_command(&["add", "Blocker Task"], &temp);
+        let id1 = extract_task_id(&r1.stdout);
+        let id2 = extract_task_id(&r2.stdout);
 
         // Create blocker
-        run_command(&["block", "task-1", "by", "task-2"], &temp);
+        run_command(&["block", &format!("task-{}", id1), "by", &format!("task-{}", id2)], &temp);
 
         // Try to start blocked task
-        let result = run_command(&["start", "task-1"], &temp);
+        let result = run_command(&["start", &format!("task-{}", id1)], &temp);
         assert!(!result.success, "start should fail when task is blocked by open task");
         assert!(result.stderr.contains("Cannot start") || result.stderr.contains("blocked"),
                 "Should explain why start failed: {}", result.stderr);
-        assert!(result.stderr.contains("task-2"), "Should mention the blocking task");
+        assert!(result.stderr.contains(&format!("task-{}", id2)), "Should mention the blocking task");
     });
 }
 
@@ -2563,17 +2671,19 @@ fn start_fails_when_blocked_by_open_task() {
 fn start_succeeds_when_blocker_is_done() {
     with_initialized_repo(|temp| {
         // Create tasks
-        run_command(&["add", "Blocked Task"], &temp);
-        run_command(&["add", "Blocker Task"], &temp);
+        let r1 = run_command(&["add", "Blocked Task"], &temp);
+        let r2 = run_command(&["add", "Blocker Task"], &temp);
+        let id1 = extract_task_id(&r1.stdout);
+        let id2 = extract_task_id(&r2.stdout);
 
         // Create blocker
-        run_command(&["block", "task-1", "by", "task-2"], &temp);
+        run_command(&["block", &format!("task-{}", id1), "by", &format!("task-{}", id2)], &temp);
 
         // Complete the blocker
-        run_command(&["done", "task-2"], &temp);
+        run_command(&["done", &format!("task-{}", id2)], &temp);
 
         // Now start should succeed
-        let result = run_command(&["start", "task-1"], &temp);
+        let result = run_command(&["start", &format!("task-{}", id1)], &temp);
         assert!(result.success, "start should succeed when blocker is done: {}", result.stderr);
     });
 }
@@ -2581,9 +2691,10 @@ fn start_succeeds_when_blocker_is_done() {
 #[test]
 fn start_succeeds_when_no_blockers() {
     with_initialized_repo(|temp| {
-        run_command(&["add", "Normal Task"], &temp);
+        let add_result = run_command(&["add", "Normal Task"], &temp);
+        let task_id = extract_task_id(&add_result.stdout);
 
-        let result = run_command(&["start", "task-1"], &temp);
+        let result = run_command(&["start", &format!("task-{}", task_id)], &temp);
         assert!(result.success, "start should succeed for task with no blockers");
     });
 }
@@ -2592,22 +2703,24 @@ fn start_succeeds_when_no_blockers() {
 fn unblock_removes_blocker_relationship() {
     with_initialized_repo(|temp| {
         // Create tasks and blocker
-        run_command(&["add", "Blocked Task"], &temp);
-        run_command(&["add", "Blocker Task"], &temp);
-        run_command(&["block", "task-1", "by", "task-2"], &temp);
+        let r1 = run_command(&["add", "Blocked Task"], &temp);
+        let r2 = run_command(&["add", "Blocker Task"], &temp);
+        let id1 = extract_task_id(&r1.stdout);
+        let id2 = extract_task_id(&r2.stdout);
+        run_command(&["block", &format!("task-{}", id1), "by", &format!("task-{}", id2)], &temp);
 
         // Remove blocker
-        let result = run_command(&["unblock", "task-1", "from", "task-2"], &temp);
+        let result = run_command(&["unblock", &format!("task-{}", id1), "from", &format!("task-{}", id2)], &temp);
         assert!(result.success, "unblock command should succeed: {}", result.stderr);
         assert!(result.stdout.contains("Blocker removed"), "Should confirm removal");
 
         // Verify blockers file no longer contains the relationship
         let blockers_path = temp.join(".knecht/blockers");
         let content = fs::read_to_string(&blockers_path).unwrap();
-        assert!(!content.contains("task-1|task-2"), "Should remove blocker relationship");
+        assert!(!content.contains(&format!("task-{}|task-{}", id1, id2)), "Should remove blocker relationship");
 
         // Start should now succeed
-        let start_result = run_command(&["start", "task-1"], &temp);
+        let start_result = run_command(&["start", &format!("task-{}", id1)], &temp);
         assert!(start_result.success, "start should succeed after unblocking");
     });
 }
@@ -2615,11 +2728,13 @@ fn unblock_removes_blocker_relationship() {
 #[test]
 fn unblock_fails_when_relationship_does_not_exist() {
     with_initialized_repo(|temp| {
-        run_command(&["add", "Task A"], &temp);
-        run_command(&["add", "Task B"], &temp);
+        let r1 = run_command(&["add", "Task A"], &temp);
+        let r2 = run_command(&["add", "Task B"], &temp);
+        let id1 = extract_task_id(&r1.stdout);
+        let id2 = extract_task_id(&r2.stdout);
 
         // Try to remove nonexistent blocker
-        let result = run_command(&["unblock", "task-1", "from", "task-2"], &temp);
+        let result = run_command(&["unblock", &format!("task-{}", id1), "from", &format!("task-{}", id2)], &temp);
         assert!(!result.success, "unblock should fail when relationship doesn't exist");
         assert!(result.stderr.contains("not blocked") || result.stderr.contains("does not exist"),
                 "Should have helpful error message: {}", result.stderr);
@@ -2630,18 +2745,21 @@ fn unblock_fails_when_relationship_does_not_exist() {
 fn multiple_blockers_all_prevent_start() {
     with_initialized_repo(|temp| {
         // Create tasks
-        run_command(&["add", "Blocked Task"], &temp);
-        run_command(&["add", "Blocker 1"], &temp);
-        run_command(&["add", "Blocker 2"], &temp);
+        let r1 = run_command(&["add", "Blocked Task"], &temp);
+        let r2 = run_command(&["add", "Blocker 1"], &temp);
+        let r3 = run_command(&["add", "Blocker 2"], &temp);
+        let id1 = extract_task_id(&r1.stdout);
+        let id2 = extract_task_id(&r2.stdout);
+        let id3 = extract_task_id(&r3.stdout);
 
         // Create multiple blockers
-        run_command(&["block", "task-1", "by", "task-2"], &temp);
-        run_command(&["block", "task-1", "by", "task-3"], &temp);
+        run_command(&["block", &format!("task-{}", id1), "by", &format!("task-{}", id2)], &temp);
+        run_command(&["block", &format!("task-{}", id1), "by", &format!("task-{}", id3)], &temp);
 
         // Start should fail
-        let result = run_command(&["start", "task-1"], &temp);
+        let result = run_command(&["start", &format!("task-{}", id1)], &temp);
         assert!(!result.success, "start should fail with multiple open blockers");
-        assert!(result.stderr.contains("task-2") && result.stderr.contains("task-3"),
+        assert!(result.stderr.contains(&format!("task-{}", id2)) && result.stderr.contains(&format!("task-{}", id3)),
                 "Should list all blocking tasks: {}", result.stderr);
     });
 }
@@ -2650,20 +2768,23 @@ fn multiple_blockers_all_prevent_start() {
 fn start_succeeds_when_all_blockers_are_done() {
     with_initialized_repo(|temp| {
         // Create tasks
-        run_command(&["add", "Blocked Task"], &temp);
-        run_command(&["add", "Blocker 1"], &temp);
-        run_command(&["add", "Blocker 2"], &temp);
+        let r1 = run_command(&["add", "Blocked Task"], &temp);
+        let r2 = run_command(&["add", "Blocker 1"], &temp);
+        let r3 = run_command(&["add", "Blocker 2"], &temp);
+        let id1 = extract_task_id(&r1.stdout);
+        let id2 = extract_task_id(&r2.stdout);
+        let id3 = extract_task_id(&r3.stdout);
 
         // Create multiple blockers
-        run_command(&["block", "task-1", "by", "task-2"], &temp);
-        run_command(&["block", "task-1", "by", "task-3"], &temp);
+        run_command(&["block", &format!("task-{}", id1), "by", &format!("task-{}", id2)], &temp);
+        run_command(&["block", &format!("task-{}", id1), "by", &format!("task-{}", id3)], &temp);
 
         // Complete both blockers
-        run_command(&["done", "task-2"], &temp);
-        run_command(&["done", "task-3"], &temp);
+        run_command(&["done", &format!("task-{}", id2)], &temp);
+        run_command(&["done", &format!("task-{}", id3)], &temp);
 
         // Start should succeed
-        let result = run_command(&["start", "task-1"], &temp);
+        let result = run_command(&["start", &format!("task-{}", id1)], &temp);
         assert!(result.success, "start should succeed when all blockers are done: {}", result.stderr);
     });
 }
@@ -2672,37 +2793,42 @@ fn start_succeeds_when_all_blockers_are_done() {
 fn show_indicates_blocker_status() {
     with_initialized_repo(|temp| {
         // Create tasks
-        run_command(&["add", "Blocked Task"], &temp);
-        run_command(&["add", "Open Blocker"], &temp);
-        run_command(&["add", "Done Blocker"], &temp);
+        let r1 = run_command(&["add", "Blocked Task"], &temp);
+        let r2 = run_command(&["add", "Open Blocker"], &temp);
+        let r3 = run_command(&["add", "Done Blocker"], &temp);
+        let id1 = extract_task_id(&r1.stdout);
+        let id2 = extract_task_id(&r2.stdout);
+        let id3 = extract_task_id(&r3.stdout);
 
         // Create blockers
-        run_command(&["block", "task-1", "by", "task-2"], &temp);
-        run_command(&["block", "task-1", "by", "task-3"], &temp);
+        run_command(&["block", &format!("task-{}", id1), "by", &format!("task-{}", id2)], &temp);
+        run_command(&["block", &format!("task-{}", id1), "by", &format!("task-{}", id3)], &temp);
 
         // Complete one blocker
-        run_command(&["done", "task-3"], &temp);
+        run_command(&["done", &format!("task-{}", id3)], &temp);
 
         // Check show output
-        let result = run_command(&["show", "task-1"], &temp);
+        let result = run_command(&["show", &format!("task-{}", id1)], &temp);
         assert!(result.success);
-        assert!(result.stdout.contains("task-2") && result.stdout.contains("open"),
-                "Should show task-2 as open: {}", result.stdout);
-        assert!(result.stdout.contains("task-3") && result.stdout.contains("done"),
-                "Should show task-3 as done: {}", result.stdout);
+        assert!(result.stdout.contains(&format!("task-{}", id2)) && result.stdout.contains("open"),
+                "Should show blocker as open: {}", result.stdout);
+        assert!(result.stdout.contains(&format!("task-{}", id3)) && result.stdout.contains("done"),
+                "Should show blocker as done: {}", result.stdout);
     });
 }
 
 #[test]
 fn block_fails_when_blockers_file_cannot_be_written() {
     with_initialized_repo(|temp| {
-        run_command(&["add", "Task A"], &temp);
-        run_command(&["add", "Task B"], &temp);
+        let r1 = run_command(&["add", "Task A"], &temp);
+        let r2 = run_command(&["add", "Task B"], &temp);
+        let id1 = extract_task_id(&r1.stdout);
+        let id2 = extract_task_id(&r2.stdout);
 
         // Make blockers file read-only
         let blockers_path = temp.join(".knecht/blockers");
         fs::write(&blockers_path, "").unwrap();
-        
+
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
@@ -2710,7 +2836,7 @@ fn block_fails_when_blockers_file_cannot_be_written() {
             perms.set_mode(0o444); // Read-only
             fs::set_permissions(&blockers_path, perms).unwrap();
         }
-        
+
         #[cfg(windows)]
         {
             let mut perms = fs::metadata(&blockers_path).unwrap().permissions();
@@ -2719,7 +2845,7 @@ fn block_fails_when_blockers_file_cannot_be_written() {
         }
 
         // Try to add blocker - should fail
-        let result = run_command(&["block", "task-1", "by", "task-2"], &temp);
+        let result = run_command(&["block", &format!("task-{}", id1), "by", &format!("task-{}", id2)], &temp);
         assert!(!result.success, "block should fail when file cannot be written");
         assert!(result.stderr.contains("Failed to write") || result.stderr.contains("Permission denied"),
                 "Should have write error message: {}", result.stderr);
@@ -2729,9 +2855,11 @@ fn block_fails_when_blockers_file_cannot_be_written() {
 #[test]
 fn unblock_fails_when_blockers_file_cannot_be_written() {
     with_initialized_repo(|temp| {
-        run_command(&["add", "Task A"], &temp);
-        run_command(&["add", "Task B"], &temp);
-        run_command(&["block", "task-1", "by", "task-2"], &temp);
+        let r1 = run_command(&["add", "Task A"], &temp);
+        let r2 = run_command(&["add", "Task B"], &temp);
+        let id1 = extract_task_id(&r1.stdout);
+        let id2 = extract_task_id(&r2.stdout);
+        run_command(&["block", &format!("task-{}", id1), "by", &format!("task-{}", id2)], &temp);
 
         // Make blockers file read-only
         let blockers_path = temp.join(".knecht/blockers");
@@ -2752,7 +2880,7 @@ fn unblock_fails_when_blockers_file_cannot_be_written() {
         }
 
         // Try to remove blocker - should fail
-        let result = run_command(&["unblock", "task-1", "from", "task-2"], &temp);
+        let result = run_command(&["unblock", &format!("task-{}", id1), "from", &format!("task-{}", id2)], &temp);
         assert!(!result.success, "unblock should fail when file cannot be written");
         assert!(result.stderr.contains("Failed to write") || result.stderr.contains("Permission denied"),
                 "Should have write error message: {}", result.stderr);
@@ -2762,11 +2890,13 @@ fn unblock_fails_when_blockers_file_cannot_be_written() {
 #[test]
 fn block_fails_with_malformed_command_no_by() {
     with_initialized_repo(|temp| {
-        run_command(&["add", "Task A"], &temp);
-        run_command(&["add", "Task B"], &temp);
+        let r1 = run_command(&["add", "Task A"], &temp);
+        let r2 = run_command(&["add", "Task B"], &temp);
+        let id1 = extract_task_id(&r1.stdout);
+        let id2 = extract_task_id(&r2.stdout);
 
         // Try block without "by" keyword
-        let result = run_command(&["block", "task-1", "task-2"], &temp);
+        let result = run_command(&["block", &format!("task-{}", id1), &format!("task-{}", id2)], &temp);
         assert!(!result.success, "block should fail without 'by' keyword");
         // Clap shows "invalid value" and "possible values: by"
         assert!(result.stderr.contains("invalid value") || result.stderr.contains("possible values"),
@@ -2777,10 +2907,11 @@ fn block_fails_with_malformed_command_no_by() {
 #[test]
 fn block_fails_with_too_few_arguments() {
     with_initialized_repo(|temp| {
-        run_command(&["add", "Task A"], &temp);
+        let r1 = run_command(&["add", "Task A"], &temp);
+        let id1 = extract_task_id(&r1.stdout);
 
         // Try block with only one argument
-        let result = run_command(&["block", "task-1"], &temp);
+        let result = run_command(&["block", &format!("task-{}", id1)], &temp);
         assert!(!result.success, "block should fail with too few arguments");
         assert!(result.stderr.contains("Usage:"), "Should show usage: {}", result.stderr);
     });
@@ -2789,11 +2920,13 @@ fn block_fails_with_too_few_arguments() {
 #[test]
 fn unblock_fails_with_malformed_command_no_from() {
     with_initialized_repo(|temp| {
-        run_command(&["add", "Task A"], &temp);
-        run_command(&["add", "Task B"], &temp);
+        let r1 = run_command(&["add", "Task A"], &temp);
+        let r2 = run_command(&["add", "Task B"], &temp);
+        let id1 = extract_task_id(&r1.stdout);
+        let id2 = extract_task_id(&r2.stdout);
 
         // Try unblock without "from" keyword
-        let result = run_command(&["unblock", "task-1", "task-2"], &temp);
+        let result = run_command(&["unblock", &format!("task-{}", id1), &format!("task-{}", id2)], &temp);
         assert!(!result.success, "unblock should fail without 'from' keyword");
         // Clap shows "invalid value" and "possible values: from"
         assert!(result.stderr.contains("invalid value") || result.stderr.contains("possible values"),
@@ -2804,10 +2937,11 @@ fn unblock_fails_with_malformed_command_no_from() {
 #[test]
 fn unblock_fails_with_too_few_arguments() {
     with_initialized_repo(|temp| {
-        run_command(&["add", "Task A"], &temp);
+        let r1 = run_command(&["add", "Task A"], &temp);
+        let id1 = extract_task_id(&r1.stdout);
 
         // Try unblock with only one argument
-        let result = run_command(&["unblock", "task-1"], &temp);
+        let result = run_command(&["unblock", &format!("task-{}", id1)], &temp);
         assert!(!result.success, "unblock should fail with too few arguments");
         assert!(result.stderr.contains("Usage:"), "Should show usage: {}", result.stderr);
     });
@@ -2816,11 +2950,13 @@ fn unblock_fails_with_too_few_arguments() {
 #[test]
 fn unblock_fails_when_blockers_file_does_not_exist() {
     with_initialized_repo(|temp| {
-        run_command(&["add", "Task A"], &temp);
-        run_command(&["add", "Task B"], &temp);
-        
+        let r1 = run_command(&["add", "Task A"], &temp);
+        let r2 = run_command(&["add", "Task B"], &temp);
+        let id1 = extract_task_id(&r1.stdout);
+        let id2 = extract_task_id(&r2.stdout);
+
         // Try to unblock without ever creating blockers file
-        let result = run_command(&["unblock", "task-1", "from", "task-2"], &temp);
+        let result = run_command(&["unblock", &format!("task-{}", id1), "from", &format!("task-{}", id2)], &temp);
         assert!(!result.success, "unblock should fail when blockers file doesn't exist");
         assert!(result.stderr.contains("not blocked"), "Should say task is not blocked: {}", result.stderr);
     });
@@ -2829,79 +2965,91 @@ fn unblock_fails_when_blockers_file_does_not_exist() {
 #[test]
 fn unblock_preserves_file_format_when_removing_middle_blocker() {
     with_initialized_repo(|temp| {
-        run_command(&["add", "Task A"], &temp);
-        run_command(&["add", "Task B"], &temp);
-        run_command(&["add", "Task C"], &temp);
-        
+        let r1 = run_command(&["add", "Task A"], &temp);
+        let r2 = run_command(&["add", "Task B"], &temp);
+        let r3 = run_command(&["add", "Task C"], &temp);
+        let id1 = extract_task_id(&r1.stdout);
+        let id2 = extract_task_id(&r2.stdout);
+        let id3 = extract_task_id(&r3.stdout);
+
         // Create three blocker relationships
-        run_command(&["block", "task-1", "by", "task-2"], &temp);
-        run_command(&["block", "task-1", "by", "task-3"], &temp);
-        run_command(&["block", "task-2", "by", "task-3"], &temp);
+        run_command(&["block", &format!("task-{}", id1), "by", &format!("task-{}", id2)], &temp);
+        run_command(&["block", &format!("task-{}", id1), "by", &format!("task-{}", id3)], &temp);
+        run_command(&["block", &format!("task-{}", id2), "by", &format!("task-{}", id3)], &temp);
         
         // Remove middle one
-        run_command(&["unblock", "task-1", "from", "task-3"], &temp);
-        
+        run_command(&["unblock", &format!("task-{}", id1), "from", &format!("task-{}", id3)], &temp);
+
         // Verify file still has proper format
         let blockers_path = temp.join(".knecht/blockers");
         let content = fs::read_to_string(&blockers_path).unwrap();
-        assert!(content.contains("task-1|task-2"), "Should preserve first blocker");
-        assert!(!content.contains("task-1|task-3"), "Should remove middle blocker");
-        assert!(content.contains("task-2|task-3"), "Should preserve last blocker");
+        assert!(content.contains(&format!("task-{}|task-{}", id1, id2)), "Should preserve first blocker");
+        assert!(!content.contains(&format!("task-{}|task-{}", id1, id3)), "Should remove middle blocker");
+        assert!(content.contains(&format!("task-{}|task-{}", id2, id3)), "Should preserve last blocker");
     });
 }
 
 #[test]
 fn show_handles_blockers_file_with_empty_lines_and_malformed_entries() {
     with_initialized_repo(|temp| {
-        run_command(&["add", "Task A"], &temp);
-        run_command(&["add", "Task B"], &temp);
-        run_command(&["add", "Task C"], &temp);
-        
+        let r1 = run_command(&["add", "Task A"], &temp);
+        let r2 = run_command(&["add", "Task B"], &temp);
+        let r3 = run_command(&["add", "Task C"], &temp);
+        let id1 = extract_task_id(&r1.stdout);
+        let id2 = extract_task_id(&r2.stdout);
+        let _id3 = extract_task_id(&r3.stdout);
+
         // Create blockers file with empty lines and malformed entries
         let blockers_path = temp.join(".knecht/blockers");
-        fs::write(&blockers_path, "task-1|task-2\n\ntask-3|task-2\nmalformed-line\ntask-1|\n|task-2\n").unwrap();
-        
+        fs::write(&blockers_path, format!("task-{}|task-{}\n\nmalformed-line\ntask-{}|\n|task-{}\n", id1, id2, id1, id2)).unwrap();
+
         // Should still parse valid entries and ignore malformed ones
-        let result = run_command(&["show", "task-1"], &temp);
+        let result = run_command(&["show", &format!("task-{}", id1)], &temp);
         assert!(result.success, "show should succeed with malformed blockers file");
-        assert!(result.stdout.contains("task-2"), "Should show valid blocker");
+        assert!(result.stdout.contains(&format!("task-{}", id2)), "Should show valid blocker");
     });
 }
 
 #[test]
 fn unblock_preserves_other_blockers_with_empty_lines() {
     with_initialized_repo(|temp| {
-        run_command(&["add", "Task A"], &temp);
-        run_command(&["add", "Task B"], &temp);
-        run_command(&["add", "Task C"], &temp);
-        
+        let r1 = run_command(&["add", "Task A"], &temp);
+        let r2 = run_command(&["add", "Task B"], &temp);
+        let r3 = run_command(&["add", "Task C"], &temp);
+        let id1 = extract_task_id(&r1.stdout);
+        let id2 = extract_task_id(&r2.stdout);
+        let id3 = extract_task_id(&r3.stdout);
+
         // Create blockers file with empty lines
         let blockers_path = temp.join(".knecht/blockers");
-        fs::write(&blockers_path, "task-1|task-2\n\ntask-1|task-3\n").unwrap();
-        
+        fs::write(&blockers_path, format!("task-{}|task-{}\n\ntask-{}|task-{}\n", id1, id2, id1, id3)).unwrap();
+
         // Remove one blocker
-        let result = run_command(&["unblock", "task-1", "from", "task-2"], &temp);
+        let result = run_command(&["unblock", &format!("task-{}", id1), "from", &format!("task-{}", id2)], &temp);
         assert!(result.success, "unblock should succeed");
-        
+
         // Verify the other blocker is preserved
-        let show_result = run_command(&["show", "task-1"], &temp);
-        assert!(show_result.stdout.contains("task-3"), "Should preserve other blocker");
-        assert!(!show_result.stdout.contains("task-2"), "Should remove specified blocker");
+        let show_result = run_command(&["show", &format!("task-{}", id1)], &temp);
+        assert!(show_result.stdout.contains(&format!("task-{}", id3)), "Should preserve other blocker");
+        assert!(!show_result.stdout.contains(&format!("task-{}", id2)), "Should remove specified blocker");
     });
 }
 
 #[test]
 fn unblock_fails_when_file_exists_but_relationship_not_found() {
     with_initialized_repo(|temp| {
-        run_command(&["add", "Task A"], &temp);
-        run_command(&["add", "Task B"], &temp);
-        run_command(&["add", "Task C"], &temp);
-        
+        let r1 = run_command(&["add", "Task A"], &temp);
+        let r2 = run_command(&["add", "Task B"], &temp);
+        let r3 = run_command(&["add", "Task C"], &temp);
+        let id1 = extract_task_id(&r1.stdout);
+        let id2 = extract_task_id(&r2.stdout);
+        let id3 = extract_task_id(&r3.stdout);
+
         // Create a blocker file with a different relationship
-        run_command(&["block", "task-1", "by", "task-2"], &temp);
-        
+        run_command(&["block", &format!("task-{}", id1), "by", &format!("task-{}", id2)], &temp);
+
         // Try to remove a relationship that doesn't exist (but file does exist)
-        let result = run_command(&["unblock", "task-1", "from", "task-3"], &temp);
+        let result = run_command(&["unblock", &format!("task-{}", id1), "from", &format!("task-{}", id3)], &temp);
         assert!(!result.success, "unblock should fail when relationship doesn't exist in file");
         assert!(result.stderr.contains("not blocked"), "Should say task is not blocked: {}", result.stderr);
     });
@@ -2910,23 +3058,25 @@ fn unblock_fails_when_file_exists_but_relationship_not_found() {
 #[test]
 fn unblock_removes_last_blocker_leaving_empty_file() {
     with_initialized_repo(|temp| {
-        run_command(&["add", "Task A"], &temp);
-        run_command(&["add", "Task B"], &temp);
-        
+        let r1 = run_command(&["add", "Task A"], &temp);
+        let r2 = run_command(&["add", "Task B"], &temp);
+        let id1 = extract_task_id(&r1.stdout);
+        let id2 = extract_task_id(&r2.stdout);
+
         // Create single blocker
-        run_command(&["block", "task-1", "by", "task-2"], &temp);
-        
+        run_command(&["block", &format!("task-{}", id1), "by", &format!("task-{}", id2)], &temp);
+
         // Remove the only blocker
-        let result = run_command(&["unblock", "task-1", "from", "task-2"], &temp);
+        let result = run_command(&["unblock", &format!("task-{}", id1), "from", &format!("task-{}", id2)], &temp);
         assert!(result.success, "unblock should succeed");
-        
+
         // Verify file is empty
         let blockers_path = temp.join(".knecht/blockers");
         let content = fs::read_to_string(&blockers_path).unwrap();
         assert!(content.is_empty(), "blockers file should be empty");
-        
+
         // Verify task can now be started
-        let start_result = run_command(&["start", "task-1"], &temp);
+        let start_result = run_command(&["start", &format!("task-{}", id1)], &temp);
         assert!(start_result.success, "start should succeed after removing last blocker");
     });
 }
@@ -2934,17 +3084,19 @@ fn unblock_removes_last_blocker_leaving_empty_file() {
 #[test]
 fn start_succeeds_when_blocker_task_is_deleted() {
     with_initialized_repo(|temp| {
-        run_command(&["add", "Blocked Task"], &temp);
-        run_command(&["add", "Blocker Task"], &temp);
-        
+        let r1 = run_command(&["add", "Blocked Task"], &temp);
+        let r2 = run_command(&["add", "Blocker Task"], &temp);
+        let id1 = extract_task_id(&r1.stdout);
+        let id2 = extract_task_id(&r2.stdout);
+
         // Create blocker
-        run_command(&["block", "task-1", "by", "task-2"], &temp);
-        
+        run_command(&["block", &format!("task-{}", id1), "by", &format!("task-{}", id2)], &temp);
+
         // Delete the blocker task (orphan the blocker reference)
-        run_command(&["delete", "task-2"], &temp);
-        
+        run_command(&["delete", &format!("task-{}", id2)], &temp);
+
         // Start should succeed (orphaned blockers are ignored)
-        let result = run_command(&["start", "task-1"], &temp);
+        let result = run_command(&["start", &format!("task-{}", id1)], &temp);
         assert!(result.success, "start should succeed when blocker task is deleted: {}", result.stderr);
     });
 }
@@ -2952,17 +3104,19 @@ fn start_succeeds_when_blocker_task_is_deleted() {
 #[test]
 fn show_handles_orphaned_blocks_reference() {
     with_initialized_repo(|temp| {
-        run_command(&["add", "Blocker Task"], &temp);
-        run_command(&["add", "Blocked Task"], &temp);
-        
+        let r1 = run_command(&["add", "Blocker Task"], &temp);
+        let r2 = run_command(&["add", "Blocked Task"], &temp);
+        let id1 = extract_task_id(&r1.stdout);
+        let id2 = extract_task_id(&r2.stdout);
+
         // Create blocker relationship
-        run_command(&["block", "task-2", "by", "task-1"], &temp);
-        
+        run_command(&["block", &format!("task-{}", id2), "by", &format!("task-{}", id1)], &temp);
+
         // Delete the blocked task (orphan the reference in "Blocks" list)
-        run_command(&["delete", "task-2"], &temp);
-        
+        run_command(&["delete", &format!("task-{}", id2)], &temp);
+
         // Show should succeed and skip the orphaned reference
-        let result = run_command(&["show", "task-1"], &temp);
+        let result = run_command(&["show", &format!("task-{}", id1)], &temp);
         assert!(result.success, "show should succeed with orphaned blocks reference: {}", result.stderr);
         // Should not crash or show error - just silently skip the orphaned reference
     });
@@ -3066,42 +3220,46 @@ fn test_delivered_status_value_is_preserved() {
 fn next_prefers_unblocked_subtasks_over_parent_task() {
     with_initialized_repo(|temp| {
         // Create a parent task with high pain count
-        run_command(&["add", "Large feature with verification", "-d", "This is a big task"], &temp);
+        let r1 = run_command(&["add", "Large feature with verification", "-d", "This is a big task"], &temp);
+        let id1 = extract_task_id(&r1.stdout);
         for i in 0..3 {
-            run_command(&["pain", "-t", "task-1", "-d", &format!("Pain {}", i)], &temp);
+            run_command(&["pain", "-t", &format!("task-{}", id1), "-d", &format!("Pain {}", i)], &temp);
         }
-        
+
         // Create subtasks that block the parent task
-        run_command(&["add", "Foundation work", "-d", "Must be done first"], &temp);
-        run_command(&["add", "Build feature A", "-d", "Needs foundation"], &temp);
-        run_command(&["add", "Build feature B", "-d", "Needs foundation"], &temp);
-        
+        let r2 = run_command(&["add", "Foundation work", "-d", "Must be done first"], &temp);
+        let id2 = extract_task_id(&r2.stdout);
+        let r3 = run_command(&["add", "Build feature A", "-d", "Needs foundation"], &temp);
+        let id3 = extract_task_id(&r3.stdout);
+        let r4 = run_command(&["add", "Build feature B", "-d", "Needs foundation"], &temp);
+        let id4 = extract_task_id(&r4.stdout);
+
         // Parent is blocked by all subtasks (can't complete parent until subtasks done)
-        run_command(&["block", "task-1", "by", "task-2"], &temp); // task-1 blocked by task-2
-        run_command(&["block", "task-1", "by", "task-3"], &temp); // task-1 blocked by task-3
-        run_command(&["block", "task-1", "by", "task-4"], &temp); // task-1 blocked by task-4
-        
+        run_command(&["block", &format!("task-{}", id1), "by", &format!("task-{}", id2)], &temp);
+        run_command(&["block", &format!("task-{}", id1), "by", &format!("task-{}", id3)], &temp);
+        run_command(&["block", &format!("task-{}", id1), "by", &format!("task-{}", id4)], &temp);
+
         // Feature tasks also blocked by foundation
-        run_command(&["block", "task-3", "by", "task-2"], &temp); // task-3 blocked by task-2
-        run_command(&["block", "task-4", "by", "task-2"], &temp); // task-4 blocked by task-2
-        
-        // Complete the foundation (task-2)
-        run_command(&["done", "task-2"], &temp);
-        
-        // Now next should suggest task-3 or task-4 (unblocked subtasks) instead of task-1 (parent)
+        run_command(&["block", &format!("task-{}", id3), "by", &format!("task-{}", id2)], &temp);
+        run_command(&["block", &format!("task-{}", id4), "by", &format!("task-{}", id2)], &temp);
+
+        // Complete the foundation
+        run_command(&["done", &format!("task-{}", id2)], &temp);
+
+        // Now next should suggest id3 or id4 (unblocked subtasks) instead of id1 (parent)
         let result = run_command(&["next"], &temp);
-        
+
         assert!(result.success, "next command should succeed");
-        // Should NOT suggest task-1 (the parent with high pain) because it has open subtasks
+        // Should NOT suggest id1 (the parent with high pain) because it has open subtasks
         assert!(
-            !result.stdout.contains("task-1"),
-            "Should not suggest parent task-1 when it has unblocked subtasks, got: {}",
+            !result.stdout.contains(&format!("task-{}", id1)),
+            "Should not suggest parent task when it has unblocked subtasks, got: {}",
             result.stdout
         );
-        // Should suggest one of the unblocked subtasks (task-3 or task-4)
+        // Should suggest one of the unblocked subtasks (id3 or id4)
         assert!(
-            result.stdout.contains("task-3") || result.stdout.contains("task-4"),
-            "Should suggest one of the unblocked subtasks (task-3 or task-4), got: {}",
+            result.stdout.contains(&format!("task-{}", id3)) || result.stdout.contains(&format!("task-{}", id4)),
+            "Should suggest one of the unblocked subtasks, got: {}",
             result.stdout
         );
     });
@@ -3112,42 +3270,49 @@ fn next_handles_three_level_blocker_tree() {
     with_initialized_repo(|temp| {
         // Create a three-level blocker tree like task-143 → task-176 → tasks 184-192
         // Root task with high pain count
-        run_command(&["add", "Root feature", "-d", "Top level feature"], &temp);
+        let r1 = run_command(&["add", "Root feature", "-d", "Top level feature"], &temp);
+        let id1 = extract_task_id(&r1.stdout);
         for i in 0..3 {
-            run_command(&["pain", "-t", "task-1", "-d", &format!("Pain {}", i)], &temp);
+            run_command(&["pain", "-t", &format!("task-{}", id1), "-d", &format!("Pain {}", i)], &temp);
         }
-        
+
         // Middle task (blocks root)
-        run_command(&["add", "Middle task", "-d", "Intermediate step"], &temp);
-        run_command(&["block", "task-1", "by", "task-2"], &temp);
-        
+        let r2 = run_command(&["add", "Middle task", "-d", "Intermediate step"], &temp);
+        let id2 = extract_task_id(&r2.stdout);
+        run_command(&["block", &format!("task-{}", id1), "by", &format!("task-{}", id2)], &temp);
+
         // Leaf tasks (block middle task)
-        run_command(&["add", "Leaf task A", "-d", "First leaf"], &temp);
-        run_command(&["add", "Leaf task B", "-d", "Second leaf"], &temp);
-        run_command(&["add", "Leaf task C", "-d", "Third leaf"], &temp);
-        run_command(&["block", "task-2", "by", "task-3"], &temp);
-        run_command(&["block", "task-2", "by", "task-4"], &temp);
-        run_command(&["block", "task-2", "by", "task-5"], &temp);
-        
-        // Now next should suggest one of the leaf tasks (3, 4, or 5)
-        // NOT the root (task-1) or middle (task-2)
+        let r3 = run_command(&["add", "Leaf task A", "-d", "First leaf"], &temp);
+        let id3 = extract_task_id(&r3.stdout);
+        let r4 = run_command(&["add", "Leaf task B", "-d", "Second leaf"], &temp);
+        let id4 = extract_task_id(&r4.stdout);
+        let r5 = run_command(&["add", "Leaf task C", "-d", "Third leaf"], &temp);
+        let id5 = extract_task_id(&r5.stdout);
+        run_command(&["block", &format!("task-{}", id2), "by", &format!("task-{}", id3)], &temp);
+        run_command(&["block", &format!("task-{}", id2), "by", &format!("task-{}", id4)], &temp);
+        run_command(&["block", &format!("task-{}", id2), "by", &format!("task-{}", id5)], &temp);
+
+        // Now next should suggest one of the leaf tasks (id3, id4, or id5)
+        // NOT the root (id1) or middle (id2)
         let result = run_command(&["next"], &temp);
-        
+
         assert!(result.success, "next command should succeed");
         assert!(
-            !result.stdout.contains("task-1"),
-            "Should not suggest root task-1 when it has blockers, got: {}",
+            !result.stdout.contains(&format!("task-{}", id1)),
+            "Should not suggest root task when it has blockers, got: {}",
             result.stdout
         );
         assert!(
-            !result.stdout.contains("task-2"),
-            "Should not suggest middle task-2 when it has blockers, got: {}",
+            !result.stdout.contains(&format!("task-{}", id2)),
+            "Should not suggest middle task when it has blockers, got: {}",
             result.stdout
         );
         // Should suggest one of the leaf tasks
         assert!(
-            result.stdout.contains("task-3") || result.stdout.contains("task-4") || result.stdout.contains("task-5"),
-            "Should suggest one of the leaf tasks (task-3, task-4, or task-5), got: {}",
+            result.stdout.contains(&format!("task-{}", id3)) ||
+            result.stdout.contains(&format!("task-{}", id4)) ||
+            result.stdout.contains(&format!("task-{}", id5)),
+            "Should suggest one of the leaf tasks, got: {}",
             result.stdout
         );
     });
@@ -3159,11 +3324,12 @@ fn deliver_command_is_recognized() {
         // Add a task first
         let add_result = run_command(&["add", "Test task"], temp);
         assert!(add_result.success);
-        assert!(add_result.stdout.contains("Created task-1"));
+        let task_id = extract_task_id(&add_result.stdout);
+        assert!(!task_id.is_empty(), "Should have created a task with an ID");
 
         // Try to deliver it
-        let deliver_result = run_command(&["deliver", "task-1"], temp);
-        
+        let deliver_result = run_command(&["deliver", &format!("task-{}", task_id)], temp);
+
         // The command should be recognized (not "Unknown command")
         assert!(
             !deliver_result.stderr.contains("Unknown command"),
@@ -3251,10 +3417,11 @@ fn add_output_shows_block_syntax() {
 
     let result = run_command(&["add", "New task"], &temp);
     assert!(result.success, "add should succeed");
+    let task_id = extract_task_id(&result.stdout);
 
     // Output should show how to make this task a blocker for another task
     assert!(
-        result.stdout.contains("knecht block") && result.stdout.contains("by task-1"),
+        result.stdout.contains("knecht block") && result.stdout.contains(&format!("by task-{}", task_id)),
         "add output should show block syntax, got: {}",
         result.stdout
     );
@@ -3265,12 +3432,13 @@ fn add_output_shows_block_syntax() {
 #[test]
 fn deliver_changes_task_status_to_delivered() {
     with_initialized_repo(|temp| {
-        run_command(&["add", "Task to deliver"], &temp);
+        let add_result = run_command(&["add", "Task to deliver"], &temp);
+        let task_id = extract_task_id(&add_result.stdout);
 
-        let result = run_command(&["deliver", "task-1"], &temp);
+        let result = run_command(&["deliver", &format!("task-{}", task_id)], &temp);
         assert!(result.success, "deliver command should succeed");
 
-        let show = run_command(&["show", "task-1"], &temp);
+        let show = run_command(&["show", &format!("task-{}", task_id)], &temp);
         assert!(
             show.stdout.contains("delivered"),
             "Task status should be 'delivered', got: {}",
@@ -3282,14 +3450,15 @@ fn deliver_changes_task_status_to_delivered() {
 #[test]
 fn deliver_fails_for_already_delivered_task() {
     with_initialized_repo(|temp| {
-        run_command(&["add", "Task to deliver twice"], temp);
+        let add_result = run_command(&["add", "Task to deliver twice"], temp);
+        let task_id = extract_task_id(&add_result.stdout);
 
         // First delivery should succeed
-        let first = run_command(&["deliver", "task-1"], temp);
+        let first = run_command(&["deliver", &format!("task-{}", task_id)], temp);
         assert!(first.success, "First deliver should succeed");
 
         // Second delivery should fail
-        let second = run_command(&["deliver", "task-1"], temp);
+        let second = run_command(&["deliver", &format!("task-{}", task_id)], temp);
         assert!(!second.success, "Second deliver should fail");
         assert!(
             second.stderr.contains("already delivered"),
@@ -3302,11 +3471,12 @@ fn deliver_fails_for_already_delivered_task() {
 #[test]
 fn deliver_fails_for_already_done_task() {
     with_initialized_repo(|temp| {
-        run_command(&["add", "Task that is done"], temp);
-        run_command(&["done", "task-1"], temp);
+        let add_result = run_command(&["add", "Task that is done"], temp);
+        let task_id = extract_task_id(&add_result.stdout);
+        run_command(&["done", &format!("task-{}", task_id)], temp);
 
         // Trying to deliver a done task should fail
-        let result = run_command(&["deliver", "task-1"], temp);
+        let result = run_command(&["deliver", &format!("task-{}", task_id)], temp);
         assert!(!result.success, "Deliver of done task should fail");
         assert!(
             result.stderr.contains("already done") || result.stderr.contains("already completed"),
@@ -3319,10 +3489,11 @@ fn deliver_fails_for_already_done_task() {
 #[test]
 fn pain_requires_d_flag_for_description() {
     with_initialized_repo(|temp| {
-        run_command(&["add", "Task needing pain"], &temp);
+        let add_result = run_command(&["add", "Task needing pain"], &temp);
+        let task_id = extract_task_id(&add_result.stdout);
 
         // Old syntax without -d should fail
-        let result = run_command(&["pain", "-t", "task-1"], &temp);
+        let result = run_command(&["pain", "-t", &format!("task-{}", task_id)], &temp);
         assert!(!result.success, "pain command should fail without -d flag");
         assert!(
             result.stderr.contains("-d") || result.stderr.contains("description"),
@@ -3335,10 +3506,11 @@ fn pain_requires_d_flag_for_description() {
 #[test]
 fn pain_with_d_flag_increments_and_documents() {
     with_initialized_repo(|temp| {
-        run_command(&["add", "Task needing pain"], &temp);
+        let add_result = run_command(&["add", "Task needing pain"], &temp);
+        let task_id = extract_task_id(&add_result.stdout);
 
         // New syntax with -t and -d should succeed
-        let result = run_command(&["pain", "-t", "task-1", "-d", "Hit this during task-99 work"], &temp);
+        let result = run_command(&["pain", "-t", &format!("task-{}", task_id), "-d", "Hit this during task-99 work"], &temp);
         assert!(result.success, "pain command should succeed with -t and -d flags, got stderr: {}", result.stderr);
 
         // Verify pain count was added
@@ -3350,7 +3522,7 @@ fn pain_with_d_flag_increments_and_documents() {
         );
 
         // Verify description was added to task
-        let show = run_command(&["show", "task-1"], &temp);
+        let show = run_command(&["show", &format!("task-{}", task_id)], &temp);
         assert!(
             show.stdout.contains("Hit this during task-99 work"),
             "Pain description should be appended to task, got: {}",
@@ -3362,13 +3534,14 @@ fn pain_with_d_flag_increments_and_documents() {
 #[test]
 fn pain_appends_multiple_descriptions() {
     with_initialized_repo(|temp| {
-        run_command(&["add", "Repeated pain task", "-d", "Initial description"], &temp);
+        let add_result = run_command(&["add", "Repeated pain task", "-d", "Initial description"], &temp);
+        let task_id = extract_task_id(&add_result.stdout);
 
         // First pain instance
-        run_command(&["pain", "-t", "task-1", "-d", "First pain instance"], &temp);
+        run_command(&["pain", "-t", &format!("task-{}", task_id), "-d", "First pain instance"], &temp);
 
         // Second pain instance
-        run_command(&["pain", "-t", "task-1", "-d", "Second pain instance"], &temp);
+        run_command(&["pain", "-t", &format!("task-{}", task_id), "-d", "Second pain instance"], &temp);
 
         // Verify pain count
         let list = run_command(&["list"], &temp);
@@ -3379,7 +3552,7 @@ fn pain_appends_multiple_descriptions() {
         );
 
         // Verify all descriptions are preserved
-        let show = run_command(&["show", "task-1"], &temp);
+        let show = run_command(&["show", &format!("task-{}", task_id)], &temp);
         assert!(
             show.stdout.contains("Initial description"),
             "Original description should be preserved, got: {}",
@@ -3401,10 +3574,11 @@ fn pain_appends_multiple_descriptions() {
 #[test]
 fn pain_without_t_flag_fails() {
     with_initialized_repo(|temp| {
-        run_command(&["add", "Some task"], &temp);
+        let add_result = run_command(&["add", "Some task"], &temp);
+        let task_id = extract_task_id(&add_result.stdout);
 
         // Bare task-id without -t flag should fail
-        let result = run_command(&["pain", "task-1", "-d", "some description"], &temp);
+        let result = run_command(&["pain", &format!("task-{}", task_id), "-d", "some description"], &temp);
         assert!(!result.success, "pain command should fail without -t flag");
     });
 }
@@ -3445,24 +3619,24 @@ fn subcommand_help_shows_usage() {
 fn deliver_success_message_matches_done_format() {
     // Task-191: deliver and done should have consistent success message format
     with_initialized_repo(|temp| {
-        run_command(&["add", "Task one"], &temp);
-        run_command(&["add", "Task two"], &temp);
+        let r1 = run_command(&["add", "Task one"], &temp);
+        let r2 = run_command(&["add", "Task two"], &temp);
+        let id1 = extract_task_id(&r1.stdout);
+        let id2 = extract_task_id(&r2.stdout);
 
-        let done_result = run_command(&["done", "task-1"], &temp);
-        let deliver_result = run_command(&["deliver", "task-2"], &temp);
+        let done_result = run_command(&["done", &format!("task-{}", id1)], &temp);
+        let deliver_result = run_command(&["deliver", &format!("task-{}", id2)], &temp);
 
         // Both should start with "✓ task-N: Title" format
-        // done shows: "✓ task-1: Task one"
-        // deliver should show: "✓ task-2: Task two" (not "✓ task-2 delivered: Task two")
         assert!(
-            done_result.stdout.contains("✓ task-1: Task one"),
-            "done should output '✓ task-1: Task one', got: {}",
-            done_result.stdout
+            done_result.stdout.contains(&format!("✓ task-{}: Task one", id1)),
+            "done should output '✓ task-{}: Task one', got: {}",
+            id1, done_result.stdout
         );
         assert!(
-            deliver_result.stdout.contains("✓ task-2: Task two"),
-            "deliver should output '✓ task-2: Task two' (matching done format), got: {}",
-            deliver_result.stdout
+            deliver_result.stdout.contains(&format!("✓ task-{}: Task two", id2)),
+            "deliver should output '✓ task-{}: Task two' (matching done format), got: {}",
+            id2, deliver_result.stdout
         );
     });
 }
@@ -3592,26 +3766,29 @@ fn list_shows_delivered_tasks_with_distinct_marker() {
 fn next_prioritizes_delivered_tasks_over_open_tasks() {
     with_initialized_repo(|temp| {
         // Add several open tasks with varying pain counts
-        run_command(&["add", "High pain open task"], &temp);
-        run_command(&["pain", "-t", "task-1", "-d", "Pain 1"], &temp);
-        run_command(&["pain", "-t", "task-1", "-d", "Pain 2"], &temp);
-        run_command(&["pain", "-t", "task-1", "-d", "Pain 3"], &temp); // pain count: 3
+        let r1 = run_command(&["add", "High pain open task"], &temp);
+        let id1 = extract_task_id(&r1.stdout);
+        run_command(&["pain", "-t", &format!("task-{}", id1), "-d", "Pain 1"], &temp);
+        run_command(&["pain", "-t", &format!("task-{}", id1), "-d", "Pain 2"], &temp);
+        run_command(&["pain", "-t", &format!("task-{}", id1), "-d", "Pain 3"], &temp); // pain count: 3
 
-        run_command(&["add", "Low pain delivered task"], &temp);
-        run_command(&["deliver", "task-2"], &temp); // delivered with no pain
+        let r2 = run_command(&["add", "Low pain delivered task"], &temp);
+        let id2 = extract_task_id(&r2.stdout);
+        run_command(&["deliver", &format!("task-{}", id2)], &temp); // delivered with no pain
 
-        run_command(&["add", "Medium pain open task"], &temp);
-        run_command(&["pain", "-t", "task-3", "-d", "Pain 1"], &temp);
-        run_command(&["pain", "-t", "task-3", "-d", "Pain 2"], &temp); // pain count: 2
+        let r3 = run_command(&["add", "Medium pain open task"], &temp);
+        let id3 = extract_task_id(&r3.stdout);
+        run_command(&["pain", "-t", &format!("task-{}", id3), "-d", "Pain 1"], &temp);
+        run_command(&["pain", "-t", &format!("task-{}", id3), "-d", "Pain 2"], &temp); // pain count: 2
 
-        // Even though task-1 has higher pain count, next should suggest task-2
+        // Even though task id1 has higher pain count, next should suggest id2
         // because delivered tasks take priority over open tasks
         let result = run_command(&["next"], &temp);
 
         assert!(result.success, "next command should succeed");
         assert!(
-            result.stdout.contains("task-2"),
-            "Should suggest delivered task-2 over higher-pain open tasks, got: {}",
+            result.stdout.contains(&format!("task-{}", id2)),
+            "Should suggest delivered task over higher-pain open tasks, got: {}",
             result.stdout
         );
         assert!(
@@ -3629,14 +3806,15 @@ fn start_changes_task_status_to_claimed() {
     // When an agent starts a task, the status should change from "open" to "claimed"
     with_initialized_repo(|temp| {
         // Add a task
-        run_command(&["add", "Task to claim"], &temp);
+        let add_result = run_command(&["add", "Task to claim"], &temp);
+        let task_id = extract_task_id(&add_result.stdout);
 
         // Start the task
-        let result = run_command(&["start", "task-1"], &temp);
+        let result = run_command(&["start", &format!("task-{}", task_id)], &temp);
         assert!(result.success, "start should succeed: {}", result.stderr);
 
         // Verify the status changed to "claimed"
-        let show_result = run_command(&["show", "task-1"], &temp);
+        let show_result = run_command(&["show", &format!("task-{}", task_id)], &temp);
         assert!(show_result.stdout.contains("Status: claimed"),
             "Task status should be 'claimed' after start, got: {}", show_result.stdout);
     });
@@ -3647,19 +3825,21 @@ fn next_skips_claimed_tasks() {
     // claimed tasks should be skipped by knecht next, just like done tasks
     with_initialized_repo(|temp| {
         // Add two tasks
-        run_command(&["add", "First task"], &temp);
-        run_command(&["add", "Second task"], &temp);
+        let r1 = run_command(&["add", "First task"], &temp);
+        let r2 = run_command(&["add", "Second task"], &temp);
+        let id1 = extract_task_id(&r1.stdout);
+        let id2 = extract_task_id(&r2.stdout);
 
         // Claim the first task
-        run_command(&["start", "task-1"], &temp);
+        run_command(&["start", &format!("task-{}", id1)], &temp);
 
         // next should suggest the second task, not the first
         let result = run_command(&["next"], &temp);
         assert!(result.success, "next should succeed: {}", result.stderr);
-        assert!(result.stdout.contains("task-2"),
-            "next should skip claimed task and suggest task-2, got: {}", result.stdout);
-        assert!(!result.stdout.contains("task-1"),
-            "next should not suggest claimed task-1, got: {}", result.stdout);
+        assert!(result.stdout.contains(&format!("task-{}", id2)),
+            "next should skip claimed task and suggest task-{}, got: {}", id2, result.stdout);
+        assert!(!result.stdout.contains(&format!("task-{}", id1)),
+            "next should not suggest claimed task-{}, got: {}", id1, result.stdout);
     });
 }
 
@@ -3668,8 +3848,9 @@ fn list_shows_claimed_tasks_with_distinct_marker() {
     // Claimed tasks should have a visual marker distinct from open/done/delivered
     with_initialized_repo(|temp| {
         // Add a task and claim it
-        run_command(&["add", "Claimed task"], &temp);
-        run_command(&["start", "task-1"], &temp);
+        let add_result = run_command(&["add", "Claimed task"], &temp);
+        let task_id = extract_task_id(&add_result.stdout);
+        run_command(&["start", &format!("task-{}", task_id)], &temp);
 
         let result = run_command(&["list"], &temp);
         assert!(result.success, "list should succeed: {}", result.stderr);
@@ -3688,8 +3869,9 @@ fn next_handles_all_tasks_claimed() {
     // When all tasks are claimed, next should indicate no available tasks
     with_initialized_repo(|temp| {
         // Add and claim all tasks
-        run_command(&["add", "Only task"], &temp);
-        run_command(&["start", "task-1"], &temp);
+        let add_result = run_command(&["add", "Only task"], &temp);
+        let task_id = extract_task_id(&add_result.stdout);
+        run_command(&["start", &format!("task-{}", task_id)], &temp);
 
         let result = run_command(&["next"], &temp);
         assert!(result.success, "next should succeed: {}", result.stderr);
@@ -3702,9 +3884,10 @@ fn next_handles_all_tasks_claimed() {
 fn done_instructs_agent_to_run_reflect_skill() {
     // task-221: Instead of inline reflection prompts, instruct agent to run /reflect skill
     with_initialized_repo(|temp| {
-        run_command(&["add", "Task to complete"], &temp);
+        let add_result = run_command(&["add", "Task to complete"], &temp);
+        let task_id = extract_task_id(&add_result.stdout);
 
-        let result = run_command(&["done", "task-1"], &temp);
+        let result = run_command(&["done", &format!("task-{}", task_id)], &temp);
 
         assert!(result.success, "done should succeed: {}", result.stderr);
         assert!(result.stdout.contains("/reflect"),

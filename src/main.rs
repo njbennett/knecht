@@ -336,12 +336,6 @@ fn cmd_pain(task_arg: &str, description: &str) {
 fn cmd_delete(task_arg: &str) {
     let task_id = parse_task_id(task_arg);
 
-    // Validate that task_id is numeric
-    if task_id.parse::<u32>().is_err() {
-        eprintln!("Error: Invalid task ID format");
-        std::process::exit(1);
-    }
-
     match delete_task_with_fs(task_id, &RealFileSystem) {
         Ok(task) => {
             println!("Deleted task-{}: {}", task.id, task.title);

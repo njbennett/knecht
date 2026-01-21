@@ -1,7 +1,7 @@
 mod test_helpers;
 
 use test_helpers::TestFileSystem;
-use knecht::{read_tasks_with_fs, write_tasks_with_fs, get_next_id_with_fs, add_task_with_fs, mark_task_done_with_fs, find_task_by_id_with_fs, increment_pain_count_with_fs, find_next_task_with_fs, delete_task_with_fs, update_task_with_fs, Task, RealFileSystem, FileSystem};
+use knecht::{read_tasks_with_fs, write_tasks_with_fs, add_task_with_fs, mark_task_done_with_fs, find_task_by_id_with_fs, increment_pain_count_with_fs, find_next_task_with_fs, delete_task_with_fs, update_task_with_fs, Task, RealFileSystem, FileSystem};
 use std::path::Path;
 
 #[test]
@@ -64,19 +64,8 @@ fn test_write_tasks_empty_list() {
 }
 
 #[test]
-fn test_get_next_id_error_on_read() {
-    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1,open,Test,,\n").fail("open");
-    assert!(get_next_id_with_fs(&fs).is_err());
-}
-
-#[test]
-fn test_add_task_error_on_read() {
-    let fs = TestFileSystem::new().with_file(".knecht/tasks", "1,open,Test,,\n").fail("open");
-    assert!(add_task_with_fs("New".to_string(), None, &fs).is_err());
-}
-
-#[test]
-fn test_add_task_error_on_create_dir() {
+fn test_add_task_error_on_create_dir_and_mkdir() {
+    // add_task no longer reads existing tasks (uses random IDs), so test mkdir error
     let fs = TestFileSystem::new().fail("mkdir");
     assert!(add_task_with_fs("New".to_string(), None, &fs).is_err());
 }

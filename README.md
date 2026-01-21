@@ -10,7 +10,7 @@ Named after Joseph Knecht from Hermann Hesse's *The Glass Bead Game* - "knecht" 
 2. **Test-Driven**: Every feature starts with a failing test
 3. **Self-Hosting**: We use knecht to build knecht
 4. **Pain-Driven**: Features are added only when their absence hurts (track pain counts at ~3-5 before implementing)
-5. **Simplest Possible**: Sequential IDs, CSV files, no complexity
+5. **Simplest Possible**: Random alphanumeric IDs, CSV files, no complexity
 
 ## Installation
 
@@ -60,7 +60,7 @@ knecht add "Add tests for edge cases"
 knecht add "Refactor auth module" -d "Break down into smaller functions and add better error handling"
 ```
 
-Output: `Created task-1`
+Output: `Created task-a3x7kp` (6-character alphanumeric ID)
 
 ### `knecht list`
 
@@ -305,9 +305,9 @@ knecht list
 
 ## Design Decisions
 
-### Why sequential IDs instead of hashes?
+### Why random alphanumeric IDs?
 
-YAGNI (You Ain't Gonna Need It). Sequential integers work fine for a personal task tracker. We can add content-based hashing later if merge conflicts become painful.
+Random 6-character alphanumeric IDs (e.g., `task-a3x7kp`) enable parallel agent sessions to create tasks without merge conflicts. With 36^6 = 2.1 billion combinations, collision probability is negligible. IDs are human-readable and speakable, and existing numeric IDs from older versions continue to work.
 
 ### Why CSV instead of JSON?
 
@@ -394,7 +394,7 @@ knecht list
 - Task descriptions (if present)
 
 **Converted:**
-- Beads IDs (alphanumeric) → Sequential numbers (1, 2, 3...)
+- Beads IDs → New random alphanumeric IDs
 - Status `in_progress` → `open` (knecht has open/delivered/done)
 
 **Dropped (Intentionally):**
@@ -417,15 +417,15 @@ $ bd list --json | beads2knecht
 # 3 tasks found
 #
 # MIGRATION STRATEGY:
-# - Map beads IDs to sequential numbers (1, 2, 3...)
+# - Assign new random alphanumeric IDs
 # - Map 'in_progress' -> 'open'
 # - PRESERVE: descriptions (in CSV description field)
 # - DROP: priorities, issue_types, timestamps, dependencies
 # - Keep: id, status, title, description
 #
-1,open,Fix authentication bug,,
-2,done,Add user registration,"Implement user registration with email verification",
-3,open,Refactor database layer,,
+a3x7kp,open,Fix authentication bug,,
+b2y8lq,done,Add user registration,"Implement user registration with email verification",
+c4z9mr,open,Refactor database layer,,
 
 === MIGRATION COMPLETE ===
 Tasks converted: 3

@@ -2,6 +2,7 @@ use std::fs::{self, OpenOptions};
 use std::io::{self, BufRead, BufReader, Write};
 use std::path::Path;
 use std::fmt;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 mod serializer;
 pub use serializer::CsvSerializer;
@@ -127,26 +128,37 @@ pub fn write_tasks_with_fs(tasks: &[Task], fs: &dyn FileSystem) -> Result<(), Kn
     CsvSerializer::write(tasks, file)
 }
 
-pub fn get_next_id_with_fs(fs: &dyn FileSystem) -> Result<u32, KnechtError> {
-    let tasks = read_tasks_with_fs(fs)?;
-    
-    let max_id = tasks
-        .iter()
-        .filter_map(|t| t.id.parse::<u32>().ok())
-        .max()
-        .unwrap_or(0);
-    
-    Ok(max_id + 1)
+/// Generates a 6-character random alphanumeric ID using timestamp and process ID for entropy.
+/// This avoids merge conflicts when parallel agents create tasks.
+pub fn generate_random_id() -> String {
+    const CHARS: &[u8] = b"0123456789abcdefghijklmnopqrstuvwxyz";
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let pid = std::process::id();
+
+    // Combine nanos and pid for entropy
+    let mut seed = nanos as u64 ^ ((pid as u64) << 32);
+
+    let mut id = String::with_capacity(6);
+    for _ in 0..6 {
+        // Simple LCG-style mixing
+        seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        let idx = ((seed >> 32) as usize) % CHARS.len();
+        id.push(CHARS[idx] as char);
+    }
+    id
 }
 
-pub fn add_task_with_fs(title: String, description: Option<String>, fs: &dyn FileSystem) -> Result<u32, KnechtError> {
-    let next_id = get_next_id_with_fs(fs)?;
+pub fn add_task_with_fs(title: String, description: Option<String>, fs: &dyn FileSystem) -> Result<String, KnechtError> {
+    let new_id = generate_random_id();
 
     // Ensure .knecht directory exists
     fs.create_dir_all(Path::new(".knecht"))?;
 
     let task = Task {
-        id: next_id.to_string(),
+        id: new_id.clone(),
         status: "open".to_string(),
         title,
         description,
@@ -156,7 +168,7 @@ pub fn add_task_with_fs(title: String, description: Option<String>, fs: &dyn Fil
     let file = fs.append(Path::new(".knecht/tasks"))?;
     CsvSerializer::append_task(&task, file)?;
 
-    Ok(next_id)
+    Ok(new_id)
 }
 
 pub fn find_task_by_id_with_fs(task_id: &str, fs: &dyn FileSystem) -> Result<Task, KnechtError> {
@@ -173,11 +185,11 @@ pub fn find_task_by_id_with_fs(task_id: &str, fs: &dyn FileSystem) -> Result<Tas
 
 pub fn mark_task_done_with_fs(task_id: &str, fs: &dyn FileSystem) -> Result<Task, KnechtError> {
     let mut tasks = read_tasks_with_fs(fs)?;
-    
-    // Find the oldest open task (lowest ID among open tasks)
+
+    // Find the first open task (by string comparison for consistent ordering)
     let oldest_open_task_id = tasks.iter()
         .filter(|t| t.status == "open")
-        .min_by_key(|t| t.id.parse::<i32>().unwrap_or(i32::MAX))
+        .min_by(|a, b| a.id.cmp(&b.id))
         .map(|t| t.id.clone());
     
     // Check if the task being marked done is different from the oldest open task
@@ -302,12 +314,15 @@ fn find_best_blocker(task_id: &str, tasks: &[Task], fs: &dyn FileSystem) -> Opti
     
 
     
-    // Find best blocker by pain count and age
+    // Find best blocker by pain count with consistent tiebreaking by ID
     let best_blocker = open_blockers.iter()
-        .max_by_key(|t| {
-            let pain = t.pain_count.unwrap_or(0);
-            let id_num: i32 = t.id.parse().unwrap_or(0);
-            (pain, -id_num)
+        .max_by(|a, b| {
+            let pain_a = a.pain_count.unwrap_or(0);
+            let pain_b = b.pain_count.unwrap_or(0);
+            // First compare by pain count (higher is better)
+            pain_a.cmp(&pain_b)
+                // On tie, prefer lexicographically smaller ID (consistent ordering)
+                .then_with(|| b.id.cmp(&a.id))
         })
         .map(|t| (*t).clone())
         .expect("No blocker found");
@@ -321,13 +336,16 @@ fn find_best_blocker(task_id: &str, tasks: &[Task], fs: &dyn FileSystem) -> Opti
     Some(best_blocker)
 }
 
-/// Find the best task from a list by highest pain count, preferring older tasks on tie
+/// Find the best task from a list by highest pain count, with consistent tiebreaking by ID
 fn find_best_by_priority(tasks: &[&Task]) -> Option<Task> {
     tasks.iter()
-        .max_by_key(|t| {
-            let pain = t.pain_count.unwrap_or(0);
-            let id_num: i32 = t.id.parse().unwrap_or(0);
-            (pain, -id_num)
+        .max_by(|a, b| {
+            let pain_a = a.pain_count.unwrap_or(0);
+            let pain_b = b.pain_count.unwrap_or(0);
+            // First compare by pain count (higher is better)
+            pain_a.cmp(&pain_b)
+                // On tie, prefer lexicographically smaller ID (consistent ordering)
+                .then_with(|| b.id.cmp(&a.id))
         })
         .map(|t| (*t).clone())
 }
