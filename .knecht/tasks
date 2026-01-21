@@ -300,3 +300,4 @@ Pain: Blocking parallel agent workflow - worktrees accumulate without cleanup
 Pain: User has to manually clean up after every failed merge session
 Pain: Urgent: breaks core cw workflow for parallel agents",3
 259,open,"cw script creates merge commits when local main is behind origin After rebasing branch onto origin/main, the script tries to merge into local main which may be behind origin. This causes ff-only to fail, and the fallback instructions tell user to do a regular merge (creating merge commit). Fix: update local main with 'git pull --ff-only' before attempting the branch merge.",,
+260,open,knecht add should accept --description as alias for -d,User tried 'knecht add TITLE --description DESC' which failed. --description is a natural long-form flag that should work as an alias for -d.,
