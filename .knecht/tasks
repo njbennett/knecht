@@ -301,3 +301,48 @@ Pain: User has to manually clean up after every failed merge session
 Pain: Urgent: breaks core cw workflow for parallel agents",3
 259,open,"cw script creates merge commits when local main is behind origin After rebasing branch onto origin/main, the script tries to merge into local main which may be behind origin. This causes ff-only to fail, and the fallback instructions tell user to do a regular merge (creating merge commit). Fix: update local main with 'git pull --ff-only' before attempting the branch merge.",,
 260,open,knecht add should accept --description as alias for -d,User tried 'knecht add TITLE --description DESC' which failed. --description is a natural long-form flag that should work as an alias for -d.,
+261,open,Implement /mikado skill for time-boxed task attempts,"A Claude Code skill that implements the Mikado Method for tackling complex tasks. The method helps avoid getting stuck on prerequisites by time-boxing attempts and systematically identifying blockers.
+
+## Recommendation: Skill (not agent mode)
+A skill is more appropriate because:
+- It modifies *how* the agent approaches a task, not what tools it has access to
+- It can be invoked on-demand when the user wants Mikado-style work
+- It integrates with the existing task system (knecht)
+
+## Skill Behavior
+
+### When invoked: `/mikado <task-description>`
+
+1. **Start timer** - Record session start time
+
+2. **Create attempt plan**
+   - Break the task into substeps
+   - Each substep gets a time checkpoint
+
+3. **Work on substeps with time checks**
+   - After each substep, check if ~15-20 minutes have elapsed
+   - If time exceeded:
+     - Stop immediately
+     - List all blockers/prerequisites identified during the attempt
+     - Prompt user to confirm which to file as blocking tasks
+
+4. **On time limit reached**
+   - Reset any uncommitted work (git checkout, etc.)
+   - File identified prerequisites as knecht tasks with `--blocker-for <current-task>`
+   - Mark current task as blocked
+   - Reflect: What did we learn? What would we do differently?
+
+5. **On success (task completed within time)**
+   - Mark task complete
+   - No need to reset or file blockers
+
+## Integration with knecht
+- `knecht add --blocker-for <task-id>` - file a task as a blocker (may need to implement)
+- `knecht block <task-id> --by <blocker-task-id>` - mark task as blocked
+- `knecht unblock <task-id>` - when blocker is resolved
+
+## Key Principles Encoded
+1. **Time-boxing prevents rabbit holes** - Forces stopping before going too deep
+2. **Reset prevents partial/broken state** - Clean slate for next attempt
+3. **Filing blockers creates actionable work** - Prerequisites become their own tasks
+4. **Reflection improves future attempts** - Learn from what didn't work",
