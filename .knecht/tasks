@@ -352,3 +352,5 @@ A skill is more appropriate because:
 - During task-127, agent identified 'test brittleness' as a blocker without attempting the work
 - The Mikado Method says: try it, hit REAL blockers, then revert and address them
 - This skill should enforce 'try first' before allowing blocker identification",
+262,open,knecht needs 'close as superseded/merged' workflow,"When merging task-129 into task-261, used 'knecht done' which triggered reflection prompts as if real work was completed. Need a way to close tasks as 'superseded by task-X' or 'merged into task-X' without implying the task itself was completed. Could be: knecht close task-129 --superseded-by task-261",
+263,open,Agent should search for related tasks before filing new ones,"When filing task-261 (Mikado skill), agent should have searched for existing Mikado-related tasks first. User had to redirect to combine with task-129. Knecht guidance or workflow should prompt: 'Search for related tasks before adding new ones' - perhaps in the output of knecht add, or as a pre-add check.",
