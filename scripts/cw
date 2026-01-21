@@ -286,10 +286,11 @@ main() {
     # Run command, capturing exit status but not failing the script
     set +e
     # If branch name looks like a task (task-N), pass it as initial prompt
+    # Start in plan mode so agent understands context before implementing
     if [[ "$BRANCH_NAME" =~ ^task-[0-9]+$ ]]; then
-        $CW_COMMAND "knecht $BRANCH_NAME"
+        $CW_COMMAND --permission-mode plan "knecht $BRANCH_NAME"
     else
-        $CW_COMMAND
+        $CW_COMMAND --permission-mode plan
     fi
     local cmd_status=$?
     set -e
