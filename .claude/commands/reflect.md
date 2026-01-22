@@ -35,7 +35,7 @@ These ARE knecht bugs - file tasks for them:
 ### 4. REQUIRED ACTION
 
 Before proceeding, do ONE of:
-- Run `knecht add "observation"` to file a new task
+- Run `knecht add "observation" -a "<testable acceptance criteria>"` to file a new task
 - Run `knecht pain -t <task-id> -d "description"` to increment pain on existing task
 - State explicitly: "Nothing to file because: [specific reason why zero friction occurred]"
 

@@ -41,7 +41,7 @@ fn done_shows_refactoring_reflection_prompt() {
 #[test]
 fn done_marks_task_complete() {
     with_initialized_repo(|temp| {
-        let add_result = run_command(&["add", "Task to complete"], &temp);
+        let add_result = run_command(&["add", "Task to complete", "-a", "Done"], &temp);
         let task_id = extract_task_id(&add_result.stdout);
 
         let result = run_command(&["done", &format!("task-{}", task_id)], &temp);
@@ -73,7 +73,7 @@ fn done_on_nonexistent_task_fails_gracefully() {
 fn done_handles_invalid_task_id_formats() {
     let temp = setup_temp_dir();
     run_command(&["init"], &temp);
-    run_command(&["add", "Test task"], &temp);
+    run_command(&["add", "Test task", "-a", "Done"], &temp);
 
     // Test various invalid formats
     let invalid_ids = vec!["not-a-number", "task-abc", "999999", "task-999999"];
@@ -100,7 +100,7 @@ fn done_handles_invalid_task_id_formats() {
 fn done_reflection_prompt_uses_actionable_language() {
     let temp = setup_temp_dir();
     run_command(&["init"], &temp);
-    let add_result = run_command(&["add", "Task to complete"], &temp);
+    let add_result = run_command(&["add", "Task to complete", "-a", "Done"], &temp);
     let task_id = extract_task_id(&add_result.stdout);
 
     let result = run_command(&["done", &format!("task-{}", task_id)], &temp);
@@ -181,7 +181,7 @@ fn done_marks_task_without_description_complete() {
     run_command(&["init"], &temp);
 
     // Add task without description
-    let add_result = run_command(&["add", "Task without description"], &temp);
+    let add_result = run_command(&["add", "Task without description", "-a", "Done"], &temp);
     let task_id = extract_task_id(&add_result.stdout);
 
     // Mark it done
@@ -201,7 +201,7 @@ fn done_marks_task_with_description_complete() {
     run_command(&["init"], &temp);
 
     // Add task with description
-    let add_result = run_command(&["add", "Task with description", "-d", "This is the description"], &temp);
+    let add_result = run_command(&["add", "Task with description", "-d", "This is the description", "-a", "Done"], &temp);
     let task_id = extract_task_id(&add_result.stdout);
 
     // Mark it done
@@ -221,8 +221,8 @@ fn done_marks_task_with_description_complete() {
 fn done_increments_pain_on_skipped_top_task() {
     with_initialized_repo(|temp| {
         // Create two tasks
-        let r1 = run_command(&["add", "Primary feature work"], &temp);
-        let r2 = run_command(&["add", "Minor improvement"], &temp);
+        let r1 = run_command(&["add", "Primary feature work", "-a", "Done"], &temp);
+        let r2 = run_command(&["add", "Minor improvement", "-a", "Done"], &temp);
         let id1 = extract_task_id(&r1.stdout);
         let id2 = extract_task_id(&r2.stdout);
 
@@ -255,8 +255,8 @@ fn done_increments_pain_on_skipped_top_task() {
 fn done_on_oldest_task_does_not_increment_pain() {
     with_initialized_repo(|temp| {
         // Create two tasks
-        let r1 = run_command(&["add", "First task"], &temp);
-        let r2 = run_command(&["add", "Second task"], &temp);
+        let r1 = run_command(&["add", "First task", "-a", "Done"], &temp);
+        let r2 = run_command(&["add", "Second task", "-a", "Done"], &temp);
         let id1 = extract_task_id(&r1.stdout);
         let id2 = extract_task_id(&r2.stdout);
 
@@ -282,11 +282,11 @@ fn done_on_oldest_task_does_not_increment_pain() {
 fn done_increments_pain_on_task_with_existing_description() {
     with_initialized_repo(|temp| {
         // Create first task with a description
-        let r1 = run_command(&["add", "Primary feature", "-d", "Original description"], &temp);
+        let r1 = run_command(&["add", "Primary feature", "-d", "Original description", "-a", "Done"], &temp);
         let id1 = extract_task_id(&r1.stdout);
 
         // Create second task
-        let r2 = run_command(&["add", "Minor task"], &temp);
+        let r2 = run_command(&["add", "Minor task", "-a", "Done"], &temp);
         let id2 = extract_task_id(&r2.stdout);
 
         // Determine which ID is lexicographically smaller (that's the "top" task)
@@ -312,7 +312,7 @@ fn done_increments_pain_on_task_with_existing_description() {
 fn done_instructs_agent_to_run_reflect_skill() {
     // task-221: Instead of inline reflection prompts, instruct agent to run /reflect skill
     with_initialized_repo(|temp| {
-        let add_result = run_command(&["add", "Task to complete"], &temp);
+        let add_result = run_command(&["add", "Task to complete", "-a", "Done"], &temp);
         let task_id = extract_task_id(&add_result.stdout);
 
         let result = run_command(&["done", &format!("task-{}", task_id)], &temp);

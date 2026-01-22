@@ -9,11 +9,11 @@ use std::fs;
 fn next_suggests_task_with_highest_pain_count() {
     with_initialized_repo(|temp| {
         // Add tasks
-        run_command(&["add", "Low priority task"], &temp);
-        let r2 = run_command(&["add", "Medium pain task"], &temp);
-        let r3 = run_command(&["add", "High pain task"], &temp);
-        run_command(&["add", "Another low priority"], &temp);
-        let r5 = run_command(&["add", "Medium pain again"], &temp);
+        run_command(&["add", "Low priority task", "-a", "Done"], &temp);
+        let r2 = run_command(&["add", "Medium pain task", "-a", "Done"], &temp);
+        let r3 = run_command(&["add", "High pain task", "-a", "Done"], &temp);
+        run_command(&["add", "Another low priority", "-a", "Done"], &temp);
+        let r5 = run_command(&["add", "Medium pain again", "-a", "Done"], &temp);
         let id2 = extract_task_id(&r2.stdout);
         let id3 = extract_task_id(&r3.stdout);
         let id5 = extract_task_id(&r5.stdout);
@@ -52,9 +52,9 @@ fn next_suggests_task_with_highest_pain_count() {
 fn next_prefers_older_task_when_pain_counts_equal() {
     with_initialized_repo(|temp| {
         // Add tasks
-        let r1 = run_command(&["add", "First task"], &temp);
-        let r2 = run_command(&["add", "Second task"], &temp);
-        let r3 = run_command(&["add", "Third task"], &temp);
+        let r1 = run_command(&["add", "First task", "-a", "Done"], &temp);
+        let r2 = run_command(&["add", "Second task", "-a", "Done"], &temp);
+        let r3 = run_command(&["add", "Third task", "-a", "Done"], &temp);
         let id1 = extract_task_id(&r1.stdout);
         let id2 = extract_task_id(&r2.stdout);
         let id3 = extract_task_id(&r3.stdout);
@@ -84,8 +84,8 @@ fn next_prefers_older_task_when_pain_counts_equal() {
 fn next_skips_done_tasks() {
     with_initialized_repo(|temp| {
         // Add tasks
-        let r1 = run_command(&["add", "High pain but done"], &temp);
-        let r2 = run_command(&["add", "Lower pain but open"], &temp);
+        let r1 = run_command(&["add", "High pain but done", "-a", "Done"], &temp);
+        let r2 = run_command(&["add", "Lower pain but open", "-a", "Done"], &temp);
         let id1 = extract_task_id(&r1.stdout);
         let id2 = extract_task_id(&r2.stdout);
 
@@ -115,7 +115,7 @@ fn next_skips_done_tasks() {
 fn next_handles_no_open_tasks() {
     with_initialized_repo(|temp| {
         // Add and complete a task
-        let add_result = run_command(&["add", "Only task"], &temp);
+        let add_result = run_command(&["add", "Only task", "-a", "Done"], &temp);
         let task_id = extract_task_id(&add_result.stdout);
         run_command(&["done", &format!("task-{}", task_id)], &temp);
 
@@ -134,7 +134,7 @@ fn next_handles_no_open_tasks() {
 fn next_fails_gracefully_when_tasks_file_unreadable() {
     with_initialized_repo(|temp| {
         // Add a task
-        run_command(&["add", "Some task"], &temp);
+        run_command(&["add", "Some task", "-a", "Done"], &temp);
         
         // Make tasks file unreadable
         let tasks_file = temp.join(".knecht/tasks");
@@ -170,7 +170,7 @@ fn next_fails_gracefully_when_tasks_file_unreadable() {
 fn next_displays_task_with_description() {
     with_initialized_repo(|temp| {
         // Add a task with description
-        let add_result = run_command(&["add", "Important task", "-d", "This task has a detailed description explaining what needs to be done"], &temp);
+        let add_result = run_command(&["add", "Important task", "-d", "This task has a detailed description explaining what needs to be done", "-a", "Done"], &temp);
         let task_id = extract_task_id(&add_result.stdout);
 
         // Add pain to make it more likely to be selected
@@ -195,8 +195,8 @@ fn next_displays_task_with_description() {
 fn next_with_zero_pain_count() {
     with_initialized_repo(|temp| {
         // Add tasks - one will have pain_count 0 (no pain added), one will be without pain_count
-        let r1 = run_command(&["add", "Task with no pain"], &temp);
-        let r2 = run_command(&["add", "Another task"], &temp);
+        let r1 = run_command(&["add", "Task with no pain", "-a", "Done"], &temp);
+        let r2 = run_command(&["add", "Another task", "-a", "Done"], &temp);
         let id1 = extract_task_id(&r1.stdout);
         let id2 = extract_task_id(&r2.stdout);
 
@@ -219,18 +219,18 @@ fn next_with_zero_pain_count() {
 fn next_prefers_unblocked_subtasks_over_parent_task() {
     with_initialized_repo(|temp| {
         // Create a parent task with high pain count
-        let r1 = run_command(&["add", "Large feature with verification", "-d", "This is a big task"], &temp);
+        let r1 = run_command(&["add", "Large feature with verification", "-d", "This is a big task", "-a", "Done"], &temp);
         let id1 = extract_task_id(&r1.stdout);
         for i in 0..3 {
             run_command(&["pain", "-t", &format!("task-{}", id1), "-d", &format!("Pain {}", i)], &temp);
         }
 
         // Create subtasks that block the parent task
-        let r2 = run_command(&["add", "Foundation work", "-d", "Must be done first"], &temp);
+        let r2 = run_command(&["add", "Foundation work", "-d", "Must be done first", "-a", "Done"], &temp);
         let id2 = extract_task_id(&r2.stdout);
-        let r3 = run_command(&["add", "Build feature A", "-d", "Needs foundation"], &temp);
+        let r3 = run_command(&["add", "Build feature A", "-d", "Needs foundation", "-a", "Done"], &temp);
         let id3 = extract_task_id(&r3.stdout);
-        let r4 = run_command(&["add", "Build feature B", "-d", "Needs foundation"], &temp);
+        let r4 = run_command(&["add", "Build feature B", "-d", "Needs foundation", "-a", "Done"], &temp);
         let id4 = extract_task_id(&r4.stdout);
 
         // Parent is blocked by all subtasks (can't complete parent until subtasks done)
@@ -269,23 +269,23 @@ fn next_handles_three_level_blocker_tree() {
     with_initialized_repo(|temp| {
         // Create a three-level blocker tree like task-143 → task-176 → tasks 184-192
         // Root task with high pain count
-        let r1 = run_command(&["add", "Root feature", "-d", "Top level feature"], &temp);
+        let r1 = run_command(&["add", "Root feature", "-d", "Top level feature", "-a", "Done"], &temp);
         let id1 = extract_task_id(&r1.stdout);
         for i in 0..3 {
             run_command(&["pain", "-t", &format!("task-{}", id1), "-d", &format!("Pain {}", i)], &temp);
         }
 
         // Middle task (blocks root)
-        let r2 = run_command(&["add", "Middle task", "-d", "Intermediate step"], &temp);
+        let r2 = run_command(&["add", "Middle task", "-d", "Intermediate step", "-a", "Done"], &temp);
         let id2 = extract_task_id(&r2.stdout);
         run_command(&["block", &format!("task-{}", id1), "by", &format!("task-{}", id2)], &temp);
 
         // Leaf tasks (block middle task)
-        let r3 = run_command(&["add", "Leaf task A", "-d", "First leaf"], &temp);
+        let r3 = run_command(&["add", "Leaf task A", "-d", "First leaf", "-a", "Done"], &temp);
         let id3 = extract_task_id(&r3.stdout);
-        let r4 = run_command(&["add", "Leaf task B", "-d", "Second leaf"], &temp);
+        let r4 = run_command(&["add", "Leaf task B", "-d", "Second leaf", "-a", "Done"], &temp);
         let id4 = extract_task_id(&r4.stdout);
-        let r5 = run_command(&["add", "Leaf task C", "-d", "Third leaf"], &temp);
+        let r5 = run_command(&["add", "Leaf task C", "-d", "Third leaf", "-a", "Done"], &temp);
         let id5 = extract_task_id(&r5.stdout);
         run_command(&["block", &format!("task-{}", id2), "by", &format!("task-{}", id3)], &temp);
         run_command(&["block", &format!("task-{}", id2), "by", &format!("task-{}", id4)], &temp);
@@ -321,17 +321,17 @@ fn next_handles_three_level_blocker_tree() {
 fn next_prioritizes_delivered_tasks_over_open_tasks() {
     with_initialized_repo(|temp| {
         // Add several open tasks with varying pain counts
-        let r1 = run_command(&["add", "High pain open task"], &temp);
+        let r1 = run_command(&["add", "High pain open task", "-a", "Done"], &temp);
         let id1 = extract_task_id(&r1.stdout);
         run_command(&["pain", "-t", &format!("task-{}", id1), "-d", "Pain 1"], &temp);
         run_command(&["pain", "-t", &format!("task-{}", id1), "-d", "Pain 2"], &temp);
         run_command(&["pain", "-t", &format!("task-{}", id1), "-d", "Pain 3"], &temp); // pain count: 3
 
-        let r2 = run_command(&["add", "Low pain delivered task"], &temp);
+        let r2 = run_command(&["add", "Low pain delivered task", "-a", "Done"], &temp);
         let id2 = extract_task_id(&r2.stdout);
         run_command(&["deliver", &format!("task-{}", id2)], &temp); // delivered with no pain
 
-        let r3 = run_command(&["add", "Medium pain open task"], &temp);
+        let r3 = run_command(&["add", "Medium pain open task", "-a", "Done"], &temp);
         let id3 = extract_task_id(&r3.stdout);
         run_command(&["pain", "-t", &format!("task-{}", id3), "-d", "Pain 1"], &temp);
         run_command(&["pain", "-t", &format!("task-{}", id3), "-d", "Pain 2"], &temp); // pain count: 2
@@ -360,7 +360,7 @@ fn next_skips_claimed_tasks() {
     with_initialized_repo(|temp| {
         // Add two tasks (first needs acceptance criteria for start to succeed)
         let r1 = run_command(&["add", "First task", "-a", "Can be started"], &temp);
-        let r2 = run_command(&["add", "Second task"], &temp);
+        let r2 = run_command(&["add", "Second task", "-a", "Done"], &temp);
         let id1 = extract_task_id(&r1.stdout);
         let id2 = extract_task_id(&r2.stdout);
 

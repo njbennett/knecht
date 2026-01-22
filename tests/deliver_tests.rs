@@ -9,7 +9,7 @@ use std::fs;
 fn deliver_command_is_recognized() {
     with_initialized_repo(|temp| {
         // Add a task first
-        let add_result = run_command(&["add", "Test task"], temp);
+        let add_result = run_command(&["add", "Test task", "-a", "Done"], temp);
         assert!(add_result.success);
         let task_id = extract_task_id(&add_result.stdout);
         assert!(!task_id.is_empty(), "Should have created a task with an ID");
@@ -40,7 +40,7 @@ fn deliver_requires_task_id_argument() {
 #[test]
 fn deliver_changes_task_status_to_delivered() {
     with_initialized_repo(|temp| {
-        let add_result = run_command(&["add", "Task to deliver"], &temp);
+        let add_result = run_command(&["add", "Task to deliver", "-a", "Done"], &temp);
         let task_id = extract_task_id(&add_result.stdout);
 
         let result = run_command(&["deliver", &format!("task-{}", task_id)], &temp);
@@ -58,7 +58,7 @@ fn deliver_changes_task_status_to_delivered() {
 #[test]
 fn deliver_fails_for_already_delivered_task() {
     with_initialized_repo(|temp| {
-        let add_result = run_command(&["add", "Task to deliver twice"], temp);
+        let add_result = run_command(&["add", "Task to deliver twice", "-a", "Done"], temp);
         let task_id = extract_task_id(&add_result.stdout);
 
         // First delivery should succeed
@@ -79,7 +79,7 @@ fn deliver_fails_for_already_delivered_task() {
 #[test]
 fn deliver_fails_for_already_done_task() {
     with_initialized_repo(|temp| {
-        let add_result = run_command(&["add", "Task that is done"], temp);
+        let add_result = run_command(&["add", "Task that is done", "-a", "Done"], temp);
         let task_id = extract_task_id(&add_result.stdout);
         run_command(&["done", &format!("task-{}", task_id)], temp);
 
@@ -98,8 +98,8 @@ fn deliver_fails_for_already_done_task() {
 fn deliver_success_message_matches_done_format() {
     // Task-191: deliver and done should have consistent success message format
     with_initialized_repo(|temp| {
-        let r1 = run_command(&["add", "Task one"], &temp);
-        let r2 = run_command(&["add", "Task two"], &temp);
+        let r1 = run_command(&["add", "Task one", "-a", "Done"], &temp);
+        let r2 = run_command(&["add", "Task two", "-a", "Done"], &temp);
         let id1 = extract_task_id(&r1.stdout);
         let id2 = extract_task_id(&r2.stdout);
 

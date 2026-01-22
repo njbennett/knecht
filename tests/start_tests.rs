@@ -6,23 +6,6 @@ use common::{cleanup_temp_dir, extract_task_id, run_command, setup_temp_dir, wit
 use std::fs;
 
 #[test]
-fn start_fails_without_acceptance_criteria() {
-    with_initialized_repo(|temp| {
-        // Add a task WITHOUT acceptance criteria
-        let add_result = run_command(&["add", "Task without criteria"], &temp);
-        assert!(add_result.success, "Failed to add task");
-        let task_id = extract_task_id(&add_result.stdout);
-
-        // Try to start - should fail
-        let result = run_command(&["start", &format!("task-{}", task_id)], &temp);
-
-        assert!(!result.success, "start should fail without acceptance criteria");
-        assert!(result.stderr.contains("acceptance criteria") || result.stderr.contains("Acceptance"),
-                "Error should mention acceptance criteria: {}", result.stderr);
-    });
-}
-
-#[test]
 fn start_succeeds_with_acceptance_criteria() {
     with_initialized_repo(|temp| {
         // Add a task WITH acceptance criteria

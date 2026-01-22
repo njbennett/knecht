@@ -9,8 +9,8 @@ use std::fs;
 fn block_command_creates_blocker_relationship() {
     with_initialized_repo(|temp| {
         // Create two tasks
-        let r1 = run_command(&["add", "Task A"], &temp);
-        let r2 = run_command(&["add", "Task B"], &temp);
+        let r1 = run_command(&["add", "Task A", "-a", "Done"], &temp);
+        let r2 = run_command(&["add", "Task B", "-a", "Done"], &temp);
         let id1 = extract_task_id(&r1.stdout);
         let id2 = extract_task_id(&r2.stdout);
 
@@ -33,7 +33,7 @@ fn block_command_creates_blocker_relationship() {
 #[test]
 fn block_command_fails_on_nonexistent_task() {
     with_initialized_repo(|temp| {
-        let r1 = run_command(&["add", "Task A"], &temp);
+        let r1 = run_command(&["add", "Task A", "-a", "Done"], &temp);
         let id1 = extract_task_id(&r1.stdout);
 
         // Try to block nonexistent task
@@ -47,7 +47,7 @@ fn block_command_fails_on_nonexistent_task() {
 #[test]
 fn block_command_fails_on_nonexistent_blocker() {
     with_initialized_repo(|temp| {
-        let r1 = run_command(&["add", "Task A"], &temp);
+        let r1 = run_command(&["add", "Task A", "-a", "Done"], &temp);
         let id1 = extract_task_id(&r1.stdout);
 
         // Try to block by nonexistent task
@@ -63,7 +63,7 @@ fn unblock_removes_blocker_relationship() {
     with_initialized_repo(|temp| {
         // Create tasks and blocker
         let r1 = run_command(&["add", "Blocked Task", "-a", "Can be started"], &temp);
-        let r2 = run_command(&["add", "Blocker Task"], &temp);
+        let r2 = run_command(&["add", "Blocker Task", "-a", "Done"], &temp);
         let id1 = extract_task_id(&r1.stdout);
         let id2 = extract_task_id(&r2.stdout);
         run_command(&["block", &format!("task-{}", id1), "by", &format!("task-{}", id2)], &temp);
@@ -87,8 +87,8 @@ fn unblock_removes_blocker_relationship() {
 #[test]
 fn unblock_fails_when_relationship_does_not_exist() {
     with_initialized_repo(|temp| {
-        let r1 = run_command(&["add", "Task A"], &temp);
-        let r2 = run_command(&["add", "Task B"], &temp);
+        let r1 = run_command(&["add", "Task A", "-a", "Done"], &temp);
+        let r2 = run_command(&["add", "Task B", "-a", "Done"], &temp);
         let id1 = extract_task_id(&r1.stdout);
         let id2 = extract_task_id(&r2.stdout);
 
@@ -105,8 +105,8 @@ fn multiple_blockers_all_prevent_start() {
     with_initialized_repo(|temp| {
         // Create tasks (blocked task needs acceptance criteria so start fails due to blockers, not missing criteria)
         let r1 = run_command(&["add", "Blocked Task", "-a", "Can be started"], &temp);
-        let r2 = run_command(&["add", "Blocker 1"], &temp);
-        let r3 = run_command(&["add", "Blocker 2"], &temp);
+        let r2 = run_command(&["add", "Blocker 1", "-a", "Done"], &temp);
+        let r3 = run_command(&["add", "Blocker 2", "-a", "Done"], &temp);
         let id1 = extract_task_id(&r1.stdout);
         let id2 = extract_task_id(&r2.stdout);
         let id3 = extract_task_id(&r3.stdout);
@@ -126,8 +126,8 @@ fn multiple_blockers_all_prevent_start() {
 #[test]
 fn block_fails_when_blockers_file_cannot_be_written() {
     with_initialized_repo(|temp| {
-        let r1 = run_command(&["add", "Task A"], &temp);
-        let r2 = run_command(&["add", "Task B"], &temp);
+        let r1 = run_command(&["add", "Task A", "-a", "Done"], &temp);
+        let r2 = run_command(&["add", "Task B", "-a", "Done"], &temp);
         let id1 = extract_task_id(&r1.stdout);
         let id2 = extract_task_id(&r2.stdout);
 
@@ -161,8 +161,8 @@ fn block_fails_when_blockers_file_cannot_be_written() {
 #[test]
 fn unblock_fails_when_blockers_file_cannot_be_written() {
     with_initialized_repo(|temp| {
-        let r1 = run_command(&["add", "Task A"], &temp);
-        let r2 = run_command(&["add", "Task B"], &temp);
+        let r1 = run_command(&["add", "Task A", "-a", "Done"], &temp);
+        let r2 = run_command(&["add", "Task B", "-a", "Done"], &temp);
         let id1 = extract_task_id(&r1.stdout);
         let id2 = extract_task_id(&r2.stdout);
         run_command(&["block", &format!("task-{}", id1), "by", &format!("task-{}", id2)], &temp);
@@ -196,8 +196,8 @@ fn unblock_fails_when_blockers_file_cannot_be_written() {
 #[test]
 fn block_fails_with_malformed_command_no_by() {
     with_initialized_repo(|temp| {
-        let r1 = run_command(&["add", "Task A"], &temp);
-        let r2 = run_command(&["add", "Task B"], &temp);
+        let r1 = run_command(&["add", "Task A", "-a", "Done"], &temp);
+        let r2 = run_command(&["add", "Task B", "-a", "Done"], &temp);
         let id1 = extract_task_id(&r1.stdout);
         let id2 = extract_task_id(&r2.stdout);
 
@@ -213,7 +213,7 @@ fn block_fails_with_malformed_command_no_by() {
 #[test]
 fn block_fails_with_too_few_arguments() {
     with_initialized_repo(|temp| {
-        let r1 = run_command(&["add", "Task A"], &temp);
+        let r1 = run_command(&["add", "Task A", "-a", "Done"], &temp);
         let id1 = extract_task_id(&r1.stdout);
 
         // Try block with only one argument
@@ -226,8 +226,8 @@ fn block_fails_with_too_few_arguments() {
 #[test]
 fn unblock_fails_with_malformed_command_no_from() {
     with_initialized_repo(|temp| {
-        let r1 = run_command(&["add", "Task A"], &temp);
-        let r2 = run_command(&["add", "Task B"], &temp);
+        let r1 = run_command(&["add", "Task A", "-a", "Done"], &temp);
+        let r2 = run_command(&["add", "Task B", "-a", "Done"], &temp);
         let id1 = extract_task_id(&r1.stdout);
         let id2 = extract_task_id(&r2.stdout);
 
@@ -243,7 +243,7 @@ fn unblock_fails_with_malformed_command_no_from() {
 #[test]
 fn unblock_fails_with_too_few_arguments() {
     with_initialized_repo(|temp| {
-        let r1 = run_command(&["add", "Task A"], &temp);
+        let r1 = run_command(&["add", "Task A", "-a", "Done"], &temp);
         let id1 = extract_task_id(&r1.stdout);
 
         // Try unblock with only one argument
@@ -256,8 +256,8 @@ fn unblock_fails_with_too_few_arguments() {
 #[test]
 fn unblock_fails_when_blockers_file_does_not_exist() {
     with_initialized_repo(|temp| {
-        let r1 = run_command(&["add", "Task A"], &temp);
-        let r2 = run_command(&["add", "Task B"], &temp);
+        let r1 = run_command(&["add", "Task A", "-a", "Done"], &temp);
+        let r2 = run_command(&["add", "Task B", "-a", "Done"], &temp);
         let id1 = extract_task_id(&r1.stdout);
         let id2 = extract_task_id(&r2.stdout);
 
@@ -271,9 +271,9 @@ fn unblock_fails_when_blockers_file_does_not_exist() {
 #[test]
 fn unblock_preserves_file_format_when_removing_middle_blocker() {
     with_initialized_repo(|temp| {
-        let r1 = run_command(&["add", "Task A"], &temp);
-        let r2 = run_command(&["add", "Task B"], &temp);
-        let r3 = run_command(&["add", "Task C"], &temp);
+        let r1 = run_command(&["add", "Task A", "-a", "Done"], &temp);
+        let r2 = run_command(&["add", "Task B", "-a", "Done"], &temp);
+        let r3 = run_command(&["add", "Task C", "-a", "Done"], &temp);
         let id1 = extract_task_id(&r1.stdout);
         let id2 = extract_task_id(&r2.stdout);
         let id3 = extract_task_id(&r3.stdout);
@@ -298,9 +298,9 @@ fn unblock_preserves_file_format_when_removing_middle_blocker() {
 #[test]
 fn unblock_preserves_other_blockers_with_empty_lines() {
     with_initialized_repo(|temp| {
-        let r1 = run_command(&["add", "Task A"], &temp);
-        let r2 = run_command(&["add", "Task B"], &temp);
-        let r3 = run_command(&["add", "Task C"], &temp);
+        let r1 = run_command(&["add", "Task A", "-a", "Done"], &temp);
+        let r2 = run_command(&["add", "Task B", "-a", "Done"], &temp);
+        let r3 = run_command(&["add", "Task C", "-a", "Done"], &temp);
         let id1 = extract_task_id(&r1.stdout);
         let id2 = extract_task_id(&r2.stdout);
         let id3 = extract_task_id(&r3.stdout);
@@ -323,9 +323,9 @@ fn unblock_preserves_other_blockers_with_empty_lines() {
 #[test]
 fn unblock_fails_when_file_exists_but_relationship_not_found() {
     with_initialized_repo(|temp| {
-        let r1 = run_command(&["add", "Task A"], &temp);
-        let r2 = run_command(&["add", "Task B"], &temp);
-        let r3 = run_command(&["add", "Task C"], &temp);
+        let r1 = run_command(&["add", "Task A", "-a", "Done"], &temp);
+        let r2 = run_command(&["add", "Task B", "-a", "Done"], &temp);
+        let r3 = run_command(&["add", "Task C", "-a", "Done"], &temp);
         let id1 = extract_task_id(&r1.stdout);
         let id2 = extract_task_id(&r2.stdout);
         let id3 = extract_task_id(&r3.stdout);
@@ -344,7 +344,7 @@ fn unblock_fails_when_file_exists_but_relationship_not_found() {
 fn unblock_removes_last_blocker_leaving_empty_file() {
     with_initialized_repo(|temp| {
         let r1 = run_command(&["add", "Task A", "-a", "Can be started"], &temp);
-        let r2 = run_command(&["add", "Task B"], &temp);
+        let r2 = run_command(&["add", "Task B", "-a", "Done"], &temp);
         let id1 = extract_task_id(&r1.stdout);
         let id2 = extract_task_id(&r2.stdout);
 

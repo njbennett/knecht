@@ -11,7 +11,7 @@ fn show_displays_task_with_description() {
 
     // Initialize and add a task with description
     run_command(&["init"], &temp);
-    let add_result = run_command(&["add", "Task title", "-d", "This is a detailed description"], &temp);
+    let add_result = run_command(&["add", "Task title", "-d", "This is a detailed description", "-a", "Done"], &temp);
     let task_id = extract_task_id(&add_result.stdout);
 
     // Run show command
@@ -32,7 +32,7 @@ fn show_displays_task_without_description() {
 
     // Initialize and add a task without description
     run_command(&["init"], &temp);
-    let add_result = run_command(&["add", "Simple task"], &temp);
+    let add_result = run_command(&["add", "Simple task", "-a", "Done"], &temp);
     let task_id = extract_task_id(&add_result.stdout);
 
     // Run show command
@@ -93,9 +93,9 @@ fn show_requires_task_id_argument() {
 fn show_displays_blockers() {
     with_initialized_repo(|temp| {
         // Create tasks
-        let r1 = run_command(&["add", "Blocked Task"], &temp);
-        let r2 = run_command(&["add", "Blocker Task"], &temp);
-        let r3 = run_command(&["add", "Another Blocker"], &temp);
+        let r1 = run_command(&["add", "Blocked Task", "-a", "Done"], &temp);
+        let r2 = run_command(&["add", "Blocker Task", "-a", "Done"], &temp);
+        let r3 = run_command(&["add", "Another Blocker", "-a", "Done"], &temp);
         let id1 = extract_task_id(&r1.stdout);
         let id2 = extract_task_id(&r2.stdout);
         let id3 = extract_task_id(&r3.stdout);
@@ -118,9 +118,9 @@ fn show_displays_blockers() {
 fn show_displays_what_task_blocks() {
     with_initialized_repo(|temp| {
         // Create tasks
-        let r1 = run_command(&["add", "Blocker Task"], &temp);
-        let r2 = run_command(&["add", "Blocked Task A"], &temp);
-        let r3 = run_command(&["add", "Blocked Task B"], &temp);
+        let r1 = run_command(&["add", "Blocker Task", "-a", "Done"], &temp);
+        let r2 = run_command(&["add", "Blocked Task A", "-a", "Done"], &temp);
+        let r3 = run_command(&["add", "Blocked Task B", "-a", "Done"], &temp);
         let id1 = extract_task_id(&r1.stdout);
         let id2 = extract_task_id(&r2.stdout);
         let id3 = extract_task_id(&r3.stdout);
@@ -142,9 +142,9 @@ fn show_displays_what_task_blocks() {
 fn show_indicates_blocker_status() {
     with_initialized_repo(|temp| {
         // Create tasks
-        let r1 = run_command(&["add", "Blocked Task"], &temp);
-        let r2 = run_command(&["add", "Open Blocker"], &temp);
-        let r3 = run_command(&["add", "Done Blocker"], &temp);
+        let r1 = run_command(&["add", "Blocked Task", "-a", "Done"], &temp);
+        let r2 = run_command(&["add", "Open Blocker", "-a", "Done"], &temp);
+        let r3 = run_command(&["add", "Done Blocker", "-a", "Done"], &temp);
         let id1 = extract_task_id(&r1.stdout);
         let id2 = extract_task_id(&r2.stdout);
         let id3 = extract_task_id(&r3.stdout);
@@ -169,9 +169,9 @@ fn show_indicates_blocker_status() {
 #[test]
 fn show_handles_blockers_file_with_empty_lines_and_malformed_entries() {
     with_initialized_repo(|temp| {
-        let r1 = run_command(&["add", "Task A"], &temp);
-        let r2 = run_command(&["add", "Task B"], &temp);
-        let r3 = run_command(&["add", "Task C"], &temp);
+        let r1 = run_command(&["add", "Task A", "-a", "Done"], &temp);
+        let r2 = run_command(&["add", "Task B", "-a", "Done"], &temp);
+        let r3 = run_command(&["add", "Task C", "-a", "Done"], &temp);
         let id1 = extract_task_id(&r1.stdout);
         let id2 = extract_task_id(&r2.stdout);
         let _id3 = extract_task_id(&r3.stdout);
@@ -190,8 +190,8 @@ fn show_handles_blockers_file_with_empty_lines_and_malformed_entries() {
 #[test]
 fn show_handles_orphaned_blocks_reference() {
     with_initialized_repo(|temp| {
-        let r1 = run_command(&["add", "Blocker Task"], &temp);
-        let r2 = run_command(&["add", "Blocked Task"], &temp);
+        let r1 = run_command(&["add", "Blocker Task", "-a", "Done"], &temp);
+        let r2 = run_command(&["add", "Blocked Task", "-a", "Done"], &temp);
         let id1 = extract_task_id(&r1.stdout);
         let id2 = extract_task_id(&r2.stdout);
 

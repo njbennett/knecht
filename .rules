@@ -95,6 +95,24 @@ knecht done task-N
 git commit -m "task-N: Description"
 ```
 
+## Acceptance Criteria Guidelines
+
+Every task requires acceptance criteria (`-a` flag). Good acceptance criteria:
+
+**DO:**
+- Be specific and testable: "cargo test passes with new test for edge case X"
+- Define a clear "done" state: "Help text shows -a flag as required"
+- Reference verification commands: "knecht show displays the criteria correctly"
+
+**DON'T:**
+- Be vague: "Works correctly" or "Is implemented"
+- Describe the work: "Add validation to cmd_add" (that's the title, not criteria)
+- Be unmeasurable: "Good user experience"
+
+**Examples:**
+- Good: "Tests pass, help updated, `knecht add` without -a shows helpful error"
+- Bad: "Feature is complete and working"
+
 ## Code Style Guidelines
 
 ### Error Handling
