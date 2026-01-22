@@ -216,6 +216,25 @@ git commit -m "task-N: Description"  # Confirm with user first!
 
 Work on ONE task per session. When complete: mark done, reflect, prepare commit, and **end the session**. If you discover subtasks/blockers, file them and stop. Let user decide next.
 
+## Skills (`.claude/commands/`)
+
+Skills are markdown files that modify agent behavior. Invoke with `/skillname`.
+
+| Skill | Purpose | When to Use |
+|-------|---------|-------------|
+| `/reflect` | Post-task reflection | **Required** after completing any task |
+| `/upstream` | File knecht feedback from other projects | Called by /reflect when working outside knecht |
+| `/journal` | Observer mode - no implementation allowed | When discussing workflows without wanting fixes |
+
+### Skill Architecture
+
+Skills live in `.claude/commands/*.md`. They can:
+- Restrict available tools via `allowed-tools:` YAML frontmatter
+- Provide structured prompts for specific workflows
+- Chain to other skills (e.g., /reflect calls /upstream)
+
+**Journal mode** (`/journal`) is special: it restricts tools so the agent can only read, search, ask questions, and file tasks - no editing or implementation. Use it for product discussions, workflow observation, or capturing insights without triggering fixes.
+
 ## Documentation
 
 Update when:
@@ -234,6 +253,7 @@ Keep docs practical, current, and concise. Prefer examples over prose.
 - Track work in knecht itself
 - Fix cargo warnings immediately
 - Work on one task per session, then stop
+- Run `/reflect` after completing a task
 
 **Never:**
 - Read .knecht/tasks or .knecht/blockers directly (use knecht commands instead)
