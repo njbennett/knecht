@@ -294,11 +294,6 @@ Pain: Merge cleanup sessions failing compounds this problem
 Pain: Blocks core use case: parallel agents working on different tasks",5,
 251,open,"Add .claude/settings.json with pre-approved permissions for cargo test, cargo build, cargo clippy, and knecht commands",,,
 252,open,Add command (e.g. knecht permissions or knecht claude-setup) that outputs a prompt directing the agent to write a .claude/settings.json with pre-approved permissions for knecht commands and test/compile/workflow commands appropriate for the project's language,,,
-253,open,"The /reflect skill is only available in knecht repo, not in projects using knecht","task-221 created .claude/commands/reflect.md in the knecht repo, but this skill won't exist in other projects that use knecht. Options: (1) Have knecht install the skill file on init, (2) Embed reflection content back in knecht binary output, (3) Document that users should copy the skill, (4) knecht done could output a URL to fetch the skill content. Need to decide the right approach.
-Pain: Session for task-36 couldn't find /reflect skill - agent in different repo
-Pain: Breaks reflection workflow for all knecht users outside knecht repo
-Pain: Agents complete tasks without reflecting - missing learning opportunities
-Pain: Core knecht feature unusable by actual users",4,
 254,open,"Update CLAUDE.md with examples of common knecht commands including knecht pain -t task-N -d ""description""",,,
 255,open,"Investigate whether removing or changing the 'For more information, try --help' hint in error messages improves agent behavior (agents may interpret it as 'usage shown is incomplete')",,,
 256,open,"Create a journal agent persona/mode for Claude - observes, asks questions, files tasks, adds pain, but doesn't implement anything","Create a journal agent persona/mode for Claude - observes, asks questions, files tasks, adds pain, but doesn't implement anything. Use case: User uses journal mode to observe knecht agent usage patterns and capture insights without the agent trying to implement fixes.
@@ -306,12 +301,6 @@ Pain: Wanted journal mode to discuss merge commit workflow issue without impleme
 Pain: User wanted to use journal mode to discuss allowed commands in settings
 Pain: User wanted to start journal session to discuss workflow and capture insights",4,
 257,open,Bug: 'knecht list' panics with 'failed printing to stdout: Broken pipe' when output is piped to head or other commands that close early,,,
-258,open,Bug: Merge cleanup claude session doesn't complete - fails to move work to main and clean up worktree/branch,"task-244 implemented launching a claude session for merge cleanup, but the session doesn't actually finish the job. User still has orphaned worktree with work that wasn't moved to main, and the branch wasn't cleaned up.
-Pain: Blocking parallel agent workflow - worktrees accumulate without cleanup
-Pain: User has to manually clean up after every failed merge session
-Pain: Urgent: breaks core cw workflow for parallel agents
-Pain: After rebase conflict resolution, claude agent doesn't complete bringing branch back onto main - user knows from experience it won't finish
-Pain: User had to manually resolve rebase conflicts - merge cleanup workflow doesn't handle this automatically",5,
 259,open,"cw script creates merge commits when local main is behind origin After rebasing branch onto origin/main, the script tries to merge into local main which may be behind origin. This causes ff-only to fail, and the fallback instructions tell user to do a regular merge (creating merge commit). Fix: update local main with 'git pull --ff-only' before attempting the branch merge.",,,
 260,open,knecht add should accept --description as alias for -d,User tried 'knecht add TITLE --description DESC' which failed. --description is a natural long-form flag that should work as an alias for -d.,,
 261,open,Implement /mikado skill for time-boxed task attempts,"A Claude Code skill that implements the Mikado Method for tackling complex tasks. The method helps avoid getting stuck on prerequisites by time-boxing attempts and systematically identifying blockers.
