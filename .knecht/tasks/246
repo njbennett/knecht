@@ -1,0 +1,1 @@
+246,open,Agent didn't recognize file-too-large-to-read error during reflection,"Pain: During session reflection, agent didn't mention that integration_test.rs was too large to read (40869 tokens exceeds 25000 limit). Agent worked around it during the session but didn't flag it as a problem when reflecting on errors encountered. User had to point it out.",,

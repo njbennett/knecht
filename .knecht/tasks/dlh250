@@ -1,0 +1,1 @@
+dlh250,done,"require acceptance criteria when creating a task, not starting it",on start is mostly just annoying and breaks the cw workflow,,"knecht start works on tasks without acceptance criteria, but knecht add fails if -a isn't provided. help is also updated to reflect this."

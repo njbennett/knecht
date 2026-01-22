@@ -1,0 +1,1 @@
+141,open,Extract Method: find_oldest_open_task,"In mark_task_done_with_fs, we have inline logic to find oldest open task. This could be extracted to a reusable function. Similar to how we extracted find_next_task_with_fs. Would make the code more readable and testable. Related to task-118 (task ID parsing) - both involve filtering and finding specific tasks.",,

@@ -1,0 +1,1 @@
+120,open,Track skip count for oldest open task,"When we skip over the oldest task repeatedly, we lose track of priorities. Add a way to track how many times the oldest open task has been passed over in favor of other work. This would help ensure we don't abandon important foundational work indefinitely.",,

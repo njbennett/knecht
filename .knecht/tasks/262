@@ -1,0 +1,1 @@
+262,open,knecht needs 'close as superseded/merged' workflow,"When merging task-129 into task-261, used 'knecht done' which triggered reflection prompts as if real work was completed. Need a way to close tasks as 'superseded by task-X' or 'merged into task-X' without implying the task itself was completed. Could be: knecht close task-129 --superseded-by task-261",,

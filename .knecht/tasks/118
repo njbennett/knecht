@@ -1,0 +1,1 @@
+118,done,Extract Method: Task ID parsing (strip 'task-' prefix),Both cmd_show and cmd_done duplicate the logic: task_arg.strip_prefix('task-').unwrap_or(task_arg). Extract into a helper function like parse_task_id(arg: &str) -> &str. This is a small but clear case of 'Duplicate Code' smell. Pain count: 1 (noticed during task-35 reflection),3,

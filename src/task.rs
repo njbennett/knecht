@@ -1,6 +1,6 @@
 use std::fs::{self, OpenOptions};
 use std::io::{self, BufRead, BufReader, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::fmt;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -14,6 +14,10 @@ pub trait FileSystem {
     fn create(&self, path: &Path) -> io::Result<Box<dyn Write>>;
     fn create_dir_all(&self, path: &Path) -> io::Result<()>;
     fn append(&self, path: &Path) -> io::Result<Box<dyn Write>>;
+    fn is_dir(&self, path: &Path) -> bool;
+    fn is_file(&self, path: &Path) -> bool;
+    fn read_dir(&self, path: &Path) -> io::Result<Vec<PathBuf>>;
+    fn remove_file(&self, path: &Path) -> io::Result<()>;
 }
 
 /// Real filesystem implementation
@@ -44,6 +48,26 @@ impl FileSystem for RealFileSystem {
             .append(true)
             .open(path)?;
         Ok(Box::new(file))
+    }
+
+    fn is_dir(&self, path: &Path) -> bool {
+        path.is_dir()
+    }
+
+    fn is_file(&self, path: &Path) -> bool {
+        path.is_file()
+    }
+
+    fn read_dir(&self, path: &Path) -> io::Result<Vec<PathBuf>> {
+        let mut entries = Vec::new();
+        for entry in fs::read_dir(path)? {
+            entries.push(entry?.path());
+        }
+        Ok(entries)
+    }
+
+    fn remove_file(&self, path: &Path) -> io::Result<()> {
+        fs::remove_file(path)
     }
 }
 
@@ -117,16 +141,78 @@ pub fn read_tasks_with_fs(fs: &dyn FileSystem) -> Result<Vec<Task>, KnechtError>
         return Ok(Vec::new());
     }
 
+    // Check if it's a directory (new format) or file (old format)
+    if fs.is_dir(path) {
+        // New directory-based format: read each file as a single task
+        let entries = fs.read_dir(path)?;
+        let mut tasks = Vec::new();
+        for entry in entries {
+            let reader = fs.open(&entry)?;
+            let mut file_tasks = CsvSerializer::read(reader)?;
+            tasks.append(&mut file_tasks);
+        }
+        Ok(tasks)
+    } else {
+        // Old single-file format: read all tasks from one file
+        let reader = fs.open(path)?;
+        CsvSerializer::read(reader)
+    }
+}
+
+/// Migrate from old single-file format to new directory-based format
+pub fn migrate_to_directory_format(fs: &dyn FileSystem) -> Result<(), KnechtError> {
+    let path = Path::new(".knecht/tasks");
+
+    // Only migrate if old file format exists
+    if !fs.exists(path) || fs.is_dir(path) {
+        return Ok(());
+    }
+
+    // Read all tasks from old file
     let reader = fs.open(path)?;
-    CsvSerializer::read(reader)
+    let tasks = CsvSerializer::read(reader)?;
+
+    // Remove old file first
+    fs.remove_file(path)?;
+
+    // Create new directory
+    fs.create_dir_all(path)?;
+
+    // Write each task to individual file
+    for task in &tasks {
+        let task_path = path.join(&task.id);
+        let file = fs.create(&task_path)?;
+        CsvSerializer::write(std::slice::from_ref(task), file)?;
+    }
+
+    Ok(())
 }
 
 pub fn write_tasks_with_fs(tasks: &[Task], fs: &dyn FileSystem) -> Result<(), KnechtError> {
-    // Ensure .knecht directory exists
-    fs.create_dir_all(Path::new(".knecht"))?;
+    // Migrate from old file format if needed
+    migrate_to_directory_format(fs)?;
 
-    let file = fs.create(Path::new(".knecht/tasks"))?;
-    CsvSerializer::write(tasks, file)
+    // Ensure .knecht/tasks directory exists (new format)
+    fs.create_dir_all(Path::new(".knecht/tasks"))?;
+
+    // Write each task to its own file
+    for task in tasks {
+        let task_path = PathBuf::from(".knecht/tasks").join(&task.id);
+        let file = fs.create(&task_path)?;
+        CsvSerializer::write(std::slice::from_ref(task), file)?;
+    }
+    Ok(())
+}
+
+/// Writes a single task to its own file (optimized for single-task updates)
+pub fn write_task_with_fs(task: &Task, fs: &dyn FileSystem) -> Result<(), KnechtError> {
+    // Ensure .knecht/tasks directory exists
+    fs.create_dir_all(Path::new(".knecht/tasks"))?;
+
+    let task_path = PathBuf::from(".knecht/tasks").join(&task.id);
+    let file = fs.create(&task_path)?;
+    CsvSerializer::write(std::slice::from_ref(task), file)?;
+    Ok(())
 }
 
 /// Generates a 6-character random alphanumeric ID using timestamp and process ID for entropy.
@@ -155,8 +241,11 @@ pub fn generate_random_id() -> String {
 pub fn add_task_with_fs(title: String, description: Option<String>, acceptance_criteria: Option<String>, fs: &dyn FileSystem) -> Result<String, KnechtError> {
     let new_id = generate_random_id();
 
-    // Ensure .knecht directory exists
-    fs.create_dir_all(Path::new(".knecht"))?;
+    // Migrate from old file format if needed
+    migrate_to_directory_format(fs)?;
+
+    // Ensure .knecht/tasks directory exists
+    fs.create_dir_all(Path::new(".knecht/tasks"))?;
 
     let task = Task {
         id: new_id.clone(),
@@ -167,21 +256,38 @@ pub fn add_task_with_fs(title: String, description: Option<String>, acceptance_c
         acceptance_criteria,
     };
 
-    let file = fs.append(Path::new(".knecht/tasks"))?;
-    CsvSerializer::append_task(&task, file)?;
+    // Create individual file for the new task
+    let task_path = PathBuf::from(".knecht/tasks").join(&new_id);
+    let file = fs.create(&task_path)?;
+    CsvSerializer::write(std::slice::from_ref(&task), file)?;
 
     Ok(new_id)
 }
 
 pub fn find_task_by_id_with_fs(task_id: &str, fs: &dyn FileSystem) -> Result<Task, KnechtError> {
+    let path = Path::new(".knecht/tasks");
+
+    // Optimized: try to read single file directly if directory-based storage
+    if fs.is_dir(path) {
+        let task_path = path.join(task_id);
+        if fs.exists(&task_path) {
+            let reader = fs.open(&task_path)?;
+            let tasks = CsvSerializer::read(reader)?;
+            if let Some(task) = tasks.into_iter().next() {
+                return Ok(task);
+            }
+        }
+        return Err(KnechtError::TaskNotFound(task_id.to_string()));
+    }
+
+    // Fallback: read all tasks (old format)
     let tasks = read_tasks_with_fs(fs)?;
-    
     for task in tasks {
         if task.id == task_id {
             return Ok(task);
         }
     }
-    
+
     Err(KnechtError::TaskNotFound(task_id.to_string()))
 }
 
@@ -231,39 +337,27 @@ pub fn mark_task_done_with_fs(task_id: &str, fs: &dyn FileSystem) -> Result<Task
 }
 
 pub fn mark_task_delivered_with_fs(task_id: &str, fs: &dyn FileSystem) -> Result<Task, KnechtError> {
-    let mut tasks = read_tasks_with_fs(fs)?;
+    // Optimized: read and write single task file
+    let mut task = find_task_by_id_with_fs(task_id, fs)?;
 
-    for task in &mut tasks {
-        if task.id == task_id {
-            if task.status == "delivered" {
-                return Err(KnechtError::TaskAlreadyDelivered(task_id.to_string()));
-            }
-            if task.status == "done" {
-                return Err(KnechtError::TaskAlreadyDone(task_id.to_string()));
-            }
-            task.mark_delivered();
-            let delivered_task = task.clone();
-            write_tasks_with_fs(&tasks, fs)?;
-            return Ok(delivered_task);
-        }
+    if task.status == "delivered" {
+        return Err(KnechtError::TaskAlreadyDelivered(task_id.to_string()));
+    }
+    if task.status == "done" {
+        return Err(KnechtError::TaskAlreadyDone(task_id.to_string()));
     }
 
-    Err(KnechtError::TaskNotFound(task_id.to_string()))
+    task.mark_delivered();
+    write_task_with_fs(&task, fs)?;
+    Ok(task)
 }
 
 pub fn mark_task_claimed_with_fs(task_id: &str, fs: &dyn FileSystem) -> Result<Task, KnechtError> {
-    let mut tasks = read_tasks_with_fs(fs)?;
-
-    for task in &mut tasks {
-        if task.id == task_id {
-            task.mark_claimed();
-            let claimed_task = task.clone();
-            write_tasks_with_fs(&tasks, fs)?;
-            return Ok(claimed_task);
-        }
-    }
-
-    Err(KnechtError::TaskNotFound(task_id.to_string()))
+    // Optimized: read and write single task file
+    let mut task = find_task_by_id_with_fs(task_id, fs)?;
+    task.mark_claimed();
+    write_task_with_fs(&task, fs)?;
+    Ok(task)
 }
 
 /// Returns a list of task IDs that block the given task (i.e., tasks that must be completed first)
@@ -387,52 +481,34 @@ pub fn find_next_task_with_fs(fs: &dyn FileSystem) -> Result<Option<Task>, Knech
 }
 
 pub fn increment_pain_count_with_fs(task_id: &str, pain_description: Option<&str>, fs: &dyn FileSystem) -> Result<Task, KnechtError> {
-    let mut tasks = read_tasks_with_fs(fs)?;
+    // Optimized: read and write single task file
+    let mut task = find_task_by_id_with_fs(task_id, fs)?;
 
-    for task in &mut tasks {
-        if task.id == task_id {
-            // Increment pain_count field
-            task.pain_count = Some(task.pain_count.unwrap_or(0) + 1);
+    // Increment pain_count field
+    task.pain_count = Some(task.pain_count.unwrap_or(0) + 1);
 
-            // Append pain description if provided
-            if let Some(desc) = pain_description {
-                let pain_note = format!("Pain: {}", desc);
-                task.description = Some(match &task.description {
-                    Some(existing) => format!("{}\n{}", existing, pain_note),
-                    None => pain_note,
-                });
-            }
-
-            let updated_task = task.clone();
-            write_tasks_with_fs(&tasks, fs)?;
-            return Ok(updated_task);
-        }
+    // Append pain description if provided
+    if let Some(desc) = pain_description {
+        let pain_note = format!("Pain: {}", desc);
+        task.description = Some(match &task.description {
+            Some(existing) => format!("{}\n{}", existing, pain_note),
+            None => pain_note,
+        });
     }
 
-    Err(KnechtError::TaskNotFound(task_id.to_string()))
+    write_task_with_fs(&task, fs)?;
+    Ok(task)
 }
 
 pub fn delete_task_with_fs(task_id: &str, fs: &dyn FileSystem) -> Result<Task, KnechtError> {
-    let mut tasks = read_tasks_with_fs(fs)?;
-    
-    // Find the task to delete
-    let mut deleted_task = None;
-    tasks.retain(|task| {
-        if task.id == task_id {
-            deleted_task = Some(task.clone());
-            false // Remove this task
-        } else {
-            true // Keep this task
-        }
-    });
-    
-    match deleted_task {
-        Some(task) => {
-            write_tasks_with_fs(&tasks, fs)?;
-            Ok(task)
-        }
-        None => Err(KnechtError::TaskNotFound(task_id.to_string()))
-    }
+    // Read the task first to return its data
+    let task = find_task_by_id_with_fs(task_id, fs)?;
+
+    // Delete the task file
+    let task_path = PathBuf::from(".knecht/tasks").join(task_id);
+    fs.remove_file(&task_path)?;
+
+    Ok(task)
 }
 
 pub fn update_task_with_fs(
@@ -442,32 +518,26 @@ pub fn update_task_with_fs(
     new_acceptance_criteria: Option<Option<String>>,
     fs: &dyn FileSystem
 ) -> Result<Task, KnechtError> {
-    let mut tasks = read_tasks_with_fs(fs)?;
+    // Optimized: read and write single task file
+    let mut task = find_task_by_id_with_fs(task_id, fs)?;
 
-    for task in &mut tasks {
-        if task.id == task_id {
-            // Update title if provided
-            if let Some(title) = new_title {
-                task.title = title;
-            }
-
-            // Update description if provided
-            // None = no change, Some(None) = clear description, Some(Some(desc)) = set description
-            if let Some(desc_opt) = new_description {
-                task.description = desc_opt;
-            }
-
-            // Update acceptance_criteria if provided
-            // None = no change, Some(None) = clear criteria, Some(Some(criteria)) = set criteria
-            if let Some(criteria_opt) = new_acceptance_criteria {
-                task.acceptance_criteria = criteria_opt;
-            }
-
-            let updated_task = task.clone();
-            write_tasks_with_fs(&tasks, fs)?;
-            return Ok(updated_task);
-        }
+    // Update title if provided
+    if let Some(title) = new_title {
+        task.title = title;
     }
 
-    Err(KnechtError::TaskNotFound(task_id.to_string()))
+    // Update description if provided
+    // None = no change, Some(None) = clear description, Some(Some(desc)) = set description
+    if let Some(desc_opt) = new_description {
+        task.description = desc_opt;
+    }
+
+    // Update acceptance_criteria if provided
+    // None = no change, Some(None) = clear criteria, Some(Some(criteria)) = set criteria
+    if let Some(criteria_opt) = new_acceptance_criteria {
+        task.acceptance_criteria = criteria_opt;
+    }
+
+    write_task_with_fs(&task, fs)?;
+    Ok(task)
 }

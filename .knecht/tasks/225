@@ -1,0 +1,2 @@
+225,open,Add --status flag to 'knecht list' to filter by task status,"Agent tried 'knecht list --status delivered' to see delivered tasks but the flag doesn't exist.
+Pain: User had to grep list results manually to find high-pain open tasks. A --status=open filter would have excluded the delivered task-221.",1,

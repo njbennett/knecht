@@ -1,0 +1,2 @@
+233,open,Add ability to sort tasks by pain count,"No way to find tasks with highest pain. Have to grep and manually filter closed tasks. Should be able to do something like 'knecht list --sort pain' to see what has accumulated the most pain.
+Pain: User had to grep list results to find high-pain tasks, landed on a delivered task (task-221) thinking it was open. Sorting by pain would have shown truly open high-pain tasks first.",1,

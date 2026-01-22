@@ -1,0 +1,1 @@
+208,done,"Show subtask/blocker syntax in knecht add output When an agent runs 'knecht add', the output should mention how to file the task as a subtask or blocker instead (e.g., 'To file as subtask: knecht subtask <parent-id> <title>'). This teaches agents the syntax at the moment they need it, without requiring them to read docs or source code.",,,

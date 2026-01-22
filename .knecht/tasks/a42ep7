@@ -1,0 +1,1 @@
+a42ep7,open,Clarify TDD guidance for non-code tasks like skill files or documentation,"Journal mode task-256 created a .claude/commands/journal.md skill file. No test possible - it's a prompt, not Rust code. Agent hesitated about whether this violated TDD rules.",,"CLAUDE.md explains when TDD applies vs doesn't (config files, prompts, docs)"

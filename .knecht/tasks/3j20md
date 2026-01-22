@@ -1,0 +1,1 @@
+3j20md,open,Update cw script to run /mikado skill at start of task attempts,"When starting a task with cw, automatically invoke the /mikado skill to set up time-boxed attempts with proper plan mode workflow. This should reduce permission prompts by getting plans filed upfront.",,

@@ -1,0 +1,1 @@
+179,open,Decide on and implement verification command,"Choose command name and semantics for moving delivered→done. Options: keep 'knecht done' for verification, add 'knecht verify', add 'knecht accept', etc. Command should mark delivered task as done after verification. Consider what output/guidance to provide.",,

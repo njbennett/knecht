@@ -1,0 +1,1 @@
+237,open,"Add automated tests for cw script (or rewrite in Rust) The cw bash script lacks automated tests. Options: (1) Write tests using Rust's test runner that invoke the script, or (2) Rewrite the script in Rust for better testability. Defer until pain accumulates.",,,

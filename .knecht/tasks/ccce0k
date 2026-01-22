@@ -1,0 +1,23 @@
+ccce0k,open,Rewrite /reflect skill to bias agents toward filing tasks rather than dismissing friction,"Current problem: Agents list friction points but phrase them descriptively, then use 'what IS a knecht bug' framing to dismiss each item. The REQUIRED ACTION section isn't working.
+
+Example output (bad):
+1. What friction did you encounter?
+- Setup friction: The project required mix setup and npm install before tests would run.
+- Test pattern learning: I had to discover that Story.update_state/3 returns a 3-tuple not a 2-tuple.
+- Test setup interference: My first test placement failed because shared setup created interfering state.
+- Multiple assertions rule: Had to refactor from two assertions to one.
+
+3. What IS a knecht bug?
+- Setup requirements - not a knecht bug, documented
+- Test pattern discovery - not a knecht bug, normal exploration
+- Test setup interference - not a knecht bug, normal test organization
+- Multiple assertions rule - not a knecht bug, caught by meta-test
+
+4. REQUIRED ACTION: Nothing to file because friction was normal exploration.
+
+What output SHOULD have been (potential tasks):
+- Document expected return types for Story functions in CLAUDE.md
+- Test setup in split_backlog describe block creates implicit state that interferes with new tests
+
+Fix: Remove 'what IS a knecht bug' framing. Ask agents to convert each friction point into a potential task. Bias toward overeager filing rather than dismissing.
+Pain: Had to explicitly prompt agent 'what tasks would you file' to get actionable list - reflect didn't produce this naturally",1,

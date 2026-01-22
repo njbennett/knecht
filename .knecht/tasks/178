@@ -1,0 +1,2 @@
+178,done,Update 'knecht list' to distinguish delivered tasks visually,"Show delivered tasks distinctly in list output. Consider: different symbol/marker than [ ] and [x], maybe [>] or [?]. Should appear between open and done tasks in output, or with clear visual distinction.
+Pain: task-221 shows as [ ] in list output but is actually delivered. User thought it was open because delivered tasks look identical to open tasks.",1,

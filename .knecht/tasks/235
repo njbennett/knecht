@@ -1,0 +1,1 @@
+235,done,cw script passes task context to Claude when branch name matches task-N pattern,"When you run cw task-48, Claude now starts with 'knecht task-48' as the initial prompt so it knows what task to work on immediately.",,

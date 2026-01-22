@@ -43,10 +43,11 @@ fn add_task_with_pipe_in_description_works_with_escaping() {
     let result = run_command(&["add", "Valid title", "-d", "Description with | pipe", "-a", "Done"], &temp);
 
     assert!(result.success, "Should succeed with pipe in description (CSV handles it naturally)");
+    let task_id = extract_task_id(&result.stdout);
 
     // Verify the pipe is preserved in the file (CSV format) and can be read back
-    let tasks_file = temp.join(".knecht/tasks");
-    let content = fs::read_to_string(&tasks_file).unwrap();
+    let task_file = temp.join(format!(".knecht/tasks/{}", task_id));
+    let content = fs::read_to_string(&task_file).unwrap();
 
     // CSV format preserves pipe without backslash escaping
     assert!(content.contains("Description with | pipe"),
@@ -94,12 +95,12 @@ fn read_tasks_with_pipe_in_description_should_fail_or_preserve() {
 #[test]
 fn csv_format_edge_cases_for_coverage() {
     let temp = setup_temp_dir();
-    fs::create_dir_all(temp.join(".knecht")).unwrap();
-    let tasks_file = temp.join(".knecht/tasks");
+    fs::create_dir_all(temp.join(".knecht/tasks")).unwrap();
+    let tasks_dir = temp.join(".knecht/tasks");
 
     // Test 1: Backslash in CSV format (no special escaping needed)
     {
-        let mut file = fs::File::create(&tasks_file).unwrap();
+        let mut file = fs::File::create(tasks_dir.join("1")).unwrap();
         writeln!(file, "1,open,\"Test\\Task\",\"Description with backslash\\here\",").unwrap();
         drop(file);
 
@@ -109,7 +110,7 @@ fn csv_format_edge_cases_for_coverage() {
 
     // Test 2: Multiple pipes (no escaping needed in CSV)
     {
-        let mut file = fs::File::create(&tasks_file).unwrap();
+        let mut file = fs::File::create(tasks_dir.join("2")).unwrap();
         writeln!(file, "2,open,\"Test|||Multi\",\"Desc|||combo\",").unwrap();
         drop(file);
 
@@ -119,7 +120,7 @@ fn csv_format_edge_cases_for_coverage() {
 
     // Test 3: Commas require quoting in CSV
     {
-        let mut file = fs::File::create(&tasks_file).unwrap();
+        let mut file = fs::File::create(tasks_dir.join("3")).unwrap();
         writeln!(file, "3,open,\"TestA, B, C\",\"DescA, B, C\",").unwrap();
         drop(file);
 
@@ -129,7 +130,7 @@ fn csv_format_edge_cases_for_coverage() {
 
     // Test 4: Empty description field
     {
-        let mut file = fs::File::create(&tasks_file).unwrap();
+        let mut file = fs::File::create(tasks_dir.join("4")).unwrap();
         writeln!(file, "4,open,\"TaskNoDesc\",,").unwrap();
         drop(file);
 
@@ -139,7 +140,7 @@ fn csv_format_edge_cases_for_coverage() {
 
     // Test 5: Quotes in CSV (escaped with double quotes)
     {
-        let mut file = fs::File::create(&tasks_file).unwrap();
+        let mut file = fs::File::create(tasks_dir.join("5")).unwrap();
         writeln!(file, "5,open,\"Title with \"\"quotes\"\"\",\"Desc with \"\"quotes\"\"\",").unwrap();
         drop(file);
 
@@ -149,17 +150,17 @@ fn csv_format_edge_cases_for_coverage() {
 
     // Test 6: Add task with backslash in title
     {
-        run_command(&["init"], &temp);
         let result = run_command(&["add", "Task\\with\\backslash", "-d", "Desc\\with\\backslash", "-a", "Done"], &temp);
         assert!(result.success, "Should add task with backslashes");
+        let task_id = extract_task_id(&result.stdout);
 
-        let content = fs::read_to_string(&tasks_file).unwrap();
+        let content = fs::read_to_string(tasks_dir.join(&task_id)).unwrap();
         assert!(content.contains("Task\\with\\backslash"), "Should preserve backslashes in CSV");
     }
 
     // Test 7: Multiple special characters
     {
-        let mut file = fs::File::create(&tasks_file).unwrap();
+        let mut file = fs::File::create(tasks_dir.join("7")).unwrap();
         writeln!(file, "7,open,\"Test with, comma | pipe\",\"Multiple|||pipes\",").unwrap();
         drop(file);
 
@@ -169,7 +170,7 @@ fn csv_format_edge_cases_for_coverage() {
 
     // Test 8: Mixed special characters
     {
-        let mut file = fs::File::create(&tasks_file).unwrap();
+        let mut file = fs::File::create(tasks_dir.join("8")).unwrap();
         writeln!(file, "8,open,\"Test\\|Mix\",\"Desc|\\combo\",").unwrap();
         drop(file);
 
@@ -205,9 +206,10 @@ fn test_add_with_backslash_and_pipe_combination() {
     // Add task with both backslashes and pipes - CSV handles these naturally
     let result = run_command(&["add", "Test\\path|command", "-d", "Run\\cmd|filter", "-a", "Done"], &temp);
     assert!(result.success, "Should add task with backslash and pipe");
+    let task_id = extract_task_id(&result.stdout);
 
-    let tasks_file = temp.join(".knecht/tasks");
-    let content = fs::read_to_string(&tasks_file).unwrap();
+    let task_file = temp.join(format!(".knecht/tasks/{}", task_id));
+    let content = fs::read_to_string(&task_file).unwrap();
 
     // CSV format preserves these characters without backslash escaping
     assert!(content.contains("Test\\path|command"), "Should preserve backslash and pipe in CSV");
@@ -431,9 +433,11 @@ fn csv_format_reading_basic_fields() {
     let temp = setup_temp_dir();
     run_command(&["init"], &temp);
 
-    // Write CSV-formatted task data
-    let tasks_path = temp.join(".knecht/tasks");
-    fs::write(&tasks_path, "1,open,\"Simple title\",,\n2,done,\"Another task\",\"Description here\",3\n")
+    // Write CSV-formatted task data (now as individual files)
+    let tasks_dir = temp.join(".knecht/tasks");
+    fs::write(tasks_dir.join("1"), "1,open,\"Simple title\",,\n")
+        .expect("Failed to write test file");
+    fs::write(tasks_dir.join("2"), "2,done,\"Another task\",\"Description here\",3\n")
         .expect("Failed to write test file");
 
     // list should read CSV format
@@ -452,9 +456,11 @@ fn csv_format_handles_special_characters() {
     let temp = setup_temp_dir();
     run_command(&["init"], &temp);
 
-    // Write CSV with special characters that would break pipe format
-    let tasks_path = temp.join(".knecht/tasks");
-    fs::write(&tasks_path, "1,open,\"Title with, comma\",,\n2,open,\"Title with | pipe\",\"Description with \\\"quotes\\\"\",\n")
+    // Write CSV with special characters that would break pipe format (now as individual files)
+    let tasks_dir = temp.join(".knecht/tasks");
+    fs::write(tasks_dir.join("1"), "1,open,\"Title with, comma\",,\n")
+        .expect("Failed to write test file");
+    fs::write(tasks_dir.join("2"), "2,open,\"Title with | pipe\",\"Description with \\\"quotes\\\"\",\n")
         .expect("Failed to write test file");
 
     let result = run_command(&["list"], &temp);

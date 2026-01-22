@@ -1,0 +1,2 @@
+afxaiu,open,Document breaking change workflow in CLAUDE.md,"When adding requirements to existing commands, search for all usages in tests before considering implementation complete. Grep for the command name.
+Pain: During task-dlh250, had to update ~90 test calls across 12+ files after changing knecht add to require -a flag. No checklist warned about this scope.",1,

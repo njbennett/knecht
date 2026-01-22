@@ -1,0 +1,29 @@
+219,done,Figure out how to get agents using knecht to consistently start work in a new git worktree for parallel agent execution,"## Problem
+Claude sessions can't effectively manage worktrees themselves - shell doesn't persist cd, so must prefix every command with path.
+
+## Solution
+User-run wrapper script that:
+1. Creates worktree with timestamped branch: git worktree add ../repo-work -b work-YYYYMMDD-HHMMSS
+2. cd into worktree
+3. Run claude (blocks until exit)
+4. On claude exit (any reason - quit, /clear, crash):
+   - Check for uncommitted changes → warn and abort if dirty
+   - Check if any commits on branch → skip merge if none
+   - git fetch origin && git rebase main
+   - cd to main worktree && git merge --ff-only branch
+   - git worktree remove ../repo-work
+   - git branch -d branch
+
+## Edge Cases
+- Uncommitted changes: abort cleanup, warn user, leave worktree intact
+- Rebase conflicts: abort cleanup, warn user, leave worktree intact  
+- No commits made: just cleanup worktree, no merge needed
+- Main moved during session: rebase handles it, conflicts possible
+
+## Interface
+Shell function or script: cw [branch-name]
+- If branch-name provided, use it; otherwise generate timestamp
+- Could live in user's dotfiles or be a knecht subcommand
+Pain: User had to manually create worktree and start Claude session for task-39 - wants knecht start task-id to automate this
+Pain: User thought they'd created separate worktrees for 2 agents but both ended up in same directory - worktree setup is error-prone without automation
+Pain: User thought they'd created separate worktrees for 2 agents but both ended up in same directory - worktree setup is error-prone without automation",4,

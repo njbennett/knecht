@@ -1,0 +1,1 @@
+234,open,beads2knecht still outputs pipe format instead of CSV,The beads2knecht tool outputs pipe-delimited format but knecht now uses CSV. The tool's strategy message also says 'in 4th pipe-delimited field'. Update the tool to output correct CSV format.,,

@@ -1,0 +1,1 @@
+110,open,"Add task ID sequencing validation  Add self-check command or automated validation to warn about task ID issues: (1) Non-sequential IDs, (2) Large gaps in sequence (e.g., tasks 1-48 missing, then 99), (3) Duplicate IDs. Could be part of 'knecht list' or a separate 'knecht check' command. Would help detect data integrity issues like the task-106 incident.",,1,

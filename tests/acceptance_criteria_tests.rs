@@ -139,15 +139,17 @@ fn acceptance_criteria_preserved_in_csv() {
         let result = run_command(&["add", "Task", "-a", "Test with, comma and | pipe"], &temp);
         assert!(result.success, "add should succeed");
 
-        // Verify CSV format handles it correctly
-        let tasks_content = fs::read_to_string(temp.join(".knecht/tasks"))
-            .expect("Failed to read tasks file");
+        // Extract task ID to find the individual task file
+        let task_id = extract_task_id(&result.stdout);
+
+        // Verify CSV format handles it correctly (now reading from individual task file)
+        let tasks_content = fs::read_to_string(temp.join(format!(".knecht/tasks/{}", task_id)))
+            .expect("Failed to read task file");
 
         // Should properly escape/quote the content
         assert!(tasks_content.contains("Test with, comma and | pipe"), "Criteria should be in file");
 
         // Verify it can be read back correctly
-        let task_id = extract_task_id(&result.stdout);
         let show = run_command(&["show", &format!("task-{}", task_id)], &temp);
         assert!(show.stdout.contains("Test with, comma and | pipe"), "Criteria should be preserved");
     });

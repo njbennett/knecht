@@ -1,0 +1,1 @@
+117,open,Track source task when recording pain instances,"When adding pain to a task, record which task the pain was experienced during. This provides context for understanding pain patterns. Example: 'task-35 caused pain during task-8' helps understand workflow issues. Related to task-38 (pain command) and task-116 (pain increment).",2,

@@ -1,0 +1,1 @@
+32tewx,open,StoryTime stories and knecht tasks aren't linked - easy to mark story done when tasks incomplete,"User accidentally marked a StoryTime story 'done' when connected knecht tasks weren't finished, had to reject and restart. No mechanism to verify knecht task completion before story completion, or to see which knecht tasks relate to which stories.",,

@@ -1,0 +1,3 @@
+245,open,No visibility into worktrees with unmerged work from other sessions,"Pain: task-213 had a lingering worktree with committed but unmerged work. User had to remember it existed and ask 'What's the work in task-213?' Neither knecht nor cw surfaced this information. When cw cleanup fails (e.g., due to merge conflicts), the worktree is preserved but there's no mechanism to discover it later. This leads to orphaned work that may be forgotten.
+Pain: When cw-managed claude session exits with uncommitted changes, there's no good recovery path except manually manipulating the worktree. Need a way to surface and recover uncommitted work.
+Pain: User forgot to tell agent to commit before closing session, now worktree needs manual cleanup",2,

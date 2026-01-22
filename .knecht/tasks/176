@@ -1,0 +1,1 @@
+176,done,Add 'knecht deliver' command to mark tasks as delivered,Replaces current usage of 'knecht done'. Marks task as delivered (ready for verification). Output should guide user to verification workflow.,,

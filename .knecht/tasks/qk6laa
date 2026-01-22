@@ -1,0 +1,3 @@
+qk6laa,open,Improve acceptance criteria flag UX,"Pain: From storytime while investigating room auth bug: Agent tried -a flag multiple times. First with multiple -a flags, then with string starting with dashes. Had to experiment to find working format (numbered list).",1,"Support multiple -a flags (e.g., -a 'first' -a 'second') OR
+   document expected format in --help output. Current behavior requires trial and error to discover that criteria must be
+    a single string with newlines."

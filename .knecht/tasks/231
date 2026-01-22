@@ -1,0 +1,3 @@
+231,open,Bug: StoryTime repo has malformed task ID 'task--' - investigate how this got created and prevent it,"Pain: Bug in task ID generation - created 'task--' which is invalid
+Pain: Malformed task IDs break knecht workflows and look unprofessional
+Pain: Should fix quickly - bug that affects data integrity",3,

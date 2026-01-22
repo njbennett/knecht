@@ -1,0 +1,20 @@
+230,open,StoryTime feature tasks get buried under agent-generated cleanup/subtasks,"## Problem
+When using knecht with StoryTime, feature tasks from stories get added to the backlog. But agents generate subtasks and cleanup tasks during work, and these accumulate. Since knecht next doesn't distinguish between task sources, days can pass working on cleanup before returning to StoryTime features.
+
+## Current workflow
+- StoryTime tasks added manually via 'knecht add' (copy/paste from StoryTime)
+- Agents generate subtasks/cleanup during work
+- knecht next suggests whatever's available, no preference for features
+
+## Desires
+- Don't want to spend days on cleanup without making progress on features
+- But also don't want features to *always* win (cleanup has value too)
+- Would be nice to automate StoryTime → knecht import eventually (separate concern?)
+
+## Ideas discussed (not prescriptive)
+- Task types/tags (feature, chore, subtask)
+- Priority numbers
+- Source tracking
+- Interleaving strategies
+- knecht next could consider task type in its suggestions
+Pain: User noticed they've been working on cleanup tasks for a while and not getting to StoryTime features",1,

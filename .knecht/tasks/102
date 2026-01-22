@@ -1,0 +1,1 @@
+102,done,Refactor: Extract Method on test helper setup/teardown Multiple tests repeat the pattern of setup_temp_dir() / run_command() / cleanup_temp_dir(). This is a 'Duplicated Code' smell. Consider 'Extract Method' to create test_in_temp_dir(test_fn) helper that handles setup/teardown. See tests/integration_test.rs.,,,

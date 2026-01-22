@@ -92,8 +92,8 @@ fn add_task_with_description() {
         assert!(!task_id.is_empty(), "Should create a task");
 
         // Verify task file contains description in proper CSV format: id,status,title,description,pain_count
-        let tasks_content = fs::read_to_string(temp.join(".knecht/tasks"))
-            .expect("Failed to read tasks file");
+        let tasks_content = fs::read_to_string(temp.join(format!(".knecht/tasks/{}", task_id)))
+            .expect("Failed to read task file");
 
         // Expected CSV format: <id>,open,"Implement feature X","This is a longer description of the feature",
         assert!(tasks_content.contains(&format!("{},open", task_id)), "Should have CSV format with id and status");
@@ -144,34 +144,33 @@ fn add_with_empty_title_fails() {
 }
 
 #[test]
-fn add_fails_when_tasks_file_cannot_be_written() {
+fn add_fails_when_tasks_directory_cannot_be_written() {
     let temp = setup_temp_dir();
 
-    // Create .knecht directory and tasks file
-    fs::create_dir_all(temp.join(".knecht")).unwrap();
-    let tasks_file = temp.join(".knecht/tasks");
-    fs::File::create(&tasks_file).unwrap();
+    // Create .knecht/tasks directory
+    let tasks_dir = temp.join(".knecht/tasks");
+    fs::create_dir_all(&tasks_dir).unwrap();
 
-    // Make the tasks file read-only (no write permissions)
+    // Make the tasks directory read-only (can't create files in it)
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        let mut perms = fs::metadata(&tasks_file).unwrap().permissions();
-        perms.set_mode(0o444); // read-only
-        fs::set_permissions(&tasks_file, perms).unwrap();
+        let mut perms = fs::metadata(&tasks_dir).unwrap().permissions();
+        perms.set_mode(0o555); // read-only directory
+        fs::set_permissions(&tasks_dir, perms).unwrap();
     }
 
     #[cfg(windows)]
     {
-        let mut perms = fs::metadata(&tasks_file).unwrap().permissions();
+        let mut perms = fs::metadata(&tasks_dir).unwrap().permissions();
         perms.set_readonly(true);
-        fs::set_permissions(&tasks_file, perms).unwrap();
+        fs::set_permissions(&tasks_dir, perms).unwrap();
     }
 
     // Try to add a task - should fail with IO error
     let result = run_command(&["add", "This should fail", "-a", "Done"], &temp);
 
-    assert!(!result.success, "Should fail when tasks file is not writable");
+    assert!(!result.success, "Should fail when tasks directory is not writable");
     assert!(result.stderr.contains("Error:"),
         "Should show error message, got: {}", result.stderr);
 
@@ -179,16 +178,16 @@ fn add_fails_when_tasks_file_cannot_be_written() {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        let mut perms = fs::metadata(&tasks_file).unwrap().permissions();
-        perms.set_mode(0o644);
-        fs::set_permissions(&tasks_file, perms).unwrap();
+        let mut perms = fs::metadata(&tasks_dir).unwrap().permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(&tasks_dir, perms).unwrap();
     }
 
     #[cfg(windows)]
     {
-        let mut perms = fs::metadata(&tasks_file).unwrap().permissions();
+        let mut perms = fs::metadata(&tasks_dir).unwrap().permissions();
         perms.set_readonly(false);
-        fs::set_permissions(&tasks_file, perms).unwrap();
+        fs::set_permissions(&tasks_dir, perms).unwrap();
     }
 
     cleanup_temp_dir(temp);
@@ -202,11 +201,12 @@ fn add_command_writes_csv_format() {
     // Add a task with special characters
     let result = run_command(&["add", "Task with, comma and | pipe", "-a", "Done"], &temp);
     assert!(result.success, "add should succeed");
+    let task_id = extract_task_id(&result.stdout);
 
-    // Verify the file is in CSV format
-    let tasks_path = temp.join(".knecht/tasks");
-    let content = fs::read_to_string(&tasks_path).expect("Failed to read tasks file");
-    
+    // Verify the file is in CSV format (now reading individual task file)
+    let task_path = temp.join(format!(".knecht/tasks/{}", task_id));
+    let content = fs::read_to_string(&task_path).expect("Failed to read task file");
+
     // Should use CSV format with quotes, not pipe-delimited with escapes
     assert!(content.contains(",open,"), "Should use CSV format with commas");
     assert!(content.contains("\"Task with, comma and | pipe\""), "Should quote fields with special chars");

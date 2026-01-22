@@ -1,0 +1,1 @@
+236,done,cw script should only fetch origin and rebase onto origin/main if origin exists,"currently knecht doesn't have a remote repository so the cw task fails to clean up after itself, it will have one in the future so it should still try to do this but then it should fall back on rebasing locally",,

@@ -1,0 +1,1 @@
+ugiaju,open,Install cw script to PATH,"Agent couldn't find cw with 'which cw' because it lives in scripts/cw and isn't installed to PATH. Options: 1) Add install instructions to README, 2) Add 'make install' target that symlinks to ~/bin, 3) Create setup script. Pain: Had to use Glob to find cw location during task-243.",,

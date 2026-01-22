@@ -1,0 +1,1 @@
+226,open,Agent filed duplicate task instead of recognizing existing implementation,"task-38 was filed to add a pain command, but the pain command already existed with -t and -d flags. The mechanisms meant to prevent duplicate task filing and instead add pain to existing tasks failed. Need to investigate why duplicates slip through and improve detection.",,

@@ -1,0 +1,1 @@
+214,open,Add 'knecht close <task-id>' command to mark tasks as closed/cancelled with optional --reason flag,,,

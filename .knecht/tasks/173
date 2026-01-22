@@ -1,0 +1,5 @@
+173,open,Rename to reflect tracking and prioritizing tidying work,"DECISION: Rename to 'tendrils' with command 'tend' or 'td'.
+
+Rationale: Tendrils captures both the gardening/tending metaphor (ongoing care, cultivation) and the spiral/cyclical nature of recursive self-improvement. The tool is a system for recursive self-improvement of a codebase, tracking pain (pain snake style), and prioritizing refactors.
+
+Previous context: User clarified naming requirement: 'I'd like the name to reflect that it's about tracking and prioritizing tidying work in a project.' Tool is fundamentally about tracking refactoring, cleanup, and maintenance tasks.",1,

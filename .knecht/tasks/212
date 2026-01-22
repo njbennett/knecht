@@ -1,0 +1,1 @@
+212,open,'knecht add' should suggest checking for related tasks first,"When filing a new task, agents should check if related tasks already exist. The 'knecht add' output could remind: 'Did you check knecht list for related tasks? Consider using knecht pain <task-id> if this is a repeat issue.'",,

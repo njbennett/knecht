@@ -1,11 +1,12 @@
 use knecht::FileSystem;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::{self, BufRead, Write};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 pub struct TestFileSystem {
     files: Arc<Mutex<HashMap<PathBuf, Vec<u8>>>>,
+    dirs: Arc<Mutex<HashSet<PathBuf>>>,
     fail_mode: Option<&'static str>,
 }
 
@@ -13,12 +14,18 @@ impl TestFileSystem {
     pub fn new() -> Self {
         Self {
             files: Arc::new(Mutex::new(HashMap::new())),
+            dirs: Arc::new(Mutex::new(HashSet::new())),
             fail_mode: None,
         }
     }
 
     pub fn with_file(self, path: &str, content: &str) -> Self {
         self.files.lock().unwrap().insert(PathBuf::from(path), content.as_bytes().to_vec());
+        self
+    }
+
+    pub fn with_dir(self, path: &str) -> Self {
+        self.dirs.lock().unwrap().insert(PathBuf::from(path));
         self
     }
 
@@ -96,7 +103,7 @@ impl Write for TestWriter {
 
 impl FileSystem for TestFileSystem {
     fn exists(&self, path: &Path) -> bool {
-        self.files.lock().unwrap().contains_key(path)
+        self.files.lock().unwrap().contains_key(path) || self.dirs.lock().unwrap().contains(path)
     }
 
     fn open(&self, path: &Path) -> io::Result<Box<dyn BufRead>> {
@@ -114,9 +121,22 @@ impl FileSystem for TestFileSystem {
         Ok(Box::new(TestWriter { content: Arc::clone(&self.files), path: path.to_path_buf(), fail: self.fail_mode == Some("write") }))
     }
 
-    fn create_dir_all(&self, _path: &Path) -> io::Result<()> {
+    fn create_dir_all(&self, path: &Path) -> io::Result<()> {
         if self.fail_mode == Some("mkdir") {
             return Err(io::Error::new(io::ErrorKind::PermissionDenied, "test error"));
+        }
+        // Track the directory and all parent directories
+        let mut current = path.to_path_buf();
+        loop {
+            self.dirs.lock().unwrap().insert(current.clone());
+            if let Some(parent) = current.parent() {
+                if parent.as_os_str().is_empty() {
+                    break;
+                }
+                current = parent.to_path_buf();
+            } else {
+                break;
+            }
         }
         Ok(())
     }
@@ -126,5 +146,37 @@ impl FileSystem for TestFileSystem {
             return Err(io::Error::new(io::ErrorKind::PermissionDenied, "test error"));
         }
         Ok(Box::new(TestWriter { content: Arc::clone(&self.files), path: path.to_path_buf(), fail: self.fail_mode == Some("write") }))
+    }
+
+    fn is_dir(&self, path: &Path) -> bool {
+        self.dirs.lock().unwrap().contains(path)
+    }
+
+    fn is_file(&self, path: &Path) -> bool {
+        self.files.lock().unwrap().contains_key(path)
+    }
+
+    fn read_dir(&self, path: &Path) -> io::Result<Vec<PathBuf>> {
+        if !self.dirs.lock().unwrap().contains(path) {
+            return Err(io::Error::new(io::ErrorKind::NotFound, "directory not found"));
+        }
+        let files = self.files.lock().unwrap();
+        let entries: Vec<PathBuf> = files.keys()
+            .filter(|p| p.parent() == Some(path))
+            .cloned()
+            .collect();
+        Ok(entries)
+    }
+
+    fn remove_file(&self, path: &Path) -> io::Result<()> {
+        if self.fail_mode == Some("remove") {
+            return Err(io::Error::new(io::ErrorKind::PermissionDenied, "test error"));
+        }
+        let mut files = self.files.lock().unwrap();
+        if files.remove(path).is_some() {
+            Ok(())
+        } else {
+            Err(io::Error::new(io::ErrorKind::NotFound, "file not found"))
+        }
     }
 }

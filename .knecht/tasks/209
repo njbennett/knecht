@@ -1,0 +1,1 @@
+209,open,Add help command listing all available commands Running 'knecht help' or 'knecht --help' returns 'Unknown command'. Agents need a way to discover available commands without reading source code. Should list all commands with brief usage.,Pain instance: User wanted to add help command task but it already exists,1,

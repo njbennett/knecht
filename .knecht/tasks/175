@@ -1,0 +1,1 @@
+175,done,Add 'delivered' status to Task data model,"Foundation for delivered→verified workflow. Update Task struct, file format parsing/writing, and all tests to handle three statuses: open, delivered, done. This blocks all other subtasks for task-143.",,

@@ -1,0 +1,1 @@
+211,done,"Agents should commit task changes with related work When completing a knecht task, agents should commit: 1) the task being marked done, and 2) any new tasks filed during the work, together with the code changes. Currently agents often forget to include .knecht/tasks changes in their commits.",,,

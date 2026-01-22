@@ -1,0 +1,1 @@
+q09lc7,open,Tests should assert intermediate command success,Tests like unblock_removes_blocker_relationship call run_command for start without checking result.success. Silent failures cause confusing test failures later.,,

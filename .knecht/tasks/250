@@ -1,0 +1,6 @@
+250,done,Sequential task IDs cause merge conflicts in parallel worktrees,"The .knecht/tasks file uses sequential IDs. When parallel agents/worktrees create tasks, they both try to add the next sequential ID, causing inevitable merge conflicts. README.md acknowledges this as future work (line 310). Options: 1) Content-based hashing, 2) UUID-based task IDs, 3) Branch-namespaced IDs during worktree sessions, 4) Accept and improve conflict resolution tooling.
+Pain: Two agents working in parallel produced merge conflicts on the tasks file
+Pain: User frustrated - tasks file always leads to merge conflicts in parallel worktrees, really annoying
+Pain: Every parallel session ends in merge conflicts on tasks file
+Pain: Merge cleanup sessions failing compounds this problem
+Pain: Blocks core use case: parallel agents working on different tasks",5,

@@ -1,0 +1,1 @@
+105,done,Investigate task deletion bug Tasks 1-98 disappeared from .knecht/tasks file. Need to find when/how they were deleted and prevent this from happening. This could be a bug in knecht commands or agent workflow issue.,,,

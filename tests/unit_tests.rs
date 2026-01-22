@@ -3,6 +3,8 @@ mod test_helpers;
 use test_helpers::TestFileSystem;
 use knecht::{read_tasks_with_fs, write_tasks_with_fs, add_task_with_fs, mark_task_done_with_fs, find_task_by_id_with_fs, increment_pain_count_with_fs, find_next_task_with_fs, delete_task_with_fs, update_task_with_fs, Task, RealFileSystem, FileSystem};
 use std::path::Path;
+use std::fs;
+use tempfile::tempdir;
 
 #[test]
 fn test_read_tasks_error_on_open() {
@@ -72,8 +74,9 @@ fn test_add_task_error_on_create_dir_and_mkdir() {
 }
 
 #[test]
-fn test_add_task_error_on_append() {
-    let fs = TestFileSystem::new().fail("append");
+fn test_add_task_error_on_create() {
+    // With directory-based storage, add uses create instead of append
+    let fs = TestFileSystem::new().fail("create");
     assert!(add_task_with_fs("New".to_string(), None, None, &fs).is_err());
 }
 
@@ -297,4 +300,215 @@ fn test_update_task_both_fields() {
     let task = result.unwrap();
     assert_eq!(task.title, "NewTitle");
     assert_eq!(task.description, Some("NewDesc".to_string()));
+}
+
+// Tests for new FileSystem trait methods (Phase 1 of directory-based storage)
+
+#[test]
+fn test_real_filesystem_is_dir_on_directory() {
+    let temp = tempdir().unwrap();
+    let fs = RealFileSystem;
+    assert!(fs.is_dir(temp.path()));
+}
+
+#[test]
+fn test_real_filesystem_is_dir_on_file() {
+    let temp = tempdir().unwrap();
+    let file_path = temp.path().join("file.txt");
+    fs::write(&file_path, "content").unwrap();
+    let fs_impl = RealFileSystem;
+    assert!(!fs_impl.is_dir(&file_path));
+}
+
+#[test]
+fn test_real_filesystem_is_dir_on_nonexistent() {
+    let fs = RealFileSystem;
+    assert!(!fs.is_dir(Path::new("/nonexistent/path/that/does/not/exist")));
+}
+
+#[test]
+fn test_real_filesystem_is_file_on_file() {
+    let temp = tempdir().unwrap();
+    let file_path = temp.path().join("file.txt");
+    fs::write(&file_path, "content").unwrap();
+    let fs_impl = RealFileSystem;
+    assert!(fs_impl.is_file(&file_path));
+}
+
+#[test]
+fn test_real_filesystem_is_file_on_directory() {
+    let temp = tempdir().unwrap();
+    let fs = RealFileSystem;
+    assert!(!fs.is_file(temp.path()));
+}
+
+#[test]
+fn test_real_filesystem_is_file_on_nonexistent() {
+    let fs = RealFileSystem;
+    assert!(!fs.is_file(Path::new("/nonexistent/path/that/does/not/exist")));
+}
+
+#[test]
+fn test_real_filesystem_read_dir_lists_files() {
+    let temp = tempdir().unwrap();
+    fs::write(temp.path().join("file1.txt"), "content1").unwrap();
+    fs::write(temp.path().join("file2.txt"), "content2").unwrap();
+    let fs_impl = RealFileSystem;
+    let entries = fs_impl.read_dir(temp.path()).unwrap();
+    assert_eq!(entries.len(), 2);
+}
+
+#[test]
+fn test_real_filesystem_read_dir_on_empty_dir() {
+    let temp = tempdir().unwrap();
+    let fs = RealFileSystem;
+    let entries = fs.read_dir(temp.path()).unwrap();
+    assert!(entries.is_empty());
+}
+
+#[test]
+fn test_real_filesystem_read_dir_on_nonexistent() {
+    let fs = RealFileSystem;
+    let result = fs.read_dir(Path::new("/nonexistent/path/that/does/not/exist"));
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_real_filesystem_remove_file_deletes_file() {
+    let temp = tempdir().unwrap();
+    let file_path = temp.path().join("file.txt");
+    fs::write(&file_path, "content").unwrap();
+    assert!(file_path.exists());
+    let fs_impl = RealFileSystem;
+    fs_impl.remove_file(&file_path).unwrap();
+    assert!(!file_path.exists());
+}
+
+#[test]
+fn test_real_filesystem_remove_file_on_nonexistent() {
+    let temp = tempdir().unwrap();
+    let file_path = temp.path().join("nonexistent.txt");
+    let fs = RealFileSystem;
+    let result = fs.remove_file(&file_path);
+    assert!(result.is_err());
+}
+
+// Tests for TestFileSystem new methods
+
+#[test]
+fn test_test_filesystem_is_dir_on_directory() {
+    let fs = TestFileSystem::new().with_dir(".knecht/tasks");
+    assert!(fs.is_dir(Path::new(".knecht/tasks")));
+}
+
+#[test]
+fn test_test_filesystem_is_dir_on_file() {
+    let fs = TestFileSystem::new().with_file(".knecht/tasks", "content");
+    assert!(!fs.is_dir(Path::new(".knecht/tasks")));
+}
+
+#[test]
+fn test_test_filesystem_is_file_on_file() {
+    let fs = TestFileSystem::new().with_file(".knecht/tasks", "content");
+    assert!(fs.is_file(Path::new(".knecht/tasks")));
+}
+
+#[test]
+fn test_test_filesystem_is_file_on_directory() {
+    let fs = TestFileSystem::new().with_dir(".knecht/tasks");
+    assert!(!fs.is_file(Path::new(".knecht/tasks")));
+}
+
+#[test]
+fn test_test_filesystem_read_dir_lists_files() {
+    let fs = TestFileSystem::new()
+        .with_dir(".knecht/tasks")
+        .with_file(".knecht/tasks/abc123", "abc123,open,Task,,\n")
+        .with_file(".knecht/tasks/def456", "def456,open,Other,,\n");
+    let entries = fs.read_dir(Path::new(".knecht/tasks")).unwrap();
+    assert_eq!(entries.len(), 2);
+}
+
+#[test]
+fn test_test_filesystem_read_dir_on_empty_dir() {
+    let fs = TestFileSystem::new().with_dir(".knecht/tasks");
+    let entries = fs.read_dir(Path::new(".knecht/tasks")).unwrap();
+    assert!(entries.is_empty());
+}
+
+#[test]
+fn test_test_filesystem_remove_file_deletes_file() {
+    let fs = TestFileSystem::new().with_file(".knecht/tasks/abc123", "content");
+    assert!(fs.exists(Path::new(".knecht/tasks/abc123")));
+    fs.remove_file(Path::new(".knecht/tasks/abc123")).unwrap();
+    assert!(!fs.exists(Path::new(".knecht/tasks/abc123")));
+}
+
+// Phase 2: Directory-based read tests
+
+#[test]
+fn test_read_tasks_from_directory_format() {
+    let fs = TestFileSystem::new()
+        .with_dir(".knecht/tasks")
+        .with_file(".knecht/tasks/abc123", "abc123,open,Task A,,,\n")
+        .with_file(".knecht/tasks/def456", "def456,done,Task B,,,\n");
+
+    let tasks = read_tasks_with_fs(&fs).unwrap();
+    assert_eq!(tasks.len(), 2);
+
+    // Verify task data
+    let task_a = tasks.iter().find(|t| t.id == "abc123").unwrap();
+    assert_eq!(task_a.title, "Task A");
+    assert_eq!(task_a.status, "open");
+
+    let task_b = tasks.iter().find(|t| t.id == "def456").unwrap();
+    assert_eq!(task_b.title, "Task B");
+    assert_eq!(task_b.status, "done");
+}
+
+#[test]
+fn test_read_tasks_from_empty_directory() {
+    let fs = TestFileSystem::new().with_dir(".knecht/tasks");
+    let tasks = read_tasks_with_fs(&fs).unwrap();
+    assert!(tasks.is_empty());
+}
+
+#[test]
+fn test_read_tasks_falls_back_to_single_file_format() {
+    // When .knecht/tasks is a file (old format), should still read it
+    let fs = TestFileSystem::new()
+        .with_file(".knecht/tasks", "abc123,open,Task A,,,\n");
+
+    let tasks = read_tasks_with_fs(&fs).unwrap();
+    assert_eq!(tasks.len(), 1);
+    assert_eq!(tasks[0].id, "abc123");
+}
+
+// Phase 3: Directory-based write tests
+
+#[test]
+fn test_write_tasks_creates_directory_structure() {
+    let fs = TestFileSystem::new();
+    let tasks = vec![
+        Task { id: "abc123".to_string(), status: "open".to_string(), title: "Task A".to_string(), description: None, pain_count: None, acceptance_criteria: None },
+        Task { id: "def456".to_string(), status: "done".to_string(), title: "Task B".to_string(), description: Some("Desc".to_string()), pain_count: Some(2), acceptance_criteria: None },
+    ];
+
+    write_tasks_with_fs(&tasks, &fs).unwrap();
+
+    // Should create directory and individual files
+    assert!(fs.is_dir(Path::new(".knecht/tasks")));
+    assert!(fs.exists(Path::new(".knecht/tasks/abc123")));
+    assert!(fs.exists(Path::new(".knecht/tasks/def456")));
+}
+
+#[test]
+fn test_add_task_creates_single_file_in_directory() {
+    let fs = TestFileSystem::new().with_dir(".knecht/tasks");
+
+    let task_id = add_task_with_fs("New task".to_string(), None, Some("Done".to_string()), &fs).unwrap();
+
+    // Should create a file for the new task
+    let task_path = format!(".knecht/tasks/{}", task_id);
+    assert!(fs.exists(Path::new(&task_path)));
 }

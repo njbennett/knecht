@@ -26,14 +26,15 @@ fn list_handles_malformed_task_file() {
     let temp = setup_temp_dir();
     run_command(&["init"], &temp);
 
-    // Write malformed task data
-    let tasks_path = temp.join(".knecht/tasks");
-    fs::write(&tasks_path, "1,open,\"Good task\",,\nBAD LINE WITHOUT PIPES\n2,open,\"Another good task\",,\n")
-        .expect("Failed to write test file");
+    // Write task data (now as individual files in directory)
+    let tasks_dir = temp.join(".knecht/tasks");
+    fs::write(tasks_dir.join("1"), "1,open,\"Good task\",,\n").expect("Failed to write test file");
+    fs::write(tasks_dir.join("malformed"), "BAD LINE WITHOUT PIPES\n").expect("Failed to write test file");
+    fs::write(tasks_dir.join("2"), "2,open,\"Another good task\",,\n").expect("Failed to write test file");
 
-    // list should handle malformed lines gracefully
+    // list should handle malformed files gracefully
     let result = run_command(&["list"], &temp);
-    assert!(result.success, "list should succeed even with malformed lines");
+    assert!(result.success, "list should succeed even with malformed files");
     assert!(result.stdout.contains("task-1"), "Should show task-1");
     assert!(result.stdout.contains("task-2"), "Should show task-2");
     assert!(result.stdout.contains("Good task"), "Should show good task");
@@ -43,16 +44,17 @@ fn list_handles_malformed_task_file() {
 }
 
 #[test]
-fn list_works_with_empty_tasks_file() {
+fn list_works_with_empty_tasks_directory() {
     with_initialized_repo(|temp| {
-        // Verify empty file exists
+        // Verify tasks directory exists
         let tasks_path = temp.join(".knecht/tasks");
         assert!(tasks_path.exists());
+        assert!(tasks_path.is_dir(), ".knecht/tasks should be a directory");
 
         // list should succeed with no tasks
         let result = run_command(&["list"], &temp);
-        assert!(result.success, "list should succeed with empty file");
-        
+        assert!(result.success, "list should succeed with empty directory");
+
         // Should show usage instructions even with no tasks (helpful for agents)
         assert!(result.stdout.contains("Usage instructions:"), "Should show usage instructions");
         assert!(result.stdout.contains("knecht show task-N"), "Should mention show command");
@@ -62,10 +64,11 @@ fn list_works_with_empty_tasks_file() {
 #[test]
 fn read_tasks_with_and_without_descriptions() {
     with_initialized_repo(|temp| {
-        // Create mixed tasks file: some with descriptions, some without
-        let tasks_path = temp.join(".knecht/tasks");
-        fs::write(&tasks_path, "1,open,\"Old task without description\",,\n2,open,\"New task\",\"This has a description\",\n3,done,\"Another old task\",,\n")
-            .expect("Failed to write test file");
+        // Create mixed tasks: some with descriptions, some without (now as individual files)
+        let tasks_dir = temp.join(".knecht/tasks");
+        fs::write(tasks_dir.join("1"), "1,open,\"Old task without description\",,\n").expect("Failed to write");
+        fs::write(tasks_dir.join("2"), "2,open,\"New task\",\"This has a description\",\n").expect("Failed to write");
+        fs::write(tasks_dir.join("3"), "3,done,\"Another old task\",,\n").expect("Failed to write");
 
         // list should handle both formats
         let result = run_command(&["list"], &temp);
@@ -79,34 +82,33 @@ fn read_tasks_with_and_without_descriptions() {
 }
 
 #[test]
-fn list_fails_gracefully_when_tasks_file_unreadable() {
+fn list_succeeds_with_empty_directory() {
     let temp = setup_temp_dir();
     run_command(&["init"], &temp);
 
-    // Create a directory instead of a file to make it unreadable as a file
-    fs::remove_file(temp.join(".knecht/tasks")).unwrap();
-    fs::create_dir(temp.join(".knecht/tasks")).unwrap();
-
+    // After init, .knecht/tasks is already a directory
     let result = run_command(&["list"], &temp);
 
-    assert!(!result.success, "Should fail when tasks file is unreadable");
-    assert!(result.stderr.contains("Error reading tasks"),
-        "Should show error reading tasks message");
+    // Empty directory means no tasks
+    assert!(result.success, "Should succeed with empty tasks directory");
+    assert!(result.stdout.contains("Usage instructions"),
+        "Should show usage instructions when no tasks");
 
     cleanup_temp_dir(temp);
 }
 
 #[test]
-fn list_handles_tasks_file_with_empty_lines() {
+fn list_handles_tasks_with_empty_lines_in_content() {
     let temp = setup_temp_dir();
     run_command(&["init"], &temp);
 
-    // Create tasks file with empty lines
-    let tasks_path = temp.join(".knecht/tasks");
-    fs::write(&tasks_path, "1,open,\"First task\",,\n\n2,open,\"Second task\",,\n  \n3,done,\"Third task\",,\n\n")
-        .expect("Failed to write test file");
+    // Create individual task files (some may have trailing empty lines)
+    let tasks_dir = temp.join(".knecht/tasks");
+    fs::write(tasks_dir.join("1"), "1,open,\"First task\",,\n\n").expect("Failed to write");
+    fs::write(tasks_dir.join("2"), "2,open,\"Second task\",,\n").expect("Failed to write");
+    fs::write(tasks_dir.join("3"), "3,done,\"Third task\",,\n").expect("Failed to write");
 
-    // list should skip empty lines
+    // list should skip empty lines within files
     let result = run_command(&["list"], &temp);
     assert!(result.success, "list should handle empty lines");
     assert!(result.stdout.contains("task-1"), "Should show task-1");
@@ -143,9 +145,11 @@ fn list_includes_usage_instructions_for_agents() {
 fn list_shows_delivered_tasks_with_distinct_marker() {
     // task-178: Delivered tasks should have a visual marker different from open tasks
     with_initialized_repo(|temp| {
-        // Create tasks with all three statuses
-        let tasks_path = temp.join(".knecht/tasks");
-        fs::write(&tasks_path, "1,open,\"Open task\",,\n2,delivered,\"Delivered task\",,\n3,done,\"Done task\",,\n").unwrap();
+        // Create tasks with all three statuses (as individual files)
+        let tasks_dir = temp.join(".knecht/tasks");
+        fs::write(tasks_dir.join("1"), "1,open,\"Open task\",,\n").unwrap();
+        fs::write(tasks_dir.join("2"), "2,delivered,\"Delivered task\",,\n").unwrap();
+        fs::write(tasks_dir.join("3"), "3,done,\"Done task\",,\n").unwrap();
 
         let result = run_command(&["list"], &temp);
         assert!(result.success, "list should succeed: {}", result.stderr);

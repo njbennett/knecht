@@ -1,0 +1,1 @@
+149,done,"beads2knecht tool doesn't exist by default - needs build instructions -d The migration guide assumes beads2knecht exists, but it needs to be built first with 'cargo build --release --bin beads2knecht'. The guide should include this step or verify the binary exists before attempting migration.",,,

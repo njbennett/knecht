@@ -1,0 +1,1 @@
+210,open,Add help/discoverability to CLI No way to discover available commands - knecht with no args or knecht help should list commands with descriptions,,,

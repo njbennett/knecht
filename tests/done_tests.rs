@@ -208,8 +208,8 @@ fn done_marks_task_with_description_complete() {
     let result = run_command(&["done", &format!("task-{}", task_id)], &temp);
     assert!(result.success, "done command should succeed");
 
-    // Verify it was marked done and still has description
-    let tasks_content = fs::read_to_string(temp.join(".knecht/tasks")).unwrap();
+    // Verify it was marked done and still has description (now reading individual task file)
+    let tasks_content = fs::read_to_string(temp.join(format!(".knecht/tasks/{}", task_id))).unwrap();
     assert!(tasks_content.contains(&format!("{},done", task_id)), "Task should be marked done");
     assert!(tasks_content.contains("Task with description"), "Should preserve title");
     assert!(tasks_content.contains("This is the description"), "Should preserve description");

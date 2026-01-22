@@ -1,0 +1,1 @@
+252,open,Add command (e.g. knecht permissions or knecht claude-setup) that outputs a prompt directing the agent to write a .claude/settings.json with pre-approved permissions for knecht commands and test/compile/workflow commands appropriate for the project's language,,,

@@ -1,0 +1,3 @@
+138,open,Add 'knecht reject' command to reopen delivered tasks,"When task-122 was incorrectly marked done, tried 'knecht undone task-122' but command doesn't exist. Need ability to reopen tasks when work wasn't actually complete or was marked done prematurely. Related to task-124 (stop command) - we need better task lifecycle management.
+Pain: Needed to revert task-221 from done to delivered but no undone command exists
+Pain: Need to reopen task-221 which was prematurely marked delivered - no command exists to do this",3,

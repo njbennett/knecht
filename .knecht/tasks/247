@@ -1,0 +1,1 @@
+247,open,knecht start should highlight pain points from task description,"During task-213, agent missed that 'cw script' was explicitly mentioned as a pain point and needed updating. User had to redirect. Knecht could parse pain points from description and display them prominently when starting work, or prompt agent to confirm they've addressed each one.",,

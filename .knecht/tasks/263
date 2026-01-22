@@ -1,0 +1,1 @@
+263,open,Agent should search for related tasks before filing new ones,"When filing task-261 (Mikado skill), agent should have searched for existing Mikado-related tasks first. User had to redirect to combine with task-129. Knecht guidance or workflow should prompt: 'Search for related tasks before adding new ones' - perhaps in the output of knecht add, or as a pre-add check.",,

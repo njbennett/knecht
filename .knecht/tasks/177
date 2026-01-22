@@ -1,0 +1,1 @@
+177,done,Update 'knecht next' to prioritize delivered tasks for verification,"Change prioritization logic so 'knecht next' suggests delivered tasks (needing verification) before open tasks (new work). Within delivered tasks, use same prioritization as open tasks (pain count, then age).",,

@@ -82,69 +82,98 @@ fn test_error_path_coverage_with_unit_tests() {
 #[test]
 fn production_tasks_file_is_never_modified_by_tests() {
     // CRITICAL TEST: Prevents data loss bug documented in task-114, task-106, task-109
-    // This test ensures that running 'cargo test' NEVER modifies the production .knecht/tasks file
-    // in the project root.
+    // This test ensures that running 'cargo test' NEVER modifies the production .knecht/tasks
+    // (file or directory) in the project root.
 
     use std::fs;
     use std::path::PathBuf;
 
     // Get the project root (where Cargo.toml is)
     let project_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let production_tasks_file = project_root.join(".knecht/tasks");
+    let production_tasks_path = project_root.join(".knecht/tasks");
 
-    // If the production tasks file doesn't exist, this test passes trivially
-    if !production_tasks_file.exists() {
+    // If the production tasks path doesn't exist, this test passes trivially
+    if !production_tasks_path.exists() {
         return;
     }
 
-    // Read the production tasks file BEFORE running any tests
-    let content_before = fs::read_to_string(&production_tasks_file)
-        .expect("Failed to read production tasks file");
-    let line_count_before = content_before.lines().count();
+    // Handle both old (file) and new (directory) formats
+    let (content_before, file_count_before) = if production_tasks_path.is_dir() {
+        // New directory-based format: collect all file contents (sorted for consistent comparison)
+        let mut entries: Vec<String> = fs::read_dir(&production_tasks_path)
+            .expect("Failed to read production tasks directory")
+            .filter_map(|e| e.ok())
+            .map(|e| {
+                let path = e.path();
+                let filename = path.file_name().unwrap().to_string_lossy().to_string();
+                let content = fs::read_to_string(&path).unwrap_or_default();
+                format!("{}:{}", filename, content)
+            })
+            .collect();
+        entries.sort();
+        let count = entries.len();
+        (entries.join("\n"), count)
+    } else {
+        // Old file format
+        let content = fs::read_to_string(&production_tasks_path)
+            .expect("Failed to read production tasks file");
+        let count = content.lines().count();
+        (content, count)
+    };
 
     // Record the modification time
-    let metadata_before = fs::metadata(&production_tasks_file)
-        .expect("Failed to get metadata for production tasks file");
+    let metadata_before = fs::metadata(&production_tasks_path)
+        .expect("Failed to get metadata for production tasks");
     let modified_before = metadata_before.modified()
         .expect("Failed to get modification time");
 
     // Run a dummy operation to ensure this test runs after other tests
-    // (This test should be one of the last to run, but we can't guarantee order)
     std::thread::sleep(std::time::Duration::from_millis(10));
 
-    // Read the production tasks file AFTER
-    let content_after = fs::read_to_string(&production_tasks_file)
-        .expect("Failed to read production tasks file after tests");
-    let line_count_after = content_after.lines().count();
+    // Read AFTER
+    let (content_after, file_count_after) = if production_tasks_path.is_dir() {
+        let mut entries: Vec<String> = fs::read_dir(&production_tasks_path)
+            .expect("Failed to read production tasks directory after tests")
+            .filter_map(|e| e.ok())
+            .map(|e| {
+                let path = e.path();
+                let filename = path.file_name().unwrap().to_string_lossy().to_string();
+                let content = fs::read_to_string(&path).unwrap_or_default();
+                format!("{}:{}", filename, content)
+            })
+            .collect();
+        entries.sort();
+        let count = entries.len();
+        (entries.join("\n"), count)
+    } else {
+        let content = fs::read_to_string(&production_tasks_path)
+            .expect("Failed to read production tasks file after tests");
+        let count = content.lines().count();
+        (content, count)
+    };
 
-    let metadata_after = fs::metadata(&production_tasks_file)
-        .expect("Failed to get metadata for production tasks file after tests");
+    let metadata_after = fs::metadata(&production_tasks_path)
+        .expect("Failed to get metadata for production tasks after tests");
     let modified_after = metadata_after.modified()
         .expect("Failed to get modification time after tests");
 
-    // Assert that the file was NOT modified
+    // Assert that the content was NOT modified
     if content_before != content_after {
         panic!(
-            "CRITICAL: Production .knecht/tasks file was MODIFIED during tests!\n\
-             Line count before: {}\n\
-             Line count after: {}\n\
+            "CRITICAL: Production .knecht/tasks was MODIFIED during tests!\n\
+             Task count before: {}\n\
+             Task count after: {}\n\
              This is the data loss bug from task-114.\n\
-             A test is writing to the production file instead of using a temp directory.\n\
-             Content before:\n{}\n\n\
-             Content after:\n{}",
-            line_count_before,
-            line_count_after,
-            content_before,
-            content_after
+             A test is writing to the production location instead of using a temp directory.",
+            file_count_before,
+            file_count_after,
         );
     }
 
     if modified_before != modified_after {
-        // This could be a false positive if another process modified the file,
-        // but it's worth checking
         eprintln!(
             "WARNING: Production .knecht/tasks modification time changed during tests.\n\
-             This might indicate a test is touching the production file.\n\
+             This might indicate a test is touching the production location.\n\
              Modified before: {:?}\n\
              Modified after: {:?}",
             modified_before,
@@ -156,10 +185,10 @@ fn production_tasks_file_is_never_modified_by_tests() {
 #[test]
 fn test_read_task_with_delivered_status() {
     with_initialized_repo(&|temp: &PathBuf| {
-        // Manually create a task with "delivered" status
-        let tasks_path = temp.join(".knecht/tasks");
-        fs::write(&tasks_path, "1,delivered,\"Fix the bug\",,\n").unwrap();
-        
+        // Manually create a task with "delivered" status (as individual file)
+        let tasks_dir = temp.join(".knecht/tasks");
+        fs::write(tasks_dir.join("1"), "1,delivered,\"Fix the bug\",,\n").unwrap();
+
         // List should read and display the delivered task
         let result = run_command(&["list"], &temp);
         assert!(result.success, "list should succeed: {}", result.stderr);
@@ -171,28 +200,27 @@ fn test_read_task_with_delivered_status() {
 #[test]
 fn test_write_task_with_delivered_status() {
     with_initialized_repo(&|temp: &PathBuf| {
-        // For now, we can't set delivered status via CLI (no deliver command yet)
-        // So this test will manually create a delivered task, read it, and verify it persists
-        let tasks_path = temp.join(".knecht/tasks");
-        fs::write(&tasks_path, "1,delivered,\"Fix the bug\",,\n").unwrap();
-        
-        // Add another task - this will read and rewrite the file
+        // Manually create a delivered task (as individual file)
+        let tasks_dir = temp.join(".knecht/tasks");
+        fs::write(tasks_dir.join("1"), "1,delivered,\"Fix the bug\",,\n").unwrap();
+
+        // Add another task - with directory-based storage, this doesn't affect existing files
         run_command(&["add", "Another task", "-a", "Done"], &temp);
-        
-        // Verify the delivered status was preserved
-        let content = fs::read_to_string(&tasks_path).unwrap();
-        assert!(content.contains("1,delivered,\"Fix the bug\""), 
-                "Delivered status should be preserved after file rewrite. Content: {}", content);
+
+        // Verify the delivered status was preserved (task file is unchanged)
+        let content = fs::read_to_string(tasks_dir.join("1")).unwrap();
+        assert!(content.contains("1,delivered,\"Fix the bug\""),
+                "Delivered status should be preserved. Content: {}", content);
     });
 }
 
 #[test]
 fn test_delivered_status_with_description() {
     with_initialized_repo(&|temp: &PathBuf| {
-        // Create a delivered task with description
-        let tasks_path = temp.join(".knecht/tasks");
-        fs::write(&tasks_path, "1,delivered,\"Fix the bug\",\"This is the description\",\n").unwrap();
-        
+        // Create a delivered task with description (as individual file)
+        let tasks_dir = temp.join(".knecht/tasks");
+        fs::write(tasks_dir.join("1"), "1,delivered,\"Fix the bug\",\"This is the description\",\n").unwrap();
+
         // Show command should display it correctly
         let result = run_command(&["show", "task-1"], &temp);
         assert!(result.success, "show should succeed: {}", result.stderr);
@@ -205,44 +233,48 @@ fn test_delivered_status_with_description() {
 #[test]
 fn test_backwards_compatibility_with_open_and_done() {
     with_initialized_repo(&|temp: &PathBuf| {
-        // Create tasks with all three statuses
-        let tasks_path = temp.join(".knecht/tasks");
-        fs::write(&tasks_path, "1,open,\"Open task\",,\n2,delivered,\"Delivered task\",,\n3,done,\"Done task\",,\n").unwrap();
-        
+        // Create tasks with all three statuses (as individual files)
+        let tasks_dir = temp.join(".knecht/tasks");
+        fs::write(tasks_dir.join("1"), "1,open,\"Open task\",,\n").unwrap();
+        fs::write(tasks_dir.join("2"), "2,delivered,\"Delivered task\",,\n").unwrap();
+        fs::write(tasks_dir.join("3"), "3,done,\"Done task\",,\n").unwrap();
+
         // List should show all three
         let result = run_command(&["list"], &temp);
         assert!(result.success, "list should succeed: {}", result.stderr);
         assert!(result.stdout.contains("Open task"), "Should show open task");
         assert!(result.stdout.contains("Delivered task"), "Should show delivered task");
         assert!(result.stdout.contains("Done task"), "Should show done task");
-        
-        // Add a new task - this will read and rewrite
+
+        // Add a new task - with directory-based storage, this doesn't affect existing files
         run_command(&["add", "New task", "-a", "Done"], &temp);
-        
-        // Verify all statuses were preserved
-        let content = fs::read_to_string(&tasks_path).unwrap();
-        assert!(content.contains("1,open,\"Open task\""), "Open status preserved");
-        assert!(content.contains("2,delivered,\"Delivered task\""), "Delivered status preserved");
-        assert!(content.contains("3,done,\"Done task\""), "Done status preserved");
+
+        // Verify all statuses were preserved (individual files are unchanged)
+        let content1 = fs::read_to_string(tasks_dir.join("1")).unwrap();
+        let content2 = fs::read_to_string(tasks_dir.join("2")).unwrap();
+        let content3 = fs::read_to_string(tasks_dir.join("3")).unwrap();
+        assert!(content1.contains("1,open,\"Open task\""), "Open status preserved");
+        assert!(content2.contains("2,delivered,\"Delivered task\""), "Delivered status preserved");
+        assert!(content3.contains("3,done,\"Done task\""), "Done status preserved");
     });
 }
 
 #[test]
 fn test_delivered_status_value_is_preserved() {
     with_initialized_repo(&|temp: &PathBuf| {
-        // Create a task with delivered status
-        let tasks_path = temp.join(".knecht/tasks");
-        fs::write(&tasks_path, "1,delivered,\"Fix the bug\",,\n").unwrap();
-        
+        // Create a task with delivered status (as individual file)
+        let tasks_dir = temp.join(".knecht/tasks");
+        fs::write(tasks_dir.join("1"), "1,delivered,\"Fix the bug\",,\n").unwrap();
+
         // Show command should display "delivered" as the status
         let result = run_command(&["show", "task-1"], &temp);
         assert!(result.success, "show should succeed: {}", result.stderr);
-        assert!(result.stdout.contains("Status: delivered"), 
+        assert!(result.stdout.contains("Status: delivered"),
                 "Status should be 'delivered', got: {}", result.stdout);
-        
+
         // Verify the raw file still contains "delivered"
-        let content = fs::read_to_string(&tasks_path).unwrap();
-        assert!(content.contains("1,delivered,\"Fix the bug\""), 
+        let content = fs::read_to_string(tasks_dir.join("1")).unwrap();
+        assert!(content.contains("1,delivered,\"Fix the bug\""),
                 "File should contain delivered status: {}", content);
     });
 }

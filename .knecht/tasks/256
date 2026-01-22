@@ -1,0 +1,4 @@
+256,claimed,"Create a journal agent persona/mode for Claude - observes, asks questions, files tasks, adds pain, but doesn't implement anything","Create a journal agent persona/mode for Claude - observes, asks questions, files tasks, adds pain, but doesn't implement anything. Use case: User uses journal mode to observe knecht agent usage patterns and capture insights without the agent trying to implement fixes.
+Pain: Wanted journal mode to discuss merge commit workflow issue without implementing
+Pain: User wanted to use journal mode to discuss allowed commands in settings
+Pain: User wanted to start journal session to discuss workflow and capture insights",4,

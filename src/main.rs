@@ -128,13 +128,8 @@ fn main() {
 }
 
 fn cmd_init() {
-    if let Err(e) = fs::create_dir_all(".knecht") {
-        eprintln!("Failed to create .knecht directory: {}", e);
-        std::process::exit(1);
-    }
-
-    if let Err(e) = fs::write(".knecht/tasks", "") {
-        eprintln!("Failed to create tasks file: {}", e);
+    if let Err(e) = fs::create_dir_all(".knecht/tasks") {
+        eprintln!("Failed to create .knecht/tasks directory: {}", e);
         std::process::exit(1);
     }
 

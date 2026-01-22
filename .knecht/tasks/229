@@ -1,0 +1,8 @@
+229,open,No natural trigger for reflection prompt when session does useful work but doesn't complete a task,"Pain: Did design work and updated task-219 with worktree script design, but didn't 'complete' a task. Reflection prompt is tied to task completion, so no reflection happens for sessions that do research, design, pain documentation, or other valuable non-completion work.
+
+Possible solutions:
+- Separate 'reflect' command that can be run manually
+- Hook into session end (via Claude Code SessionEnd hook) to prompt reflection
+- Track 'work sessions' separately from task completion
+- Accept that reflection only happens on task completion (YAGNI?)
+Pain: This session: did worktree design work, updated task-219, but no reflection prompt because no task completed",1,

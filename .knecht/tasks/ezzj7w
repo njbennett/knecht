@@ -1,0 +1,4 @@
+ezzj7w,open,Eliminate messy merge conflicts from task file updates,"Current .knecht/tasks conflates schema (field structure), content (task details), and activity (pain instances) into a single file. Any parallel change causes conflicts. Schema changes (like adding acceptance_criteria) rewrite every line, making the entire file conflict. The fix requires separating these concerns. See subtasks for specific approaches.
+Pain: Schema change (adding acceptance_criteria field) caused 500+ line conflict across 7 conflict blocks - entire file conflicted because every line changed format
+Pain: Rebasing journal branch onto main required resolving 7 conflict blocks across 2 commits - monolithic tasks file makes every parallel change conflict
+Pain: Resolving rebase conflict required Grep for markers + Read with offset due to file size - agent tooling struggles with monolithic file",4,
