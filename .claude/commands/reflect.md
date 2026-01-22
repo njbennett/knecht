@@ -39,6 +39,23 @@ Before proceeding, do ONE of:
 - Run `knecht pain -t <task-id> -d "description"` to increment pain on existing task
 - State explicitly: "Nothing to file because: [specific reason why zero friction occurred]"
 
+### 5. Upstream Feedback (for knecht improvements)
+
+If you're working in a project OTHER than knecht itself, and you encountered friction with:
+- knecht commands or output (hard to parse, missing information, confusing)
+- knecht workflow or process (unclear what to do next, wrong guidance)
+- knecht documentation or CLAUDE.md guidance
+
+Then also invoke /upstream to file it in the knecht project.
+
+The /upstream skill will:
+1. Find the knecht project on your filesystem
+2. Show you existing tasks that might be related
+3. Help you decide: increment pain on existing task, or create new task
+4. File the feedback with source context (which project you're in, what you were working on)
+
+This ensures knecht improvements discovered while using knecht in other projects make it back to knecht's own development.
+
 ## Commit Reminder
 
 After reflection:
