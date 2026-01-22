@@ -8,8 +8,8 @@ use std::fs;
 #[test]
 fn delete_removes_existing_task() {
     with_initialized_repo(|temp| {
-        let r1 = run_command(&["add", "Task to delete"], &temp);
-        run_command(&["add", "Task to keep"], &temp);
+        let r1 = run_command(&["add", "Task to delete", "-a", "Done"], &temp);
+        run_command(&["add", "Task to keep", "-a", "Done"], &temp);
         let id1 = extract_task_id(&r1.stdout);
 
         let result = run_command(&["delete", &format!("task-{}", id1)], &temp);
@@ -30,7 +30,7 @@ fn delete_removes_existing_task() {
 #[test]
 fn delete_accepts_id_without_prefix() {
     with_initialized_repo(|temp| {
-        let add_result = run_command(&["add", "Task to delete"], &temp);
+        let add_result = run_command(&["add", "Task to delete", "-a", "Done"], &temp);
         let task_id = extract_task_id(&add_result.stdout);
 
         // Delete should accept ID without 'task-' prefix
@@ -47,9 +47,9 @@ fn delete_accepts_id_without_prefix() {
 #[test]
 fn delete_preserves_other_tasks() {
     with_initialized_repo(|temp| {
-        let r1 = run_command(&["add", "First task"], &temp);
-        let r2 = run_command(&["add", "Second task"], &temp);
-        let r3 = run_command(&["add", "Third task"], &temp);
+        let r1 = run_command(&["add", "First task", "-a", "Done"], &temp);
+        let r2 = run_command(&["add", "Second task", "-a", "Done"], &temp);
+        let r3 = run_command(&["add", "Third task", "-a", "Done"], &temp);
         let _id1 = extract_task_id(&r1.stdout);
         let id2 = extract_task_id(&r2.stdout);
         let _id3 = extract_task_id(&r3.stdout);
@@ -66,7 +66,7 @@ fn delete_preserves_other_tasks() {
 #[test]
 fn delete_works_for_done_tasks() {
     with_initialized_repo(|temp| {
-        let add_result = run_command(&["add", "Completed task"], &temp);
+        let add_result = run_command(&["add", "Completed task", "-a", "Done"], &temp);
         let task_id = extract_task_id(&add_result.stdout);
         run_command(&["done", &format!("task-{}", task_id)], &temp);
 
@@ -119,8 +119,8 @@ fn delete_requires_task_id_argument() {
 #[test]
 fn delete_can_delete_first_task() {
     with_initialized_repo(|temp| {
-        let r1 = run_command(&["add", "First"], &temp);
-        run_command(&["add", "Second"], &temp);
+        let r1 = run_command(&["add", "First", "-a", "Done"], &temp);
+        run_command(&["add", "Second", "-a", "Done"], &temp);
         let id1 = extract_task_id(&r1.stdout);
 
         let result = run_command(&["delete", &format!("task-{}", id1)], &temp);
@@ -135,8 +135,8 @@ fn delete_can_delete_first_task() {
 #[test]
 fn delete_can_delete_last_task() {
     with_initialized_repo(|temp| {
-        run_command(&["add", "First"], &temp);
-        let r2 = run_command(&["add", "Last"], &temp);
+        run_command(&["add", "First", "-a", "Done"], &temp);
+        let r2 = run_command(&["add", "Last", "-a", "Done"], &temp);
         let id2 = extract_task_id(&r2.stdout);
 
         let result = run_command(&["delete", &format!("task-{}", id2)], &temp);
@@ -151,7 +151,7 @@ fn delete_can_delete_last_task() {
 #[test]
 fn delete_can_delete_only_task() {
     with_initialized_repo(|temp| {
-        let add_result = run_command(&["add", "Only task"], &temp);
+        let add_result = run_command(&["add", "Only task", "-a", "Done"], &temp);
         let task_id = extract_task_id(&add_result.stdout);
 
         let result = run_command(&["delete", &format!("task-{}", task_id)], &temp);
@@ -165,9 +165,9 @@ fn delete_can_delete_only_task() {
 #[test]
 fn delete_maintains_file_format() {
     with_initialized_repo(|temp| {
-        let r1 = run_command(&["add", "Task one", "-d", "Description with | pipe"], &temp);
-        let r2 = run_command(&["add", "Task two"], &temp);
-        let r3 = run_command(&["add", "Task three", "-d", "Another description"], &temp);
+        let r1 = run_command(&["add", "Task one", "-d", "Description with | pipe", "-a", "Done"], &temp);
+        let r2 = run_command(&["add", "Task two", "-a", "Done"], &temp);
+        let r3 = run_command(&["add", "Task three", "-d", "Another description", "-a", "Done"], &temp);
         let id1 = extract_task_id(&r1.stdout);
         let id2 = extract_task_id(&r2.stdout);
         let id3 = extract_task_id(&r3.stdout);

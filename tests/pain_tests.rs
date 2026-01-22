@@ -9,7 +9,7 @@ use std::fs;
 fn pain_increments_pain_count_on_task() {
     with_initialized_repo(|temp| {
         // Add a task without pain count
-        let add_result = run_command(&["add", "Fix bug"], &temp);
+        let add_result = run_command(&["add", "Fix bug", "-a", "Done"], &temp);
         let task_id = extract_task_id(&add_result.stdout);
 
         // Increment pain count (should add it as 1)
@@ -42,7 +42,7 @@ fn pain_increments_pain_count_on_task() {
 fn pain_adds_pain_count_to_task_without_one() {
     with_initialized_repo(|temp| {
         // Add a task without pain count
-        let add_result = run_command(&["add", "Some task"], &temp);
+        let add_result = run_command(&["add", "Some task", "-a", "Done"], &temp);
         let task_id = extract_task_id(&add_result.stdout);
 
         // Increment pain count
@@ -90,7 +90,7 @@ fn pain_requires_task_id_argument() {
 fn pain_on_task_with_description_and_pain_count() {
     with_initialized_repo(|temp| {
         // Add a task with description
-        let add_result = run_command(&["add", "Fix critical bug", "-d", "This bug breaks production"], &temp);
+        let add_result = run_command(&["add", "Fix critical bug", "-d", "This bug breaks production", "-a", "Done"], &temp);
         let task_id = extract_task_id(&add_result.stdout);
 
         // Add pain count
@@ -117,7 +117,7 @@ fn pain_on_task_with_description_and_pain_count() {
 #[test]
 fn pain_requires_d_flag_for_description() {
     with_initialized_repo(|temp| {
-        let add_result = run_command(&["add", "Task needing pain"], &temp);
+        let add_result = run_command(&["add", "Task needing pain", "-a", "Done"], &temp);
         let task_id = extract_task_id(&add_result.stdout);
 
         // Old syntax without -d should fail
@@ -134,7 +134,7 @@ fn pain_requires_d_flag_for_description() {
 #[test]
 fn pain_with_d_flag_increments_and_documents() {
     with_initialized_repo(|temp| {
-        let add_result = run_command(&["add", "Task needing pain"], &temp);
+        let add_result = run_command(&["add", "Task needing pain", "-a", "Done"], &temp);
         let task_id = extract_task_id(&add_result.stdout);
 
         // New syntax with -t and -d should succeed
@@ -162,7 +162,7 @@ fn pain_with_d_flag_increments_and_documents() {
 #[test]
 fn pain_appends_multiple_descriptions() {
     with_initialized_repo(|temp| {
-        let add_result = run_command(&["add", "Repeated pain task", "-d", "Initial description"], &temp);
+        let add_result = run_command(&["add", "Repeated pain task", "-d", "Initial description", "-a", "Done"], &temp);
         let task_id = extract_task_id(&add_result.stdout);
 
         // First pain instance
@@ -202,7 +202,7 @@ fn pain_appends_multiple_descriptions() {
 #[test]
 fn pain_without_t_flag_fails() {
     with_initialized_repo(|temp| {
-        let add_result = run_command(&["add", "Some task"], &temp);
+        let add_result = run_command(&["add", "Some task", "-a", "Done"], &temp);
         let task_id = extract_task_id(&add_result.stdout);
 
         // Bare task-id without -t flag should fail

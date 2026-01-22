@@ -177,7 +177,7 @@ fn test_write_task_with_delivered_status() {
         fs::write(&tasks_path, "1,delivered,\"Fix the bug\",,\n").unwrap();
         
         // Add another task - this will read and rewrite the file
-        run_command(&["add", "Another task"], &temp);
+        run_command(&["add", "Another task", "-a", "Done"], &temp);
         
         // Verify the delivered status was preserved
         let content = fs::read_to_string(&tasks_path).unwrap();
@@ -217,7 +217,7 @@ fn test_backwards_compatibility_with_open_and_done() {
         assert!(result.stdout.contains("Done task"), "Should show done task");
         
         // Add a new task - this will read and rewrite
-        run_command(&["add", "New task"], &temp);
+        run_command(&["add", "New task", "-a", "Done"], &temp);
         
         // Verify all statuses were preserved
         let content = fs::read_to_string(&tasks_path).unwrap();

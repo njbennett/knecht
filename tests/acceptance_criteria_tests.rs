@@ -41,35 +41,37 @@ fn add_task_with_both_description_and_acceptance_criteria() {
 }
 
 #[test]
-fn add_task_without_acceptance_criteria_still_works() {
+fn add_task_fails_without_acceptance_criteria() {
     with_initialized_repo(|temp| {
-        // Add task without acceptance criteria (backwards compatibility)
+        // Add task without acceptance criteria should fail
         let result = run_command(&["add", "Simple task"], &temp);
-        assert!(result.success, "add without acceptance criteria should still work");
-
-        let task_id = extract_task_id(&result.stdout);
-        let show = run_command(&["show", &format!("task-{}", task_id)], &temp);
-        assert!(show.success);
-        assert!(!show.stdout.contains("Acceptance Criteria:"), "Should not show acceptance criteria if none");
+        assert!(!result.success, "add without acceptance criteria should fail");
+        assert!(
+            result.stderr.contains("Acceptance criteria") || result.stderr.contains("acceptance criteria"),
+            "Error should mention acceptance criteria: {}",
+            result.stderr
+        );
     });
 }
 
 #[test]
-fn update_add_acceptance_criteria() {
+fn update_modify_acceptance_criteria_via_update() {
     with_initialized_repo(|temp| {
-        // Add a task without acceptance criteria
-        let add_result = run_command(&["add", "Task without criteria"], &temp);
+        // Add a task with acceptance criteria
+        let add_result = run_command(&["add", "Task with criteria", "-a", "Original criteria"], &temp);
+        assert!(add_result.success, "add should succeed: {}", add_result.stderr);
         let task_id = extract_task_id(&add_result.stdout);
 
-        // Add acceptance criteria via update
+        // Update acceptance criteria via update
         let result = run_command(&["update", &format!("task-{}", task_id), "--acceptance-criteria", "Must pass tests"], &temp);
         assert!(result.success, "update should succeed: {}", result.stderr);
 
-        // Verify criteria was added
+        // Verify criteria was updated
         let show = run_command(&["show", &format!("task-{}", task_id)], &temp);
         assert!(show.success);
         assert!(show.stdout.contains("Acceptance Criteria:"), "Should show criteria label");
-        assert!(show.stdout.contains("Must pass tests"), "Should show criteria content");
+        assert!(show.stdout.contains("Must pass tests"), "Should show updated criteria content");
+        assert!(!show.stdout.contains("Original criteria"), "Should not show old criteria");
     });
 }
 
@@ -95,18 +97,19 @@ fn update_modify_acceptance_criteria() {
 #[test]
 fn update_acceptance_criteria_with_short_flag() {
     with_initialized_repo(|temp| {
-        // Add a task
-        let add_result = run_command(&["add", "Task"], &temp);
+        // Add a task with criteria
+        let add_result = run_command(&["add", "Task", "-a", "Original criteria"], &temp);
+        assert!(add_result.success, "add should succeed: {}", add_result.stderr);
         let task_id = extract_task_id(&add_result.stdout);
 
         // Update using short flag -a
         let result = run_command(&["update", &format!("task-{}", task_id), "-a", "Criteria via short flag"], &temp);
         assert!(result.success, "update with -a should succeed: {}", result.stderr);
 
-        // Verify criteria was added
+        // Verify criteria was updated
         let show = run_command(&["show", &format!("task-{}", task_id)], &temp);
         assert!(show.success);
-        assert!(show.stdout.contains("Criteria via short flag"), "Should show criteria");
+        assert!(show.stdout.contains("Criteria via short flag"), "Should show new criteria");
     });
 }
 

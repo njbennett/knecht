@@ -13,7 +13,7 @@ fn add_handles_tasks_with_pipe_characters_in_title() {
     run_command(&["init"], &temp);
 
     // Add task with pipe in title - this is tricky for pipe-delimited format
-    let result = run_command(&["add", "Fix bug in foo|bar function"], &temp);
+    let result = run_command(&["add", "Fix bug in foo|bar function", "-a", "Done"], &temp);
 
     // Should either handle it gracefully or reject it with clear error
     if result.success {
@@ -40,7 +40,7 @@ fn add_task_with_pipe_in_description_works_with_escaping() {
     let temp = setup_temp_dir();
     run_command(&["init"], &temp);
 
-    let result = run_command(&["add", "Valid title", "-d", "Description with | pipe"], &temp);
+    let result = run_command(&["add", "Valid title", "-d", "Description with | pipe", "-a", "Done"], &temp);
 
     assert!(result.success, "Should succeed with pipe in description (CSV handles it naturally)");
 
@@ -150,7 +150,7 @@ fn csv_format_edge_cases_for_coverage() {
     // Test 6: Add task with backslash in title
     {
         run_command(&["init"], &temp);
-        let result = run_command(&["add", "Task\\with\\backslash", "-d", "Desc\\with\\backslash"], &temp);
+        let result = run_command(&["add", "Task\\with\\backslash", "-d", "Desc\\with\\backslash", "-a", "Done"], &temp);
         assert!(result.success, "Should add task with backslashes");
 
         let content = fs::read_to_string(&tasks_file).unwrap();
@@ -203,7 +203,7 @@ fn test_add_with_backslash_and_pipe_combination() {
     run_command(&["init"], &temp);
 
     // Add task with both backslashes and pipes - CSV handles these naturally
-    let result = run_command(&["add", "Test\\path|command", "-d", "Run\\cmd|filter"], &temp);
+    let result = run_command(&["add", "Test\\path|command", "-d", "Run\\cmd|filter", "-a", "Done"], &temp);
     assert!(result.success, "Should add task with backslash and pipe");
 
     let tasks_file = temp.join(".knecht/tasks");
@@ -300,7 +300,7 @@ fn test_empty_string_escaping() {
     run_command(&["init"], &temp);
 
     // Empty title with description - edge case
-    let result = run_command(&["add", "A", "-d", ""], &temp);
+    let result = run_command(&["add", "A", "-d", "", "-a", "Done"], &temp);
     assert!(result.success || !result.success, "Should handle empty description");
 
     cleanup_temp_dir(temp);

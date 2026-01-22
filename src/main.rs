@@ -147,6 +147,14 @@ fn cmd_add(title: &str, description: Option<String>, acceptance_criteria: Option
         std::process::exit(1);
     }
 
+    if acceptance_criteria.is_none() {
+        eprintln!("Error: Acceptance criteria is required. Use -a to specify criteria.");
+        eprintln!();
+        eprintln!("Example:");
+        eprintln!("  knecht add \"Task title\" -a \"Criteria that defines done\"");
+        std::process::exit(1);
+    }
+
     match add_task_with_fs(title.to_string(), description, acceptance_criteria, &RealFileSystem) {
         Ok(task_id) => {
             println!("Created task-{}", task_id);
@@ -283,16 +291,7 @@ fn cmd_start(task_arg: &str) {
     let task_id = parse_task_id(task_arg);
 
     match find_task_by_id_with_fs(task_id, &RealFileSystem) {
-        Ok(task) => {
-            // Check for acceptance criteria
-            if task.acceptance_criteria.is_none() {
-                eprintln!("Error: Cannot start task-{}. No acceptance criteria defined.", task_id);
-                eprintln!();
-                eprintln!("Add acceptance criteria first:");
-                eprintln!("  knecht update task-{} --acceptance-criteria \"<criteria>\"", task_id);
-                std::process::exit(1);
-            }
-
+        Ok(_task) => {
             // Check for open blockers
             let blockers = get_blockers_for_task(task_id);
             let mut open_blockers = Vec::new();

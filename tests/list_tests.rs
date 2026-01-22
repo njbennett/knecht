@@ -8,8 +8,8 @@ use std::fs;
 #[test]
 fn list_shows_all_tasks() {
     with_initialized_repo(|temp| {
-        let r1 = run_command(&["add", "Task one"], &temp);
-        let r2 = run_command(&["add", "Task two"], &temp);
+        let r1 = run_command(&["add", "Task one", "-a", "Done"], &temp);
+        let r2 = run_command(&["add", "Task two", "-a", "Done"], &temp);
         let id1 = extract_task_id(&r1.stdout);
         let id2 = extract_task_id(&r2.stdout);
 
@@ -120,7 +120,7 @@ fn list_handles_tasks_file_with_empty_lines() {
 fn list_includes_usage_instructions_for_agents() {
     with_initialized_repo(|temp| {
         // Add a task with a description
-        run_command(&["add", "Test task", "-d", "Task description here"], &temp);
+        run_command(&["add", "Test task", "-d", "Task description here", "-a", "Done"], &temp);
         
         let result = run_command(&["list"], &temp);
         assert!(result.success);

@@ -50,14 +50,14 @@ Initialize knecht in the current directory. Creates `.knecht/tasks`.
 knecht init
 ```
 
-### `knecht add <title> [-d <description>]`
+### `knecht add <title> -a <acceptance-criteria> [-d <description>]`
 
-Create a new task with the given title and optional description.
+Create a new task with the given title and acceptance criteria. Description is optional.
 
 ```bash
-knecht add "Implement payment processing"
-knecht add "Add tests for edge cases"
-knecht add "Refactor auth module" -d "Break down into smaller functions and add better error handling"
+knecht add "Implement payment processing" -a "Tests pass, payments are recorded in database"
+knecht add "Add tests for edge cases" -a "Coverage includes null inputs, empty arrays, boundary values"
+knecht add "Refactor auth module" -d "Break down into smaller functions" -a "All auth tests pass, code is in separate module"
 ```
 
 Output: `Created task-a3x7kp` (6-character alphanumeric ID)

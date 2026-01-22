@@ -15,7 +15,7 @@ fn can_create_and_list_a_task() {
     assert!(temp.join(".knecht/tasks").exists(), ".knecht/tasks file was not created");
 
     // Add a task
-    let add_result = run_command(&["add", "Write first test"], &temp);
+    let add_result = run_command(&["add", "Write first test", "-a", "Test passes"], &temp);
     assert!(add_result.success, "add command failed: {}", add_result.stderr);
     let task_id = extract_task_id(&add_result.stdout);
     assert!(!task_id.is_empty(), "Expected task ID in output, got: {}", add_result.stdout);
@@ -33,8 +33,8 @@ fn can_create_and_list_a_task() {
 #[test]
 fn add_creates_unique_alphanumeric_ids() {
     with_initialized_repo(|temp| {
-        let r1 = run_command(&["add", "First task"], &temp);
-        let r2 = run_command(&["add", "Second task"], &temp);
+        let r1 = run_command(&["add", "First task", "-a", "Done"], &temp);
+        let r2 = run_command(&["add", "Second task", "-a", "Done"], &temp);
 
         let id1 = extract_task_id(&r1.stdout);
         let id2 = extract_task_id(&r2.stdout);
@@ -64,7 +64,7 @@ fn add_handles_missing_knecht_directory() {
     // Don't run init - .knecht directory doesn't exist
 
     // add should create the directory or fail gracefully
-    let result = run_command(&["add", "New task"], &temp);
+    let result = run_command(&["add", "New task", "-a", "Done"], &temp);
 
     // Either it succeeds by creating the directory, or fails with a helpful error
     if !result.success {
@@ -86,7 +86,7 @@ fn add_handles_missing_knecht_directory() {
 fn add_task_with_description() {
     with_initialized_repo(|temp| {
         // Add task with description using -d flag
-        let result = run_command(&["add", "Implement feature X", "-d", "This is a longer description of the feature"], &temp);
+        let result = run_command(&["add", "Implement feature X", "-d", "This is a longer description of the feature", "-a", "Feature works"], &temp);
         assert!(result.success, "add with description should succeed: {}", result.stderr);
         let task_id = extract_task_id(&result.stdout);
         assert!(!task_id.is_empty(), "Should create a task");
@@ -110,8 +110,8 @@ fn add_task_with_description() {
 #[test]
 fn add_task_without_description_still_works() {
     with_initialized_repo(|temp| {
-        // Add task without description (backwards compatibility)
-        let result = run_command(&["add", "Simple task"], &temp);
+        // Add task without description (description is optional, acceptance criteria is required)
+        let result = run_command(&["add", "Simple task", "-a", "Task complete"], &temp);
         assert!(result.success, "add without description should still work");
 
         let list_result = run_command(&["list"], &temp);
@@ -169,7 +169,7 @@ fn add_fails_when_tasks_file_cannot_be_written() {
     }
 
     // Try to add a task - should fail with IO error
-    let result = run_command(&["add", "This should fail"], &temp);
+    let result = run_command(&["add", "This should fail", "-a", "Done"], &temp);
 
     assert!(!result.success, "Should fail when tasks file is not writable");
     assert!(result.stderr.contains("Error:"),
@@ -200,7 +200,7 @@ fn add_command_writes_csv_format() {
     run_command(&["init"], &temp);
 
     // Add a task with special characters
-    let result = run_command(&["add", "Task with, comma and | pipe"], &temp);
+    let result = run_command(&["add", "Task with, comma and | pipe", "-a", "Done"], &temp);
     assert!(result.success, "add should succeed");
 
     // Verify the file is in CSV format
@@ -220,7 +220,7 @@ fn add_output_shows_block_syntax() {
     let temp = setup_temp_dir();
     run_command(&["init"], &temp);
 
-    let result = run_command(&["add", "New task"], &temp);
+    let result = run_command(&["add", "New task", "-a", "Done"], &temp);
     assert!(result.success, "add should succeed");
     let task_id = extract_task_id(&result.stdout);
 

@@ -9,7 +9,7 @@ use std::fs;
 fn update_title_only() {
     with_initialized_repo(|temp| {
         // Add a task
-        let add_result = run_command(&["add", "Old Title"], &temp);
+        let add_result = run_command(&["add", "Old Title", "-a", "Done"], &temp);
         let task_id = extract_task_id(&add_result.stdout);
 
         // Update the title
@@ -34,7 +34,7 @@ fn update_title_only() {
 fn update_description_only() {
     with_initialized_repo(|temp| {
         // Add a task with a description
-        let add_result = run_command(&["add", "Task Title", "-d", "Old description"], &temp);
+        let add_result = run_command(&["add", "Task Title", "-d", "Old description", "-a", "Done"], &temp);
         let task_id = extract_task_id(&add_result.stdout);
 
         // Update only the description
@@ -54,7 +54,7 @@ fn update_description_only() {
 fn update_add_description_to_task_without_one() {
     with_initialized_repo(|temp| {
         // Add a task without description
-        let add_result = run_command(&["add", "Task without description"], &temp);
+        let add_result = run_command(&["add", "Task without description", "-a", "Done"], &temp);
         let task_id = extract_task_id(&add_result.stdout);
 
         // Add a description
@@ -72,7 +72,7 @@ fn update_add_description_to_task_without_one() {
 fn update_both_title_and_description() {
     with_initialized_repo(|temp| {
         // Add a task with both
-        let add_result = run_command(&["add", "Old Title", "-d", "Old description"], &temp);
+        let add_result = run_command(&["add", "Old Title", "-d", "Old description", "-a", "Done"], &temp);
         let task_id = extract_task_id(&add_result.stdout);
 
         // Update both
@@ -93,7 +93,7 @@ fn update_both_title_and_description() {
 fn update_with_short_flags() {
     with_initialized_repo(|temp| {
         // Add a task
-        let add_result = run_command(&["add", "Old Title"], &temp);
+        let add_result = run_command(&["add", "Old Title", "-a", "Done"], &temp);
         let task_id = extract_task_id(&add_result.stdout);
 
         // Update using short flags
@@ -112,7 +112,7 @@ fn update_with_short_flags() {
 fn update_clear_description() {
     with_initialized_repo(|temp| {
         // Add a task with description
-        let add_result = run_command(&["add", "Task Title", "-d", "Description to remove"], &temp);
+        let add_result = run_command(&["add", "Task Title", "-d", "Description to remove", "-a", "Done"], &temp);
         let task_id = extract_task_id(&add_result.stdout);
 
         // Clear the description
@@ -143,7 +143,7 @@ fn update_nonexistent_task() {
 fn update_no_flags_provided() {
     with_initialized_repo(|temp| {
         // Add a task
-        let add_result = run_command(&["add", "Task Title"], &temp);
+        let add_result = run_command(&["add", "Task Title", "-a", "Done"], &temp);
         let task_id = extract_task_id(&add_result.stdout);
 
         // Try to update without providing any flags
@@ -157,7 +157,7 @@ fn update_no_flags_provided() {
 fn update_preserves_status() {
     with_initialized_repo(|temp| {
         // Add and complete a task
-        let add_result = run_command(&["add", "Done Task"], &temp);
+        let add_result = run_command(&["add", "Done Task", "-a", "Done"], &temp);
         let task_id = extract_task_id(&add_result.stdout);
         run_command(&["done", &format!("task-{}", task_id)], &temp);
 
@@ -177,9 +177,9 @@ fn update_preserves_status() {
 fn update_only_affects_target_task() {
     with_initialized_repo(|temp| {
         // Add multiple tasks
-        let r1 = run_command(&["add", "Task One"], &temp);
-        let r2 = run_command(&["add", "Task Two"], &temp);
-        let r3 = run_command(&["add", "Task Three"], &temp);
+        let r1 = run_command(&["add", "Task One", "-a", "Done"], &temp);
+        let r2 = run_command(&["add", "Task Two", "-a", "Done"], &temp);
+        let r3 = run_command(&["add", "Task Three", "-a", "Done"], &temp);
         let id1 = extract_task_id(&r1.stdout);
         let id2 = extract_task_id(&r2.stdout);
         let id3 = extract_task_id(&r3.stdout);
@@ -213,7 +213,7 @@ fn update_fails_when_no_task_id_provided() {
 #[test]
 fn update_fails_when_title_flag_has_no_value() {
     with_initialized_repo(|temp| {
-        run_command(&["add", "Task Title"], &temp);
+        run_command(&["add", "Task Title", "-a", "Done"], &temp);
         
         // Try to update with --title but no value
         let result = run_command(&["update", "task-1", "--title"], &temp);
@@ -225,7 +225,7 @@ fn update_fails_when_title_flag_has_no_value() {
 #[test]
 fn update_fails_when_description_flag_has_no_value() {
     with_initialized_repo(|temp| {
-        run_command(&["add", "Task Title"], &temp);
+        run_command(&["add", "Task Title", "-a", "Done"], &temp);
         
         // Try to update with --description but no value
         let result = run_command(&["update", "task-1", "--description"], &temp);
@@ -237,7 +237,7 @@ fn update_fails_when_description_flag_has_no_value() {
 #[test]
 fn update_fails_with_unknown_flag() {
     with_initialized_repo(|temp| {
-        run_command(&["add", "Task Title"], &temp);
+        run_command(&["add", "Task Title", "-a", "Done"], &temp);
         
         // Try to update with an unknown flag
         let result = run_command(&["update", "task-1", "--invalid-flag", "value"], &temp);
@@ -250,7 +250,7 @@ fn update_fails_with_unknown_flag() {
 fn update_handles_special_characters() {
     with_initialized_repo(|temp| {
         // Add a task
-        let add_result = run_command(&["add", "Simple Title"], &temp);
+        let add_result = run_command(&["add", "Simple Title", "-a", "Done"], &temp);
         let task_id = extract_task_id(&add_result.stdout);
 
         // Update with special characters (pipe is tricky for our format)
