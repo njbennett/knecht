@@ -116,6 +116,22 @@ pub struct Task {
     pub acceptance_criteria: Option<String>,
 }
 
+/// A single pain instance recorded in the append-only pain log
+#[derive(Debug, Clone)]
+pub struct PainEntry {
+    pub task_id: String,
+    pub timestamp: u64,
+    pub source_type: PainSourceType,
+    pub source_id: Option<String>,
+    pub description: String,
+}
+
+#[derive(Debug, Clone)]
+pub enum PainSourceType {
+    Manual,
+    Skip,
+}
+
 impl Task {
     pub fn is_done(&self) -> bool {
         self.status == "done"
@@ -299,40 +315,38 @@ pub fn mark_task_done_with_fs(task_id: &str, fs: &dyn FileSystem) -> Result<Task
         .filter(|t| t.status == "open")
         .min_by(|a, b| a.id.cmp(&b.id))
         .map(|t| t.id.clone());
-    
+
     // Check if the task being marked done is different from the oldest open task
     let should_increment_skip = oldest_open_task_id.as_ref().is_some_and(|oldest_id| oldest_id != task_id);
     let skipped_task_id = oldest_open_task_id.clone();
-    
+
     for task in &mut tasks {
         if task.id == task_id {
             task.mark_done();
             let completed_task = task.clone();
-            
-            // If we skipped the top task, increment its pain
-            if should_increment_skip
-                && let Some(ref skipped_id) = skipped_task_id {
-                    for t in &mut tasks {
-                        if &t.id == skipped_id {
-                            t.pain_count = Some(t.pain_count.unwrap_or(0) + 1);
-                            
-                            // Add skip note to description
-                            let skip_note = format!("Skip: task-{} completed instead", task_id);
-                            if let Some(ref desc) = t.description {
-                                t.description = Some(format!("{}. {}", desc, skip_note));
-                            } else {
-                                t.description = Some(skip_note);
-                            }
-                            break;
-                        }
-                    }
+
+            // If we skipped the top task, log pain to append-only pain log
+            if should_increment_skip {
+                if let Some(ref skipped_id) = skipped_task_id {
+                    let entry = PainEntry {
+                        task_id: skipped_id.clone(),
+                        timestamp: SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .unwrap()
+                            .as_secs(),
+                        source_type: PainSourceType::Skip,
+                        source_id: Some(task_id.to_string()),
+                        description: format!("Skip: task-{} completed instead", task_id),
+                    };
+                    append_pain_entry_with_fs(&entry, fs)?;
                 }
-            
+            }
+
             write_tasks_with_fs(&tasks, fs)?;
             return Ok(completed_task);
         }
     }
-    
+
     Err(KnechtError::TaskNotFound(task_id.to_string()))
 }
 
@@ -400,21 +414,19 @@ fn has_open_blockers(task_id: &str, tasks: &[Task], fs: &dyn FileSystem) -> bool
 }
 
 /// Recursively finds the best unblocked blocker task to work on
-fn find_best_blocker(task_id: &str, tasks: &[Task], fs: &dyn FileSystem) -> Option<Task> {
+fn find_best_blocker(task_id: &str, tasks: &[Task], pain_counts: &HashMap<String, u32>, fs: &dyn FileSystem) -> Option<Task> {
     let blockers = get_blockers_for_task(task_id, fs);
-    
+
     // Get open blocker tasks
     let open_blockers: Vec<&Task> = tasks.iter()
         .filter(|t| t.status == "open" && blockers.contains(&t.id))
         .collect();
-    
 
-    
     // Find best blocker by pain count with consistent tiebreaking by ID
     let best_blocker = open_blockers.iter()
         .max_by(|a, b| {
-            let pain_a = a.pain_count.unwrap_or(0);
-            let pain_b = b.pain_count.unwrap_or(0);
+            let pain_a = pain_counts.get(&a.id).copied().unwrap_or(0);
+            let pain_b = pain_counts.get(&b.id).copied().unwrap_or(0);
             // First compare by pain count (higher is better)
             pain_a.cmp(&pain_b)
                 // On tie, prefer lexicographically smaller ID (consistent ordering)
@@ -422,22 +434,22 @@ fn find_best_blocker(task_id: &str, tasks: &[Task], fs: &dyn FileSystem) -> Opti
         })
         .map(|t| (*t).clone())
         .expect("No blocker found");
-    
+
     // Check if this blocker itself has open blockers - recursively find leaf blocker
     if has_open_blockers(&best_blocker.id, tasks, fs) {
         // Recursively find the best blocker of this blocker
-        return find_best_blocker(&best_blocker.id, tasks, fs);
+        return find_best_blocker(&best_blocker.id, tasks, pain_counts, fs);
     }
-    
+
     Some(best_blocker)
 }
 
 /// Find the best task from a list by highest pain count, with consistent tiebreaking by ID
-fn find_best_by_priority(tasks: &[&Task]) -> Option<Task> {
+fn find_best_by_priority(tasks: &[&Task], pain_counts: &HashMap<String, u32>) -> Option<Task> {
     tasks.iter()
         .max_by(|a, b| {
-            let pain_a = a.pain_count.unwrap_or(0);
-            let pain_b = b.pain_count.unwrap_or(0);
+            let pain_a = pain_counts.get(&a.id).copied().unwrap_or(0);
+            let pain_b = pain_counts.get(&b.id).copied().unwrap_or(0);
             // First compare by pain count (higher is better)
             pain_a.cmp(&pain_b)
                 // On tie, prefer lexicographically smaller ID (consistent ordering)
@@ -449,13 +461,16 @@ fn find_best_by_priority(tasks: &[&Task]) -> Option<Task> {
 pub fn find_next_task_with_fs(fs: &dyn FileSystem) -> Result<Option<Task>, KnechtError> {
     let tasks = read_tasks_with_fs(fs)?;
 
+    // Get pain counts from the pain log (efficient bulk read)
+    let pain_counts = get_all_pain_counts(fs)?;
+
     // First, check for delivered tasks (needing verification) - they take priority
     let delivered_tasks: Vec<_> = tasks.iter()
         .filter(|t| t.status == "delivered")
         .collect();
 
     if !delivered_tasks.is_empty() {
-        return Ok(find_best_by_priority(&delivered_tasks));
+        return Ok(find_best_by_priority(&delivered_tasks, &pain_counts));
     }
 
     // Otherwise, fall back to open tasks
@@ -467,36 +482,109 @@ pub fn find_next_task_with_fs(fs: &dyn FileSystem) -> Result<Option<Task>, Knech
         return Ok(None);
     }
 
-    let best_task = find_best_by_priority(&open_tasks);
+    let best_task = find_best_by_priority(&open_tasks, &pain_counts);
 
     // If the best task has open blockers, find the best blocker to work on instead
     if let Some(ref task) = best_task
         && has_open_blockers(&task.id, &tasks, fs) {
             // find_best_blocker always returns Some (panics if no blocker found)
-            let blocker = find_best_blocker(&task.id, &tasks, fs).unwrap();
+            let blocker = find_best_blocker(&task.id, &tasks, &pain_counts, fs).unwrap();
             return Ok(Some(blocker));
         }
 
     Ok(best_task)
 }
 
-pub fn increment_pain_count_with_fs(task_id: &str, pain_description: Option<&str>, fs: &dyn FileSystem) -> Result<Task, KnechtError> {
-    // Optimized: read and write single task file
-    let mut task = find_task_by_id_with_fs(task_id, fs)?;
+/// Append a pain entry to the append-only pain log (.knecht/pain)
+pub fn append_pain_entry_with_fs(entry: &PainEntry, fs: &dyn FileSystem) -> Result<(), KnechtError> {
+    let pain_path = Path::new(".knecht/pain");
 
-    // Increment pain_count field
-    task.pain_count = Some(task.pain_count.unwrap_or(0) + 1);
+    let source_type_str = match entry.source_type {
+        PainSourceType::Manual => "manual",
+        PainSourceType::Skip => "skip",
+    };
+    let source_id_str = entry.source_id.as_deref().unwrap_or("");
 
-    // Append pain description if provided
-    if let Some(desc) = pain_description {
-        let pain_note = format!("Pain: {}", desc);
-        task.description = Some(match &task.description {
-            Some(existing) => format!("{}\n{}", existing, pain_note),
-            None => pain_note,
-        });
+    let mut writer = fs.append(pain_path)?;
+    writeln!(writer, "{}|{}|{}|{}|{}",
+        entry.task_id, entry.timestamp, source_type_str, source_id_str, entry.description)?;
+
+    Ok(())
+}
+
+/// Read all pain entries from the pain log
+pub fn read_pain_entries_with_fs(fs: &dyn FileSystem) -> Result<Vec<PainEntry>, KnechtError> {
+    let pain_path = Path::new(".knecht/pain");
+
+    if !fs.exists(pain_path) {
+        return Ok(Vec::new());
     }
 
-    write_task_with_fs(&task, fs)?;
+    let reader = fs.open(pain_path)?;
+    let mut entries = Vec::new();
+
+    for line in reader.lines() {
+        let line = line?;
+        if line.is_empty() { continue; }
+
+        let parts: Vec<&str> = line.splitn(5, '|').collect();
+        if parts.len() >= 5 {
+            entries.push(PainEntry {
+                task_id: parts[0].to_string(),
+                timestamp: parts[1].parse().unwrap_or(0),
+                source_type: if parts[2] == "skip" { PainSourceType::Skip } else { PainSourceType::Manual },
+                source_id: if parts[3].is_empty() { None } else { Some(parts[3].to_string()) },
+                description: parts[4].to_string(),
+            });
+        }
+    }
+
+    Ok(entries)
+}
+
+/// Get pain entries for a specific task
+pub fn get_pain_entries_for_task(task_id: &str, fs: &dyn FileSystem) -> Result<Vec<PainEntry>, KnechtError> {
+    let entries = read_pain_entries_with_fs(fs)?;
+    Ok(entries.into_iter().filter(|e| e.task_id == task_id).collect())
+}
+
+/// Get pain count for a specific task from the pain log
+pub fn get_pain_count_for_task(task_id: &str, fs: &dyn FileSystem) -> Result<u32, KnechtError> {
+    let entries = read_pain_entries_with_fs(fs)?;
+    Ok(entries.iter().filter(|e| e.task_id == task_id).count() as u32)
+}
+
+use std::collections::HashMap;
+
+/// Get pain counts for all tasks (more efficient for bulk operations like list)
+pub fn get_all_pain_counts(fs: &dyn FileSystem) -> Result<HashMap<String, u32>, KnechtError> {
+    let entries = read_pain_entries_with_fs(fs)?;
+    let mut counts: HashMap<String, u32> = HashMap::new();
+
+    for entry in entries {
+        *counts.entry(entry.task_id).or_insert(0) += 1;
+    }
+
+    Ok(counts)
+}
+
+pub fn increment_pain_count_with_fs(task_id: &str, pain_description: Option<&str>, fs: &dyn FileSystem) -> Result<Task, KnechtError> {
+    // Verify task exists
+    let task = find_task_by_id_with_fs(task_id, fs)?;
+
+    // Append to pain log (append-only for merge conflict reduction)
+    let entry = PainEntry {
+        task_id: task_id.to_string(),
+        timestamp: SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs(),
+        source_type: PainSourceType::Manual,
+        source_id: None,
+        description: pain_description.unwrap_or("").to_string(),
+    };
+    append_pain_entry_with_fs(&entry, fs)?;
+
     Ok(task)
 }
 

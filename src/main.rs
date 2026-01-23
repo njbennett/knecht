@@ -1,7 +1,7 @@
 use std::fs;
 
 use clap::{Parser, Subcommand};
-use knecht::{add_task_with_fs, delete_task_with_fs, find_next_task_with_fs, find_task_by_id_with_fs, increment_pain_count_with_fs, mark_task_claimed_with_fs, mark_task_delivered_with_fs, mark_task_done_with_fs, read_tasks_with_fs, update_task_with_fs, RealFileSystem};
+use knecht::{add_task_with_fs, delete_task_with_fs, find_next_task_with_fs, find_task_by_id_with_fs, get_all_pain_counts, get_pain_count_for_task, get_pain_entries_for_task, increment_pain_count_with_fs, mark_task_claimed_with_fs, mark_task_delivered_with_fs, mark_task_done_with_fs, read_tasks_with_fs, update_task_with_fs, RealFileSystem};
 
 #[derive(Parser)]
 #[command(name = "knecht")]
@@ -171,6 +171,9 @@ fn cmd_list() {
         }
     };
 
+    // Get all pain counts from the pain log (efficient bulk read)
+    let pain_counts = get_all_pain_counts(&RealFileSystem).unwrap_or_default();
+
     for task in tasks {
         let checkbox = if task.is_done() {
             "[x]"
@@ -181,8 +184,9 @@ fn cmd_list() {
         } else {
             "[ ]"
         };
-        let pain_suffix = if let Some(count) = task.pain_count {
-            format!(" (pain count: {})", count)
+        let pain_count = pain_counts.get(&task.id).copied().unwrap_or(0);
+        let pain_suffix = if pain_count > 0 {
+            format!(" (pain count: {})", pain_count)
         } else {
             String::new()
         };
@@ -271,6 +275,16 @@ fn cmd_show(task_arg: &str) {
                 for blocked_id in &blocks {
                     if let Ok(blocked_task) = find_task_by_id_with_fs(blocked_id, &RealFileSystem) {
                         println!("  - task-{} ({}): {}", blocked_task.id, blocked_task.status, blocked_task.title);
+                    }
+                }
+            }
+
+            // Display pain history from pain log
+            if let Ok(pain_entries) = get_pain_entries_for_task(task_id, &RealFileSystem) {
+                if !pain_entries.is_empty() {
+                    println!("Pain ({} instance{}):", pain_entries.len(), if pain_entries.len() == 1 { "" } else { "s" });
+                    for entry in &pain_entries {
+                        println!("  {}", entry.description);
                     }
                 }
             }
@@ -367,10 +381,10 @@ fn cmd_next() {
             if let Some(desc) = &task.description {
                 println!("\nDescription:\n{}", desc);
             }
-            if let Some(pain) = task.pain_count
-                && pain > 0 {
-                    println!("\n(pain count: {})", pain);
-                }
+            let pain_count = get_pain_count_for_task(&task.id, &RealFileSystem).unwrap_or(0);
+            if pain_count > 0 {
+                println!("\n(pain count: {})", pain_count);
+            }
         }
         Ok(None) => {
             println!("No open tasks");

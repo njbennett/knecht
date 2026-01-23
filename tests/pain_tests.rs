@@ -210,3 +210,77 @@ fn pain_without_t_flag_fails() {
         assert!(!result.success, "pain command should fail without -t flag");
     });
 }
+
+// =====================================================================
+// Pain Log Tests (append-only pain log for merge conflict reduction)
+// =====================================================================
+
+#[test]
+fn pain_log_file_created_on_first_pain() {
+    with_initialized_repo(|temp| {
+        let add_result = run_command(&["add", "Test task", "-a", "Done"], &temp);
+        let task_id = extract_task_id(&add_result.stdout);
+
+        run_command(&["pain", "-t", &format!("task-{}", task_id), "-d", "First pain"], &temp);
+
+        let pain_path = temp.join(".knecht/pain");
+        assert!(pain_path.exists(), "Pain log file should be created");
+    });
+}
+
+#[test]
+fn pain_log_contains_task_id_and_description() {
+    with_initialized_repo(|temp| {
+        let add_result = run_command(&["add", "Test task", "-a", "Done"], &temp);
+        let task_id = extract_task_id(&add_result.stdout);
+
+        run_command(&["pain", "-t", &format!("task-{}", task_id), "-d", "Test pain entry"], &temp);
+
+        let pain_content = fs::read_to_string(temp.join(".knecht/pain")).unwrap();
+        assert!(pain_content.contains(&task_id), "Should contain task ID");
+        assert!(pain_content.contains("Test pain entry"), "Should contain description");
+        assert!(pain_content.contains("|manual|"), "Should have manual source type");
+    });
+}
+
+#[test]
+fn pain_log_is_append_only() {
+    with_initialized_repo(|temp| {
+        let add_result1 = run_command(&["add", "Task one", "-a", "Done"], &temp);
+        let task_id1 = extract_task_id(&add_result1.stdout);
+        let add_result2 = run_command(&["add", "Task two", "-a", "Done"], &temp);
+        let task_id2 = extract_task_id(&add_result2.stdout);
+
+        run_command(&["pain", "-t", &format!("task-{}", task_id1), "-d", "Pain for task one"], &temp);
+        run_command(&["pain", "-t", &format!("task-{}", task_id2), "-d", "Pain for task two"], &temp);
+        run_command(&["pain", "-t", &format!("task-{}", task_id1), "-d", "Second pain for task one"], &temp);
+
+        let pain_content = fs::read_to_string(temp.join(".knecht/pain")).unwrap();
+        let lines: Vec<&str> = pain_content.lines().collect();
+
+        // Should have 3 entries in order (append-only)
+        assert_eq!(lines.len(), 3, "Should have 3 pain entries");
+        assert!(lines[0].contains(&task_id1) && lines[0].contains("Pain for task one"),
+            "First entry should be first pain for task one");
+        assert!(lines[1].contains(&task_id2) && lines[1].contains("Pain for task two"),
+            "Second entry should be pain for task two");
+        assert!(lines[2].contains(&task_id1) && lines[2].contains("Second pain for task one"),
+            "Third entry should be second pain for task one");
+    });
+}
+
+#[test]
+fn pain_count_computed_from_log() {
+    with_initialized_repo(|temp| {
+        let add_result = run_command(&["add", "Test task", "-a", "Done"], &temp);
+        let task_id = extract_task_id(&add_result.stdout);
+
+        run_command(&["pain", "-t", &format!("task-{}", task_id), "-d", "Pain 1"], &temp);
+        run_command(&["pain", "-t", &format!("task-{}", task_id), "-d", "Pain 2"], &temp);
+        run_command(&["pain", "-t", &format!("task-{}", task_id), "-d", "Pain 3"], &temp);
+
+        let list = run_command(&["list"], &temp);
+        assert!(list.stdout.contains("(pain count: 3)"),
+            "Pain count should be computed from log entries, got: {}", list.stdout);
+    });
+}
