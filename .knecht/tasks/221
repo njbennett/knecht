@@ -2,4 +2,5 @@
 Pain: Agent said 'Knecht could potentially help here by showing related commands when displaying a task, but this feels more like agent diligence than a knecht UX bug'. Context: task-38 asked to add a pain command, but the pain command already existed with -t and -d flags. User had to ask 'Do we already have this capability?' before agent checked. Agent recognized knecht could show related commands but dismissed it as agent's responsibility to check, rather than filing it as a UX improvement.
 Pain: Agent dismissed task-190 reflection as 'process issue, not knecht UX bug' instead of filing a task. The issue: agents creating test-only tasks decoupled from feature work violates TDD. Should file task to update rules/guidance to prevent this pattern.
 Pain: Agent reviewing StoryTime reflection was about to dismiss codebase issues as 'not knecht tasks' until user corrected
-Pain: Agent dismissed cw script redirection as 'my failure to read' rather than filing a task until user pointed out the pattern",5,
+Pain: Agent dismissed cw script redirection as 'my failure to read' rather than filing a task until user pointed out the pattern
+Pain: Agent dismissed friction in reflection, needed user prompt to file tasks (task-crllo7 session)",6,

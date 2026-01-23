@@ -90,6 +90,13 @@ is_in_rebase() {
     [[ -d "$rebase_dir" ]]
 }
 
+is_valid_worktree_for_branch() {
+    # Check if path is a valid git worktree on the expected branch
+    local path="$1"
+    local expected_branch="$2"
+    git worktree list --porcelain | grep -A1 "^worktree $path$" | grep -q "^branch refs/heads/$expected_branch$"
+}
+
 cleanup_worktree() {
     # Guard against double cleanup
     if [[ "$CLEANUP_DONE" == "true" ]]; then
@@ -252,20 +259,46 @@ main() {
     repo_name="$(get_repo_name)"
     WORKTREE_PATH="$(dirname "$MAIN_WORKTREE")/${repo_name}-${BRANCH_NAME}"
 
-    # Check worktree path doesn't already exist
+    # Check if worktree path already exists - offer to resume if valid
     if [[ -e "$WORKTREE_PATH" ]]; then
-        die "Worktree path already exists: $WORKTREE_PATH"
+        if is_valid_worktree_for_branch "$WORKTREE_PATH" "$BRANCH_NAME"; then
+            info "Worktree already exists at $WORKTREE_PATH"
+            read -p "Resume work in existing worktree? [Y/n] " -n 1 -r
+            echo
+            if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+                info "Resuming in existing worktree..."
+                # Skip worktree creation and claiming, jump to running claude
+                trap handle_signal INT TERM
+                cd "$WORKTREE_PATH"
+                set +e
+                if [[ "$BRANCH_NAME" =~ ^task-[a-zA-Z0-9]+$ ]]; then
+                    $CW_COMMAND --permission-mode plan "knecht $BRANCH_NAME"
+                else
+                    $CW_COMMAND --permission-mode plan
+                fi
+                local cmd_status=$?
+                set -e
+                info ""
+                info "$CW_COMMAND exited with status $cmd_status"
+                cleanup_worktree
+                exit 0
+            else
+                die "Worktree path already exists: $WORKTREE_PATH"
+            fi
+        else
+            die "Path already exists but is not a valid worktree: $WORKTREE_PATH"
+        fi
     fi
 
     # If branch name looks like a task (task-N), claim it before creating worktree
     # This commits the claim to main branch so other agents see it
-    if [[ "$BRANCH_NAME" =~ ^task-[0-9]+$ ]]; then
+    if [[ "$BRANCH_NAME" =~ ^task-[a-zA-Z0-9]+$ ]]; then
         info "Claiming $BRANCH_NAME before starting worktree..."
         if ! knecht start "$BRANCH_NAME" >/dev/null 2>&1; then
             die "Failed to claim $BRANCH_NAME. Task may not exist or may be blocked."
         fi
         # Commit the claim to main branch
-        git add .knecht/tasks
+        git add ".knecht/tasks/$BRANCH_NAME"
         git commit -m "Claim $BRANCH_NAME"
         info "Claimed $BRANCH_NAME (committed to $MAIN_BRANCH)"
     fi
@@ -287,7 +320,7 @@ main() {
     set +e
     # If branch name looks like a task (task-N), pass it as initial prompt
     # Start in plan mode so agent understands context before implementing
-    if [[ "$BRANCH_NAME" =~ ^task-[0-9]+$ ]]; then
+    if [[ "$BRANCH_NAME" =~ ^task-[a-zA-Z0-9]+$ ]]; then
         $CW_COMMAND --permission-mode plan "knecht $BRANCH_NAME"
     else
         $CW_COMMAND --permission-mode plan

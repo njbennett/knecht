@@ -1,0 +1,1 @@
+m3rdst,open,Task ID format change (numeric to alphanumeric) not documented anywhere,,,"CLAUDE.md or README mentions that task IDs can be alphanumeric like task-abc123, not just task-123"
