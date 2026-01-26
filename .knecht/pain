@@ -1,3 +1,5 @@
 197|1769190680|manual||No way to understand why knecht next suggests what it suggests - can't verify pain counts through CLI
 106kyn|1769447283|manual||From storytime-velocity-predictions while identifying refactoring opportunities: Agent ran 'knecht add' 3 times without proposing tasks first. User had to correct: 'I would have preferred if you'd proposed those tasks and then let me approve them before adding them.'
 103|1769463047|skip|2dw9hr|Skip: task-2dw9hr completed instead
+168|1769463524|manual||From storytime while working on task-tqncdb (dev_routes security fix): Agent read raw .knecht/tasks/tqncdb file directly instead of using 'knecht show tqncdb'. User had to redirect with 'Use knecht show'. CLAUDE.md says to use 'knecht next' but doesn't mention 'knecht show' for viewing task details.
+168|1769463932|manual||From storytime while adding a new task: Agent tried to Write task file directly instead of using 'knecht add' - user had to redirect
