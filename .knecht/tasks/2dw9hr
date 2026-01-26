@@ -1,0 +1,1 @@
+2dw9hr,done,Fix cw script task file path: strip task- prefix,,,cw script correctly adds .knecht/tasks/<id> instead of .knecht/tasks/task-<id>

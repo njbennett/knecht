@@ -298,7 +298,9 @@ main() {
             die "Failed to claim $BRANCH_NAME. Task may not exist or may be blocked."
         fi
         # Commit the claim to main branch
-        git add ".knecht/tasks/$BRANCH_NAME"
+        # Task files are stored without the "task-" prefix
+        local task_id="${BRANCH_NAME#task-}"
+        git add ".knecht/tasks/$task_id"
         git commit -m "Claim $BRANCH_NAME"
         info "Claimed $BRANCH_NAME (committed to $MAIN_BRANCH)"
     fi
