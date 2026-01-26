@@ -1,0 +1,3 @@
+197|1769190680|manual||No way to understand why knecht next suggests what it suggests - can't verify pain counts through CLI
+106kyn|1769447283|manual||From storytime-velocity-predictions while identifying refactoring opportunities: Agent ran 'knecht add' 3 times without proposing tasks first. User had to correct: 'I would have preferred if you'd proposed those tasks and then let me approve them before adding them.'
+103|1769463047|skip|2dw9hr|Skip: task-2dw9hr completed instead

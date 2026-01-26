@@ -1,1 +1,0 @@
-101,open,Add command to list done tasks Currently 'knecht list' only shows open tasks. There's no way to see completed tasks or verify a task was marked done. Need 'knecht list --done' or 'knecht list --all' to show task history.,Skip: task-165 completed instead. Skip: task-dlh250 completed instead. Skip: task-4yp5xw completed instead. Skip: task-crllo7 completed instead,3,
