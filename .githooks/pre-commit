@@ -1,5 +1,21 @@
 #!/bin/bash
-# Pre-commit hook: prompt README review when README changes
+# Pre-commit hook: run tests and prompt README review
+
+set -e
+
+# Run tests if this is a Rust project
+if [ -f "Cargo.toml" ]; then
+    echo "Running cargo test..."
+    if ! cargo test 2>&1; then
+        echo ""
+        echo "================================"
+        echo "COMMIT BLOCKED: Tests failed"
+        echo "Fix the failing tests before committing."
+        echo "================================"
+        exit 1
+    fi
+    echo "Tests passed."
+fi
 
 # Check if README.md is staged for commit
 if git diff --cached --name-only | grep -q '^README\.md$'; then

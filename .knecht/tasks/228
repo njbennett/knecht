@@ -1,1 +1,1 @@
-228,open,'done' on already-done task should fail like 'deliver' on already-delivered,,,
+228,done,'done' on already-done task should fail like 'deliver' on already-delivered,,,

@@ -40,21 +40,6 @@
 
 ## Architecture Overview
 
-### Module Structure
-
-```
-knecht/
-├── src/
-│   ├── main.rs      # CLI command routing and user-facing logic
-│   └── task.rs      # Task struct and data operations (read/write/modify)
-├── tests/
-│   └── integration_test.rs  # End-to-end tests via CLI
-└── .knecht/
-    └── tasks        # Self-hosting: knecht's own tasks
-```
-
-**Design Decision**: Start with minimal modules. Only extract new modules when you feel pain from a file being too large or having multiple concerns.
-
 ### Data Format
 
 File: `.knecht/tasks` - CSV format: `id,status,title,description,pain_count`

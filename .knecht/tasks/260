@@ -1,1 +1,1 @@
-260,open,knecht add should accept --description as alias for -d,User tried 'knecht add TITLE --description DESC' which failed. --description is a natural long-form flag that should work as an alias for -d.,,
+260,done,knecht add should accept --description as alias for -d,User tried 'knecht add TITLE --description DESC' which failed. --description is a natural long-form flag that should work as an alias for -d.,,
