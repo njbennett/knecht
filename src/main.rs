@@ -21,7 +21,7 @@ enum Commands {
         #[arg(required = true, num_args = 1..)]
         title: Vec<String>,
         /// Task description
-        #[arg(short, long)]
+        #[arg(short, long = "description")]
         d: Option<String>,
         /// Acceptance criteria
         #[arg(short, long = "acceptance-criteria")]

@@ -108,6 +108,27 @@ fn add_task_with_description() {
 }
 
 #[test]
+fn add_task_with_description_long_flag() {
+    with_initialized_repo(|temp| {
+        // Add task with description using --description long flag
+        let result = run_command(&["add", "Feature using long flag", "--description", "Description via long flag", "-a", "Feature works"], &temp);
+        assert!(result.success, "add with --description should succeed: {}", result.stderr);
+        let task_id = extract_task_id(&result.stdout);
+        assert!(!task_id.is_empty(), "Should create a task");
+
+        // Verify task file contains the description
+        let tasks_content = fs::read_to_string(temp.join(format!(".knecht/tasks/{}", task_id)))
+            .expect("Failed to read task file");
+        assert!(tasks_content.contains("Description via long flag"), "Should contain description from --description flag");
+
+        // Verify the task shows in list
+        let list_result = run_command(&["list"], &temp);
+        assert!(list_result.success, "list should work");
+        assert!(list_result.stdout.contains("Feature using long flag"), "Should show task title");
+    });
+}
+
+#[test]
 fn add_task_without_description_still_works() {
     with_initialized_repo(|temp| {
         // Add task without description (description is optional, acceptance criteria is required)
