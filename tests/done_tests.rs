@@ -323,3 +323,25 @@ fn done_instructs_agent_to_run_reflect_skill() {
             "Should instruct agent to run /reflect skill, got: {}", result.stdout);
     });
 }
+
+#[test]
+fn done_fails_for_already_done_task() {
+    // task-228: 'done' on already-done task should fail like 'deliver' on already-delivered
+    with_initialized_repo(|temp| {
+        let add_result = run_command(&["add", "Task to mark done twice", "-a", "Done"], temp);
+        let task_id = extract_task_id(&add_result.stdout);
+
+        // First done should succeed
+        let first = run_command(&["done", &format!("task-{}", task_id)], temp);
+        assert!(first.success, "First done should succeed");
+
+        // Second done should fail
+        let second = run_command(&["done", &format!("task-{}", task_id)], temp);
+        assert!(!second.success, "Second done should fail");
+        assert!(
+            second.stderr.contains("already done"),
+            "Error should mention task is already done, got: {}",
+            second.stderr
+        );
+    });
+}

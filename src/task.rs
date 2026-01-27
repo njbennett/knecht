@@ -310,6 +310,13 @@ pub fn find_task_by_id_with_fs(task_id: &str, fs: &dyn FileSystem) -> Result<Tas
 pub fn mark_task_done_with_fs(task_id: &str, fs: &dyn FileSystem) -> Result<Task, KnechtError> {
     let mut tasks = read_tasks_with_fs(fs)?;
 
+    // Check if task exists and is already done
+    let existing_task = tasks.iter().find(|t| t.id == task_id);
+    if let Some(task) = existing_task
+        && task.status == "done" {
+            return Err(KnechtError::TaskAlreadyDone(task_id.to_string()));
+        }
+
     // Find the first open task (by string comparison for consistent ordering)
     let oldest_open_task_id = tasks.iter()
         .filter(|t| t.status == "open")
