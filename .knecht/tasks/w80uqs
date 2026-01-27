@@ -1,0 +1,2 @@
+w80uqs,open,Task templates should suggest verification methods appropriate to task type,"From storytime while working on task-0o9p8b (remove description field from form): Agent ran tests and tried to mark task done, but user had to redirect with 'did you verify by running the application?' UI changes need explicit guidance to verify visually, not just pass tests.",,"1. Tasks involving UI changes include 'Start server and verify in browser' in acceptance criteria template
+2. knecht add prompts for verification method when task appears UI-related"
