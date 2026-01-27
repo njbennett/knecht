@@ -4,3 +4,4 @@
 168|1769463524|manual||From storytime while working on task-tqncdb (dev_routes security fix): Agent read raw .knecht/tasks/tqncdb file directly instead of using 'knecht show tqncdb'. User had to redirect with 'Use knecht show'. CLAUDE.md says to use 'knecht next' but doesn't mention 'knecht show' for viewing task details.
 168|1769463932|manual||From storytime while adding a new task: Agent tried to Write task file directly instead of using 'knecht add' - user had to redirect
 168|1769530792|manual||From storytime during /reflect cleanup: Agent used 'rm .knecht/tasks/495bl0' to delete an incorrectly-filed task instead of using a knecht command. No 'knecht delete' or 'knecht close' command exists yet (see task-214).
+103|1769533075|skip|168|Skip: task-168 completed instead
