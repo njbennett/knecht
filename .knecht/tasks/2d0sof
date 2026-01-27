@@ -1,0 +1,1 @@
+2d0sof,open,Document 'propose before adding' pattern for task creation,"During task-168, agent assumed it could file tasks directly. User redirected 3 times. The pattern 'propose task, confirm with user, then add' should be documented.",,CLAUDE.md or a skill explicitly states agents should propose tasks and get user approval before running knecht add
