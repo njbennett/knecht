@@ -1,1 +1,1 @@
-d2wzb0,open,Pre-commit hook should block commits when tests fail,,,Cannot commit when cargo test fails; currently CLAUDE.md exceeds 250 line limit but commits still possible
+d2wzb0,done,Pre-commit hook should block commits when tests fail,,,Cannot commit when cargo test fails; currently CLAUDE.md exceeds 250 line limit but commits still possible

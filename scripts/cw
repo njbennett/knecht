@@ -272,7 +272,7 @@ main() {
                 cd "$WORKTREE_PATH"
                 set +e
                 if [[ "$BRANCH_NAME" =~ ^task-[a-zA-Z0-9]+$ ]]; then
-                    $CW_COMMAND --permission-mode plan "knecht $BRANCH_NAME"
+                    $CW_COMMAND --permission-mode plan "knecht show $BRANCH_NAME"
                 else
                     $CW_COMMAND --permission-mode plan
                 fi
