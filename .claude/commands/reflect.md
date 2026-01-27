@@ -34,10 +34,29 @@ These ARE knecht bugs - file tasks for them:
 
 ### 4. REQUIRED ACTION
 
-Before proceeding, do ONE of:
-- Run `knecht add "observation" -a "<testable acceptance criteria>"` to file a new task
-- Run `knecht pain -t <task-id> -d "description"` to increment pain on existing task
+Before proceeding, do ONE of the following:
+
+**Option A: Propose new tasks for user approval**
+
+If you identified friction that warrants new tasks:
+1. List each proposed task clearly with:
+   - Title (what the task is)
+   - Acceptance criteria (how to verify it's done)
+   - Brief rationale (why this friction matters)
+2. Ask the user: "Which of these tasks should I file? (Reply with numbers, 'all', or 'none')"
+3. WAIT for user response before running any `knecht add` commands
+4. Only run `knecht add "title" -a "criteria"` for tasks the user approves
+
+**Option B: Increment pain on existing task**
+
+If this matches an existing task:
+- Run `knecht pain -t <task-id> -d "description"` to increment pain count
+
+**Option C: Nothing to file**
+
 - State explicitly: "Nothing to file because: [specific reason why zero friction occurred]"
+
+**IMPORTANT**: Never run `knecht add` without user approval. Always propose first, then wait.
 
 ### 5. Upstream Feedback (for knecht improvements)
 
