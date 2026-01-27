@@ -27,8 +27,12 @@ enum Commands {
         #[arg(short, long = "acceptance-criteria")]
         a: Option<String>,
     },
-    /// List all tasks
-    List,
+    /// List tasks (open tasks by default)
+    List {
+        /// Show all tasks including done/delivered
+        #[arg(long)]
+        all: bool,
+    },
     /// Mark a task as done
     Done {
         /// Task ID (e.g., task-1 or 1)
@@ -113,7 +117,7 @@ fn main() {
     match cli.command {
         Commands::Init => cmd_init(),
         Commands::Add { title, d, a } => cmd_add(&title.join(" "), d, a),
-        Commands::List => cmd_list(),
+        Commands::List { all } => cmd_list(all),
         Commands::Done { task_id } => cmd_done(&task_id),
         Commands::Deliver { task_id } => cmd_deliver(&task_id),
         Commands::Delete { task_id } => cmd_delete(&task_id),
@@ -162,7 +166,7 @@ fn cmd_add(title: &str, description: Option<String>, acceptance_criteria: Option
     }
 }
 
-fn cmd_list() {
+fn cmd_list(show_all: bool) {
     let tasks = match read_tasks_with_fs(&RealFileSystem) {
         Ok(tasks) => tasks,
         Err(e) => {
@@ -171,10 +175,17 @@ fn cmd_list() {
         }
     };
 
+    // Filter to open tasks unless --all flag is provided
+    let filtered_tasks: Vec<_> = if show_all {
+        tasks
+    } else {
+        tasks.into_iter().filter(|t| !t.is_done() && t.status != "delivered").collect()
+    };
+
     // Get all pain counts from the pain log (efficient bulk read)
     let pain_counts = get_all_pain_counts(&RealFileSystem).unwrap_or_default();
 
-    for task in tasks {
+    for task in &filtered_tasks {
         let checkbox = if task.is_done() {
             "[x]"
         } else if task.status == "delivered" {
@@ -195,6 +206,10 @@ fn cmd_list() {
 
     // Print usage instructions for agents
     println!();
+    if !show_all {
+        println!("Showing open tasks only. Use --all to see all tasks.");
+        println!();
+    }
     println!("Usage instructions:");
     println!("  knecht show task-N     - View full task details including description");
     println!("  knecht start task-N    - Begin work on a task");

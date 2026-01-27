@@ -189,8 +189,8 @@ fn test_read_task_with_delivered_status() {
         let tasks_dir = temp.join(".knecht/tasks");
         fs::write(tasks_dir.join("1"), "1,delivered,\"Fix the bug\",,\n").unwrap();
 
-        // List should read and display the delivered task
-        let result = run_command(&["list"], &temp);
+        // List --all should read and display the delivered task (hidden by default)
+        let result = run_command(&["list", "--all"], &temp);
         assert!(result.success, "list should succeed: {}", result.stderr);
         assert!(result.stdout.contains("task-1"), "Should show task-1");
         assert!(result.stdout.contains("Fix the bug"), "Should show task title");
@@ -239,8 +239,8 @@ fn test_backwards_compatibility_with_open_and_done() {
         fs::write(tasks_dir.join("2"), "2,delivered,\"Delivered task\",,\n").unwrap();
         fs::write(tasks_dir.join("3"), "3,done,\"Done task\",,\n").unwrap();
 
-        // List should show all three
-        let result = run_command(&["list"], &temp);
+        // List --all should show all three (delivered/done are hidden by default)
+        let result = run_command(&["list", "--all"], &temp);
         assert!(result.success, "list should succeed: {}", result.stderr);
         assert!(result.stdout.contains("Open task"), "Should show open task");
         assert!(result.stdout.contains("Delivered task"), "Should show delivered task");

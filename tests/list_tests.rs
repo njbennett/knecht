@@ -70,12 +70,12 @@ fn read_tasks_with_and_without_descriptions() {
         fs::write(tasks_dir.join("2"), "2,open,\"New task\",\"This has a description\",\n").expect("Failed to write");
         fs::write(tasks_dir.join("3"), "3,done,\"Another old task\",,\n").expect("Failed to write");
 
-        // list should handle both formats
-        let result = run_command(&["list"], &temp);
+        // list --all should handle both formats and show all tasks
+        let result = run_command(&["list", "--all"], &temp);
         assert!(result.success, "list should handle mixed format");
         assert!(result.stdout.contains("task-1"), "Should show task-1");
         assert!(result.stdout.contains("task-2"), "Should show task-2");
-        assert!(result.stdout.contains("task-3"), "Should show task-3");
+        assert!(result.stdout.contains("task-3"), "Should show task-3 with --all");
         assert!(result.stdout.contains("Old task without description"), "Should show old format task");
         assert!(result.stdout.contains("New task"), "Should show new format task");
     });
@@ -108,12 +108,12 @@ fn list_handles_tasks_with_empty_lines_in_content() {
     fs::write(tasks_dir.join("2"), "2,open,\"Second task\",,\n").expect("Failed to write");
     fs::write(tasks_dir.join("3"), "3,done,\"Third task\",,\n").expect("Failed to write");
 
-    // list should skip empty lines within files
-    let result = run_command(&["list"], &temp);
+    // list --all should skip empty lines within files and show all tasks
+    let result = run_command(&["list", "--all"], &temp);
     assert!(result.success, "list should handle empty lines");
     assert!(result.stdout.contains("task-1"), "Should show task-1");
     assert!(result.stdout.contains("task-2"), "Should show task-2");
-    assert!(result.stdout.contains("task-3"), "Should show task-3");
+    assert!(result.stdout.contains("task-3"), "Should show task-3 with --all");
 
     cleanup_temp_dir(temp);
 }
@@ -151,7 +151,8 @@ fn list_shows_delivered_tasks_with_distinct_marker() {
         fs::write(tasks_dir.join("2"), "2,delivered,\"Delivered task\",,\n").unwrap();
         fs::write(tasks_dir.join("3"), "3,done,\"Done task\",,\n").unwrap();
 
-        let result = run_command(&["list"], &temp);
+        // Use --all to see done and delivered tasks (they're hidden by default)
+        let result = run_command(&["list", "--all"], &temp);
         assert!(result.success, "list should succeed: {}", result.stderr);
 
         // Find the lines for each task
@@ -195,5 +196,57 @@ fn list_shows_claimed_tasks_with_distinct_marker() {
             .expect("Should have claimed task line");
         assert!(claimed_line.contains("[~]"),
             "Claimed task should show [~] marker, got: {}", claimed_line);
+    });
+}
+
+#[test]
+fn list_shows_only_open_tasks_by_default() {
+    // task-166: list should show only open tasks by default
+    with_initialized_repo(|temp| {
+        // Create tasks with different statuses
+        let tasks_dir = temp.join(".knecht/tasks");
+        fs::write(tasks_dir.join("1"), "1,open,\"Open task\",,\n").unwrap();
+        fs::write(tasks_dir.join("2"), "2,claimed,\"Claimed task\",,\n").unwrap();
+        fs::write(tasks_dir.join("3"), "3,done,\"Done task\",,\n").unwrap();
+        fs::write(tasks_dir.join("4"), "4,delivered,\"Delivered task\",,\n").unwrap();
+
+        let result = run_command(&["list"], &temp);
+        assert!(result.success, "list should succeed: {}", result.stderr);
+
+        // Should show open and claimed tasks
+        assert!(result.stdout.contains("Open task"), "Should show open task");
+        assert!(result.stdout.contains("Claimed task"), "Should show claimed task (still in progress)");
+
+        // Should NOT show done or delivered tasks
+        assert!(!result.stdout.contains("Done task"), "Should NOT show done task by default");
+        assert!(!result.stdout.contains("Delivered task"), "Should NOT show delivered task by default");
+
+        // Should show hint about --all flag
+        assert!(result.stdout.contains("--all"), "Should mention --all flag");
+    });
+}
+
+#[test]
+fn list_all_flag_shows_all_tasks() {
+    // task-166: list --all should show all tasks including done/delivered
+    with_initialized_repo(|temp| {
+        // Create tasks with different statuses
+        let tasks_dir = temp.join(".knecht/tasks");
+        fs::write(tasks_dir.join("1"), "1,open,\"Open task\",,\n").unwrap();
+        fs::write(tasks_dir.join("2"), "2,claimed,\"Claimed task\",,\n").unwrap();
+        fs::write(tasks_dir.join("3"), "3,done,\"Done task\",,\n").unwrap();
+        fs::write(tasks_dir.join("4"), "4,delivered,\"Delivered task\",,\n").unwrap();
+
+        let result = run_command(&["list", "--all"], &temp);
+        assert!(result.success, "list --all should succeed: {}", result.stderr);
+
+        // Should show ALL tasks
+        assert!(result.stdout.contains("Open task"), "Should show open task");
+        assert!(result.stdout.contains("Claimed task"), "Should show claimed task");
+        assert!(result.stdout.contains("Done task"), "Should show done task with --all");
+        assert!(result.stdout.contains("Delivered task"), "Should show delivered task with --all");
+
+        // Should NOT show hint about --all when already using it
+        assert!(!result.stdout.contains("Use --all"), "Should not show --all hint when using --all");
     });
 }

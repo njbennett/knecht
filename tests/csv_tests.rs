@@ -440,12 +440,12 @@ fn csv_format_reading_basic_fields() {
     fs::write(tasks_dir.join("2"), "2,done,\"Another task\",\"Description here\",3\n")
         .expect("Failed to write test file");
 
-    // list should read CSV format
-    let result = run_command(&["list"], &temp);
+    // list --all should read CSV format and show all tasks including done
+    let result = run_command(&["list", "--all"], &temp);
     assert!(result.success, "list should succeed with CSV format");
     assert!(result.stdout.contains("task-1"), "Should show task-1");
     assert!(result.stdout.contains("Simple title"), "Should show task title");
-    assert!(result.stdout.contains("task-2"), "Should show task-2");
+    assert!(result.stdout.contains("task-2"), "Should show task-2 with --all");
     assert!(result.stdout.contains("Another task"), "Should show another task");
 
     cleanup_temp_dir(temp);

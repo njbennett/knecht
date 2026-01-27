@@ -47,7 +47,8 @@ fn done_marks_task_complete() {
         let result = run_command(&["done", &format!("task-{}", task_id)], &temp);
         assert!(result.success, "done command should succeed");
 
-        let list = run_command(&["list"], &temp);
+        // Use --all since done tasks are hidden by default
+        let list = run_command(&["list", "--all"], &temp);
         assert!(
             list.stdout.contains("[x]") || list.stdout.contains("✓"),
             "Completed task should show [x] or ✓, got: {}",
@@ -188,8 +189,8 @@ fn done_marks_task_without_description_complete() {
     let result = run_command(&["done", &format!("task-{}", task_id)], &temp);
     assert!(result.success, "done command should succeed");
 
-    // Verify it was marked done
-    let list = run_command(&["list"], &temp);
+    // Verify it was marked done (use --all since done tasks are hidden by default)
+    let list = run_command(&["list", "--all"], &temp);
     assert!(list.stdout.contains("[x]"), "Task should be marked done");
 
     cleanup_temp_dir(temp);
