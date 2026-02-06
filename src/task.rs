@@ -130,6 +130,7 @@ pub struct PainEntry {
 pub enum PainSourceType {
     Manual,
     Skip,
+    Sentry,
 }
 
 impl Task {
@@ -509,6 +510,7 @@ pub fn append_pain_entry_with_fs(entry: &PainEntry, fs: &dyn FileSystem) -> Resu
     let source_type_str = match entry.source_type {
         PainSourceType::Manual => "manual",
         PainSourceType::Skip => "skip",
+        PainSourceType::Sentry => "sentry",
     };
     let source_id_str = entry.source_id.as_deref().unwrap_or("");
 
@@ -539,7 +541,11 @@ pub fn read_pain_entries_with_fs(fs: &dyn FileSystem) -> Result<Vec<PainEntry>, 
             entries.push(PainEntry {
                 task_id: parts[0].to_string(),
                 timestamp: parts[1].parse().unwrap_or(0),
-                source_type: if parts[2] == "skip" { PainSourceType::Skip } else { PainSourceType::Manual },
+                source_type: match parts[2] {
+                    "skip" => PainSourceType::Skip,
+                    "sentry" => PainSourceType::Sentry,
+                    _ => PainSourceType::Manual,
+                },
                 source_id: if parts[3].is_empty() { None } else { Some(parts[3].to_string()) },
                 description: parts[4].to_string(),
             });
