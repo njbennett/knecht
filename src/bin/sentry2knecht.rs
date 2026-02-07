@@ -4,6 +4,7 @@ use knecht::{
     RealFileSystem,
 };
 use serde::Deserialize;
+use serde_json::Value;
 use std::collections::HashMap;
 use std::io::{BufRead, Write};
 use std::path::Path;
@@ -52,6 +53,30 @@ struct SentryIssue {
     first_seen: String,
     #[serde(rename = "lastSeen")]
     last_seen: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct SentryEvent {
+    #[serde(default)]
+    tags: Vec<SentryTag>,
+    #[serde(default)]
+    entries: Vec<SentryEntry>,
+    #[serde(default)]
+    #[allow(dead_code)]
+    context: HashMap<String, Value>,
+}
+
+#[derive(Debug, Deserialize)]
+struct SentryTag {
+    key: String,
+    value: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct SentryEntry {
+    #[serde(rename = "type")]
+    entry_type: String,
+    data: Value,
 }
 
 #[derive(Debug, Clone)]
@@ -131,7 +156,7 @@ fn main() {
                 total_pain += event_count;
             }
         } else {
-            match sync_single_issue(issue, existing, &fs) {
+            match sync_single_issue(issue, existing, &cli, &fs) {
                 Ok(SyncResult::Created { task_id, pain_count }) => {
                     println!(
                         "Created task-{}: [SENTRY-{}] {} ({} pain)",
@@ -170,13 +195,15 @@ fn main() {
 
 fn fetch_sentry_issues(cli: &Cli) -> Result<Vec<SentryIssue>, String> {
     let url = format!(
-        "{}/api/0/projects/{}/{}/issues/?query=is:{}",
-        cli.base_url, cli.org, cli.project, cli.status
+        "{}/api/0/projects/{}/{}/issues/",
+        cli.base_url, cli.org, cli.project
     );
+    let query = format!("is:{}", cli.status);
 
     let client = reqwest::blocking::Client::new();
     let response = client
         .get(&url)
+        .query(&[("query", &query)])
         .header("Authorization", format!("Bearer {}", cli.token))
         .send()
         .map_err(|e| format!("HTTP request failed: {}", e))?;
@@ -192,6 +219,103 @@ fn fetch_sentry_issues(cli: &Cli) -> Result<Vec<SentryIssue>, String> {
     response
         .json::<Vec<SentryIssue>>()
         .map_err(|e| format!("Failed to parse response: {}", e))
+}
+
+fn fetch_latest_event(cli: &Cli, issue_id: &str) -> Result<Option<SentryEvent>, String> {
+    let url = format!(
+        "{}/api/0/organizations/{}/issues/{}/events/latest/",
+        cli.base_url, cli.org, issue_id
+    );
+
+    let client = reqwest::blocking::Client::new();
+    let response = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", cli.token))
+        .send()
+        .map_err(|e| format!("HTTP request failed: {}", e))?;
+
+    if response.status().as_u16() == 404 {
+        return Ok(None);
+    }
+
+    if !response.status().is_success() {
+        return Err(format!(
+            "Sentry API returned status {}: {}",
+            response.status(),
+            response.text().unwrap_or_default()
+        ));
+    }
+
+    response
+        .json::<SentryEvent>()
+        .map(Some)
+        .map_err(|e| format!("Failed to parse event: {}", e))
+}
+
+fn format_description(issue: &SentryIssue, event: Option<&SentryEvent>) -> String {
+    let mut desc = String::new();
+
+    // Header
+    desc.push_str(&format!("# {}\n\n", issue.title));
+    desc.push_str(&format!("**Issue ID:** {}\n", issue.id));
+    desc.push_str(&format!("**Link:** {}\n", issue.permalink));
+    desc.push_str(&format!("**First seen:** {}\n", issue.first_seen));
+    desc.push_str(&format!("**Last seen:** {}\n", issue.last_seen));
+    desc.push_str(&format!("**Events:** {}\n", issue.count));
+
+    if let Some(event) = event {
+        // Tags
+        if !event.tags.is_empty() {
+            desc.push_str("\n## Tags\n\n");
+            for tag in &event.tags {
+                desc.push_str(&format!("- **{}:** {}\n", tag.key, tag.value));
+            }
+        }
+
+        // Exception/stacktrace from entries
+        for entry in &event.entries {
+            if entry.entry_type == "exception" {
+                if let Some(values) = entry.data.get("values").and_then(|v| v.as_array()) {
+                    desc.push_str("\n## Exception\n\n");
+                    for exc in values {
+                        if let Some(exc_type) = exc.get("type").and_then(|v| v.as_str()) {
+                            desc.push_str(&format!("**Type:** {}\n", exc_type));
+                        }
+                        if let Some(exc_value) = exc.get("value").and_then(|v| v.as_str()) {
+                            desc.push_str(&format!("**Value:** {}\n", exc_value));
+                        }
+
+                        // Stacktrace
+                        if let Some(stacktrace) = exc.get("stacktrace") {
+                            if let Some(frames) = stacktrace.get("frames").and_then(|v| v.as_array()) {
+                                desc.push_str("\n### Stacktrace\n\n```\n");
+                                // Show frames in reverse order (most recent first)
+                                for frame in frames.iter().rev().take(10) {
+                                    let filename = frame.get("filename")
+                                        .and_then(|v| v.as_str())
+                                        .unwrap_or("?");
+                                    let function = frame.get("function")
+                                        .and_then(|v| v.as_str())
+                                        .unwrap_or("?");
+                                    let lineno = frame.get("lineNo")
+                                        .and_then(|v| v.as_u64())
+                                        .map(|n| n.to_string())
+                                        .unwrap_or_else(|| "?".to_string());
+                                    desc.push_str(&format!(
+                                        "  {} in {} [Line {}]\n",
+                                        function, filename, lineno
+                                    ));
+                                }
+                                desc.push_str("```\n");
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    desc
 }
 
 fn read_sentry_mappings(fs: &dyn FileSystem) -> Result<HashMap<String, SentryMapping>, String> {
@@ -248,6 +372,7 @@ fn append_sentry_mapping(mapping: &SentryMapping, fs: &dyn FileSystem) -> Result
 fn sync_single_issue(
     issue: &SentryIssue,
     existing: Option<&SentryMapping>,
+    cli: &Cli,
     fs: &dyn FileSystem,
 ) -> Result<SyncResult, String> {
     let event_count: u64 = issue.count.parse().unwrap_or(0);
@@ -283,12 +408,12 @@ fn sync_single_issue(
             new_pain: delta,
         })
     } else {
-        // New issue - create task
+        // New issue - create task with rich description
         let title = format!("[SENTRY-{}] {}", issue.short_id, issue.title);
-        let description = format!(
-            "Sentry issue: {}\nFirst seen: {}\nLast seen: {}",
-            issue.permalink, issue.first_seen, issue.last_seen
-        );
+
+        // Fetch latest event for detailed info
+        let event = fetch_latest_event(cli, &issue.id).unwrap_or(None);
+        let description = format_description(issue, event.as_ref());
 
         let task_id = add_task_with_fs(title, Some(description), None, fs)
             .map_err(|e| format!("Failed to create task: {}", e))?;

@@ -1,0 +1,1 @@
+45halv,open,Pre-commit hook should enforce test coverage,,,Hook fails if any .rs file has 0% coverage; cargo-tarpaulin or similar integrated
