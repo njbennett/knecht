@@ -1,0 +1,3 @@
+yihiv5,open,"[SENTRY-SERVER-F5] ** (stop) {:badmatch, {:error, #Ecto.Changeset<action: :update, changes: %{state: :started}, errors: [state: {""draft stories can only be in 'unready' or 'ready' state"", [constraint: :check, constraint_name: ""limit_draft_states""]}], data: #Storytime.Stor...","Sentry issue: https://story-time-7d.sentry.io/issues/7081983859/
+First seen: 2025-12-02T18:33:47.486126Z
+Last seen: 2026-01-19T18:47:32.716279Z",,

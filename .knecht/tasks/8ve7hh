@@ -1,0 +1,3 @@
+8ve7hh,open,"[SENTRY-SERVER-H3] [[initial_call: {StorytimeWeb.RoomLive, :mount, [:Argument__1, :Argument__2, :Argument__3]}, pid: #PID<0.23694.0>, registered_name: [], error_info: {:error, %ArgumentError{message: ""errors were found at the given arguments:\n\n  * 1st argument: not a te...","Sentry issue: https://story-time-7d.sentry.io/issues/7213562131/
+First seen: 2026-01-23T17:37:49.106637Z
+Last seen: 2026-01-23T17:37:49.106637Z",,

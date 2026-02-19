@@ -1,0 +1,3 @@
+eciuff,open,"[SENTRY-SERVER-GE] [[initial_call: {StorytimeWeb.RoomLive, :mount, [:Argument__1, :Argument__2, :Argument__3]}, pid: #PID<0.2980.0>, registered_name: [], error_info: {:error, %ArgumentError{message: ""errors were found at the given arguments:\n\n  * 1st argument: not a tex...","Sentry issue: https://story-time-7d.sentry.io/issues/7190034442/
+First seen: 2026-01-14T20:14:42.012270Z
+Last seen: 2026-01-14T20:14:42.012270Z",,

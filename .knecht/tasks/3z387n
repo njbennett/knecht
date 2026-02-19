@@ -1,0 +1,3 @@
+3z387n,open,"[SENTRY-SERVER-H1] [supervisor: {#PID<0.2649.0>, Supervisor.Default}, errorContext: :child_terminated, reason: {%UndefinedFunctionError{module: nil, function: :live_dashboard_path, arity: 4, reason: nil, message: nil}, [{nil, :live_dashboard_path, [#Phoenix.LiveView.Socke...","Sentry issue: https://story-time-7d.sentry.io/issues/7211896675/
+First seen: 2026-01-23T02:47:40.387674Z
+Last seen: 2026-01-23T02:47:40.387674Z",,

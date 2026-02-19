@@ -10,3 +10,10 @@
 104|1769534140|skip|166|Skip: task-166 completed instead
 104|1769534141|skip|228|Skip: task-228 completed instead
 104|1769534369|skip|d2wzb0|Skip: task-d2wzb0 completed instead
+erptxl|1770438853|manual||From storytime while working on task-3yvfqv: Agent ran 'knecht task-3yvfqv' expecting task details, got error about unrecognized subcommand, had to retry with 'knecht show task-3yvfqv'
+erptxl|1770531970|manual||From storytime while working on task-umq5xm: Agent ran 'knecht task-umq5xm' expecting to see task details, user had to correct to 'knecht show task-umq5xm'
+ezzj7w|1770690071|manual||From storytime while resolving rebase conflict: pain file (not just task file) also has append-only format that causes merge conflicts when multiple branches add entries
+ezzj7w|1770692064|manual||From storytime while resolving merge conflict in task-xfixh5: The .knecht/pain file had merge conflicts after rebasing onto main - both branches added lines to the end of the file causing a merge conflict that needed manual resolution
+hpao14|1770693256|manual||From storytime while working on task-docj27: Agent tried 'knecht task' and 'knecht show' directly before user redirected to use /knecht skill
+241|1771533096|manual||From storytime while working on task-w7neu8: User said 'I thought we just fixed this issue' - agent didn't connect current Sentry issue to recently-completed task-161h2a which fixed the same root cause
+ezzj7w|1771533872|manual||From storytime while working on task-w7neu8: Rebasing onto main caused merge conflict in .knecht/pain file. Both branches had appended different entries, requiring manual resolution to keep both.
